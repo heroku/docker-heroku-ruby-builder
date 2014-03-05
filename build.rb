@@ -87,6 +87,8 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
       lines.each {|line| file.puts line }
     end
   end
-  pipe "ls #{prefix}"
-  pipe("tar czPf #{output_dir}/#{name}.tgz #{prefix}/*")
+  Dir.chdir(prefix) do
+    pipe "ls"
+    pipe("tar czf #{output_dir}/#{name}.tgz *")
+  end
 end
