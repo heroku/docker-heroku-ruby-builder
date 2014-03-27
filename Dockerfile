@@ -1,4 +1,4 @@
-FROM fabiokung/cedar
+FROM hone/cedar-autoconf
 MAINTAINER hone
 
 # setup workspace
