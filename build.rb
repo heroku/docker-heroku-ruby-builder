@@ -19,6 +19,9 @@ end
 workspace_dir = ARGV[0]
 output_dir    = ARGV[1]
 
+LIBYAML_VERSION = "0.1.6"
+LIBFFI_VERSION  = "3.0.10"
+
 vendor_url   = "https://s3.amazonaws.com/#{ENV['S3_BUCKET_NAME'] ? ENV['S3_BUCKET_NAME'] : 'heroku-buildpack-ruby'}"
 full_version = ENV['VERSION']
 full_name    = "ruby-#{full_version}"
@@ -43,8 +46,8 @@ end
 
 Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
   Dir.chdir(vendor_dir) do
-    `curl "#{vendor_url}/libyaml-0.1.5.tgz" -s -o - | tar zxf -`
-    `curl "#{vendor_url}/libffi-3.0.10.tgz" -s -o - | tar zxf -`
+    `curl "#{vendor_url}/libyaml-#{LIBYAML_VERSION}.tgz" -s -o - | tar zxf -`
+    `curl "#{vendor_url}/libffi-#{LIBFFI_VERSION}.tgz" -s -o - | tar zxf -`
     `curl http://production.cf.rubygems.org/rubygems/rubygems-#{rubygems}.tgz -s -o - | tar xzf -` if rubygems
   end
 
