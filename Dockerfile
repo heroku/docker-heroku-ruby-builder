@@ -8,4 +8,4 @@ RUN mkdir -p /tmp/workspace
 # output dir is mounted
 
 ADD build.rb /tmp/build.rb
-CMD ["ruby", "/tmp/build.rb", "/tmp/workspace", "/tmp/output"]
+CMD ["ruby", "/tmp/build.rb", "/tmp/workspace", "/tmp/output", "/tmp/cache"]

@@ -2,6 +2,7 @@
 
 require 'tmpdir'
 require 'fileutils'
+require 'uri'
 
 def pipe(command)
   output = ""
@@ -16,8 +17,20 @@ def pipe(command)
   output
 end
 
+def fetch(url)
+  uri    = URI.parse(url)
+  binary = uri.to_s.split("/").last
+  if File.exists?(binary)
+    puts "Using #{binary}"
+  else
+    puts "Fetching #{binary}"
+    `curl #{uri} -s -O`
+  end
+end
+
 workspace_dir = ARGV[0]
 output_dir    = ARGV[1]
+cache_dir     = ARGV[2]
 
 LIBYAML_VERSION = "0.1.6"
 LIBFFI_VERSION  = "3.0.10"
@@ -35,20 +48,53 @@ debug        = true if ENV['DEBUG']
 jobs         = ENV['JOBS'] || 2
 rubygems     = ENV['RUBYGEMS_VERSION'] ? ENV['RUBYGEMS_VERSION'] : nil
 git_url      = ENV["GIT_URL"]
+treeish      = nil
 
-if git_url
-  url, treeish = git_url.split('#', 2)
-  full_name    = "ruby"
-  pipe "git clone #{url}"
-else
-  pipe "curl http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{full_name}.tar.gz -s -o - | tar zxf -"
+# fetch deps
+Dir.chdir(cache_dir) do
+  if git_url
+    uri          = URI.parse(git_url)
+    treeish      = uri.fragment
+    uri.fragment = nil
+    full_name    = uri.to_s.split('/').last.sub(".git", "")
+
+    if File.exists?(full_name)
+      Dir.chdir(full_name) do
+        puts "Updating git repo"
+        pipe "git pull"
+      end
+    else
+      puts "Fetching #{git_url}"
+      pipe "git clone #{uri}"
+    end
+  else
+    fetch("http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{full_name}.tar.gz")
+  end
+
+  ["libyaml-#{LIBYAML_VERSION}.tgz", "libffi-#{LIBFFI_VERSION}.tgz"].each do |binary|
+    if File.exists?(binary)
+      puts "Using #{binary}"
+    else
+      puts "Fetching #{binary}"
+      fetch("#{vendor_url}/#{binary}")
+    end
+  end
+  if rubygems
+    rubygems_binary = "rubygems-#{rubygems}"
+    fetch("http://production.cf.rubygems.org/rubygems/#{rubygems_binary}.tgz")
+  end
 end
 
 Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
+  if git_url
+    FileUtils.cp_r("#{cache_dir}/#{full_name}", ".")
+  else
+    `tar zxf #{cache_dir}/#{full_name}.tar.gz`
+  end
   Dir.chdir(vendor_dir) do
-    `curl "#{vendor_url}/libyaml-#{LIBYAML_VERSION}.tgz" -s -o - | tar zxf -`
-    `curl "#{vendor_url}/libffi-#{LIBFFI_VERSION}.tgz" -s -o - | tar zxf -`
-    `curl http://production.cf.rubygems.org/rubygems/rubygems-#{rubygems}.tgz -s -o - | tar xzf -` if rubygems
+    `tar zxf #{cache_dir}/libyaml-#{LIBYAML_VERSION}.tgz`
+    `tar zxf #{cache_dir}/libffi-#{LIBFFI_VERSION}.tgz`
+    `tar zxf #{cache_dir}/rubygems-#{rubygems}.tgz` if rubygems
   end
 
   prefix = "/app/vendor/#{name}"
