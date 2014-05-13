@@ -81,7 +81,7 @@ Dir.chdir(cache_dir) do
     end
   else
     tarball = "#{full_name}.tar.gz"
-    fetch("http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{tarball}") unless File.exists?(tarball)
+    fetch("http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{tarball}")
   end
 
   ["libyaml-#{LIBYAML_VERSION}.tgz", "libffi-#{LIBFFI_VERSION}.tgz"].each do |binary|
