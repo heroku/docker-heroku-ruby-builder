@@ -1,4 +1,4 @@
-FROM hone/cedar-autoconf
+FROM hone/ruby-builder-base
 MAINTAINER hone
 
 # setup workspace
