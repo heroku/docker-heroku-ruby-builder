@@ -48,6 +48,7 @@ debug        = true if ENV['DEBUG']
 jobs         = ENV['JOBS'] || 2
 rubygems     = ENV['RUBYGEMS_VERSION'] ? ENV['RUBYGEMS_VERSION'] : nil
 git_url      = ENV["GIT_URL"]
+svn_url      = ENV["SVN_URL"]
 treeish      = nil
 
 # fetch deps
@@ -67,8 +68,20 @@ Dir.chdir(cache_dir) do
       puts "Fetching #{git_url}"
       pipe "git clone #{uri}"
     end
+  elsif svn_url
+    uri          = URI.parse(svn_url)
+    revision     = uri.fragment
+    uri.fragment = nil
+
+    if File.exists?(full_name)
+      puts "Using existing svn checkout: #{full_name}"
+      pipe "svn update -r#{revision}"
+    else
+      pipe "svn co #{svn_url}@#{revision} #{full_name}"
+    end
   else
-    fetch("http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{full_name}.tar.gz")
+    tarball = "#{full_name}.tar.gz"
+    fetch("http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{tarball}") unless File.exists?(tarball)
   end
 
   ["libyaml-#{LIBYAML_VERSION}.tgz", "libffi-#{LIBFFI_VERSION}.tgz"].each do |binary|
@@ -86,7 +99,7 @@ Dir.chdir(cache_dir) do
 end
 
 Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
-  if git_url
+  if git_url || svn_url
     FileUtils.cp_r("#{cache_dir}/#{full_name}", ".")
   else
     `tar zxf #{cache_dir}/#{full_name}.tar.gz`
@@ -120,7 +133,8 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
       "env CPATH=#{vendor_dir}/include:\\$CPATH CPPATH=#{vendor_dir}/include:\\$CPPATH LIBRARY_PATH=#{vendor_dir}/lib:\\$LIBRARY_PATH make -j#{jobs}",
       "make install"
     ]
-    cmds.unshift("#{configure_env} autoconf") if git_url
+    cmds.unshift("#{configure_env} autoconf") if git_url || svn_url
+    cmds.unshift("chmod +x ./tool/*") if git_url || svn_url
     pipe(cmds.join(" && "))
   end
   if rubygems
