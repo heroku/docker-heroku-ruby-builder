@@ -51,6 +51,9 @@ git_url      = ENV["GIT_URL"]
 svn_url      = ENV["SVN_URL"]
 treeish      = nil
 
+# create cache dir if it doesn't exist
+FileUtils.mkdir_p(cache_dir)
+
 # fetch deps
 Dir.chdir(cache_dir) do
   if git_url
@@ -151,7 +154,10 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
     end
   end
   Dir.chdir(prefix) do
+    filename = "#{name}.tgz"
+
     pipe "ls"
-    pipe("tar czf #{output_dir}/#{name}.tgz *")
+    puts "Writing #{filename}"
+    pipe("tar czf #{output_dir}/#{filename} *")
   end
 end
