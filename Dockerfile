@@ -1,4 +1,4 @@
-FROM hone/ruby-builder-base
+FROM hone/ruby-builder-base:14
 MAINTAINER hone
 
 # setup workspace
