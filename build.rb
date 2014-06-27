@@ -49,6 +49,7 @@ jobs         = ENV['JOBS'] || 2
 rubygems     = ENV['RUBYGEMS_VERSION'] ? ENV['RUBYGEMS_VERSION'] : nil
 git_url      = ENV["GIT_URL"]
 svn_url      = ENV["SVN_URL"]
+relname      = ENV["RELNAME"]
 treeish      = nil
 
 # create cache dir if it doesn't exist
@@ -56,6 +57,8 @@ FileUtils.mkdir_p(cache_dir)
 
 # fetch deps
 Dir.chdir(cache_dir) do
+  tarball = "#{full_name}.tar.gz"
+
   if git_url
     uri          = URI.parse(git_url)
     treeish      = uri.fragment
@@ -71,19 +74,25 @@ Dir.chdir(cache_dir) do
       puts "Fetching #{git_url}"
       pipe "git clone #{uri}"
     end
+
   elsif svn_url
-    uri          = URI.parse(svn_url)
-    revision     = uri.fragment
-    uri.fragment = nil
+    uri = URI.parse(svn_url)
 
     if File.exists?(full_name)
       puts "Using existing svn checkout: #{full_name}"
-      pipe "svn update -r#{revision}"
+      pipe "svn update"
     else
-      pipe "svn co #{svn_url}@#{revision} #{full_name}"
+      pipe "svn co #{svn_url} #{full_name}"
     end
+
+    Dir.chdir(full_name) do
+      cmd = "ruby tool/make-snapshot -archname=#{full_name} build #{relname}"
+      puts cmd
+      pipe cmd
+    end
+
+    FileUtils.mv("#{full_name}/build/#{tarball}", ".")
   else
-    tarball = "#{full_name}.tar.gz"
     fetch("http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{tarball}")
   end
 
@@ -102,7 +111,7 @@ Dir.chdir(cache_dir) do
 end
 
 Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
-  if git_url || svn_url
+  if git_url
     FileUtils.cp_r("#{cache_dir}/#{full_name}", ".")
   else
     `tar zxf #{cache_dir}/#{full_name}.tar.gz`
@@ -136,8 +145,8 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
       "env CPATH=#{vendor_dir}/include:\\$CPATH CPPATH=#{vendor_dir}/include:\\$CPPATH LIBRARY_PATH=#{vendor_dir}/lib:\\$LIBRARY_PATH make -j#{jobs}",
       "make install"
     ]
-    cmds.unshift("#{configure_env} autoconf") if git_url || svn_url
-    cmds.unshift("chmod +x ./tool/*") if git_url || svn_url
+    cmds.unshift("#{configure_env} autoconf") if git_url
+    cmds.unshift("chmod +x ./tool/*") if git_url
     pipe(cmds.join(" && "))
   end
   if rubygems
