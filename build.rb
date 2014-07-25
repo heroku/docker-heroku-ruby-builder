@@ -33,7 +33,7 @@ output_dir    = ARGV[1]
 cache_dir     = ARGV[2]
 
 LIBYAML_VERSION = "0.1.6"
-LIBFFI_VERSION  = "3.0.10"
+LIBFFI_VERSION  = "3.1"
 
 vendor_url   = "https://s3.amazonaws.com/#{ENV['S3_BUCKET_NAME'] ? ENV['S3_BUCKET_NAME'] : 'heroku-buildpack-ruby'}"
 full_version = ENV['VERSION']
@@ -50,6 +50,7 @@ rubygems     = ENV['RUBYGEMS_VERSION'] ? ENV['RUBYGEMS_VERSION'] : nil
 git_url      = ENV["GIT_URL"]
 svn_url      = ENV["SVN_URL"]
 relname      = ENV["RELNAME"]
+stack        = "cedar-14"
 treeish      = nil
 
 # create cache dir if it doesn't exist
