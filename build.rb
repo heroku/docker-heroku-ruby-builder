@@ -97,12 +97,7 @@ Dir.chdir(cache_dir) do
   end
 
   ["libyaml-#{LIBYAML_VERSION}.tgz", "libffi-#{LIBFFI_VERSION}.tgz"].each do |binary|
-    if File.exists?(binary)
-      puts "Using #{binary}"
-    else
-      puts "Fetching #{binary}"
-      fetch("#{vendor_url}/#{binary}")
-    end
+    fetch("#{vendor_url}/#{stack}/#{binary}")
   end
   if rubygems
     rubygems_binary = "rubygems-#{rubygems}"
