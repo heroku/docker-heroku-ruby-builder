@@ -2,7 +2,7 @@ FROM heroku/cedar:14
 MAINTAINER hone
 
 # need autoconf 2.69 for compiling ruby 2.1+
-RUN apt-get install autoconf subversion -y
+RUN apt-get install autoconf subversion zip -y
 # need bison 2.7 for compiling ruby 1.9.2
 RUN cd /tmp/ && curl -O http://ftp.gnu.org/gnu/bison/bison-2.7.tar.gz && tar xzf bison-2.7.tar.gz && cd bison-2.7 && ./configure && make install && cd .. && rm -rf bison-2.7 && rm bison-2.7.tar.gz
 
