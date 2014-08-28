@@ -127,7 +127,7 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
     pipe "git checkout #{treeish}" if treeish
 
     if debug
-      configure_env = "optflags=\"-O0\" debugflags=\"-g3 -ggdb\""
+      configure_env = "debugflags=\"-ggdb3\""
     else
       configure_env = "debugflags=\"-g\""
     end
