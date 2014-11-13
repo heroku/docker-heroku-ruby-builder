@@ -159,7 +159,7 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
     end
   end
   Dir.chdir(prefix) do
-    filename = "#{name}.tgz"
+    filename = "#{full_name}.tgz"
 
     pipe "ls"
     puts "Writing #{filename}"
