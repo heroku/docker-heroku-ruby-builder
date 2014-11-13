@@ -37,5 +37,7 @@ task :default, [:version, :stack] do |t, args|
   s3       = AWS::S3.new
   bucket   = s3.buckets['heroku-buildpack-ruby']
   object   = bucket.objects[s3_key]
+
+  puts "Copying #{s3_key} to #{dest_key}"
   object.copy_to(dest_key, acl: :public_read)
 end
