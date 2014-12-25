@@ -33,7 +33,7 @@ output_dir    = ARGV[1]
 cache_dir     = ARGV[2]
 
 LIBYAML_VERSION = "0.1.6"
-LIBFFI_VERSION  = "3.1"
+LIBFFI_VERSION  = "3.2.1"
 
 vendor_url   = "https://s3.amazonaws.com/#{ENV['S3_BUCKET_NAME'] ? ENV['S3_BUCKET_NAME'] : 'heroku-buildpack-ruby'}"
 full_version = ENV['VERSION']
