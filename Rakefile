@@ -31,9 +31,11 @@ end
 
 desc "Make this patchlevel the default for that version"
 task :default, [:version, :stack] do |t, args|
+  require 'aws-sdk'
+
   file     = "ruby-#{args[:version]}.tgz"
   s3_key   = "#{args[:stack]}/#{file}"
-  dest_key = "#{args[:stack]}/ruby-#{args[:version].split.first}.tgz"
+  dest_key = "#{args[:stack]}/ruby-#{args[:version].split("-").first}.tgz"
   s3       = AWS::S3.new
   bucket   = s3.buckets['heroku-buildpack-ruby']
   object   = bucket.objects[s3_key]
