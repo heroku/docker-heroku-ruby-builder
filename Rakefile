@@ -17,15 +17,16 @@ desc "Upload a ruby to S3"
 task :upload, [:version, :stack] do |t, args|
   require 'aws-sdk'
   
-  file        = "ruby-#{args[:version]}.tgz"
-  s3_key      = "#{args[:stack]}/#{file}"
+  filename    = "ruby-#{args[:version]}.tgz"
+  s3_key      = "#{args[:stack]}/#{filename}"
   bucket_name = "heroku-buildpack-ruby"
   s3          = AWS::S3.new
   bucket      = s3.buckets[bucket_name]
   object      = bucket.objects[s3_key]
+  output_file = "output/#{args[:stack]}/#{filename}"
 
-  puts "Uploading output/#{file} to s3://#{bucket_name}/#{s3_key}"
-  object.write(file: "output/#{file}")
+  puts "Uploading #{output_file} to s3://#{bucket_name}/#{s3_key}"
+  object.write(file: output_file)
   object.acl = :public_read
 end
 
