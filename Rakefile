@@ -23,7 +23,7 @@ task :upload, [:version, :stack] do |t, args|
   s3          = AWS::S3.new
   bucket      = s3.buckets[bucket_name]
   object      = bucket.objects[s3_key]
-  output_file = "output/#{args[:stack]}/#{filename}"
+  output_file = "builds/#{args[:stack]}/#{filename}"
 
   puts "Uploading #{output_file} to s3://#{bucket_name}/#{s3_key}"
   object.write(file: output_file)

@@ -3,7 +3,7 @@ cache
 Gemfile
 Gemfile.lock
 LICENSE.md
-output
+builds
 Rakefile
 README.md
 rubies
