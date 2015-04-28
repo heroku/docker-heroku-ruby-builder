@@ -163,6 +163,7 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
 
     pipe "ls"
     puts "Writing #{filename}"
+    FileUtils.mkdir_p("#{output_dir}/#{stack}")
     pipe("tar czf #{output_dir}/#{stack}/#{filename} *")
   end
 end
