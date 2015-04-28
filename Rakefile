@@ -1,6 +1,6 @@
 desc "Generate a new ruby shell script"
 task :new, [:version, :stack] do |t, args|
-  file = "rubies/ruby-#{args[:version]}.sh"
+  file = "rubies/#{args[:stack]}/ruby-#{args[:version]}.sh"
   puts "Writing #{file}"
   File.open(file, 'w') do |file|
     file.puts <<FILE
