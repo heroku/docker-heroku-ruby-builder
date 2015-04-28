@@ -1,0 +1,4 @@
+.bundle/
+builds/
+cache/
+vendor/
