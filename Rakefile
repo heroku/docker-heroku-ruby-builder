@@ -44,3 +44,11 @@ task :default, [:version, :stack] do |t, args|
   puts "Copying #{s3_key} to #{dest_key}"
   object.copy_to(dest_key, acl: :public_read)
 end
+
+desc "Build docker image for stack"
+task :generate_image, [:stack] do |t, args|
+  require 'fileutils'
+  FileUtils.cp("dockerfiles/Dockerfile.#{args[:stack]}", "Dockerfile")
+  system("docker build -t hone/ruby-builder:#{args[:stack]} .")
+  FileUtils.rm("Dockerfile")
+end
