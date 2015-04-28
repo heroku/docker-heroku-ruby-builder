@@ -1,16 +1,26 @@
 desc "Generate a new ruby shell script"
 task :new, [:version, :stack] do |t, args|
-  file = "rubies/#{args[:stack]}/ruby-#{args[:version]}.sh"
-  puts "Writing #{file}"
-  File.open(file, 'w') do |file|
-    file.puts <<FILE
+  write_file = Proc.new do |version, stack, build=false|
+    file =
+     if build
+       "rubies/#{args[:stack]}/ruby-build-#{args[:version]}.sh"
+      else
+       "rubies/#{args[:stack]}/ruby-#{args[:version]}.sh"
+      end
+    puts "Writing #{file}"
+    File.open(file, 'w') do |file|
+      file.puts <<FILE
 #!/bin/bash
 
-source `dirname $0`/common.sh
+source `dirname $0`/../common.sh
 
-docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=#{args[:version]} hone/ruby-builder:#{args[:stack]}
+docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=#{args[:version]}#{build ? " -e BUILD=true" : " "} hone/ruby-builder:#{args[:stack]}
 FILE
+    end
   end
+
+  write_file.call(args[:version], args[:stack])
+  write_file.call(args[:version], args[:stack], true) if args[:version].include?("1.9.2") || args[:version].include?("1.8.7")
 end
 
 desc "Upload a ruby to S3"
