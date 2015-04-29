@@ -50,7 +50,7 @@ rubygems     = ENV['RUBYGEMS_VERSION'] ? ENV['RUBYGEMS_VERSION'] : nil
 git_url      = ENV["GIT_URL"]
 svn_url      = ENV["SVN_URL"]
 relname      = ENV["RELNAME"]
-stack        = "cedar-14"
+stack        = ENV["STACK"]
 treeish      = nil
 
 # create cache dir if it doesn't exist

@@ -14,7 +14,7 @@ task :new, [:version, :stack] do |t, args|
 
 source `dirname $0`/../common.sh
 
-docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=#{args[:version]}#{build ? " -e BUILD=true" : " "} hone/ruby-builder:#{args[:stack]}
+docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=#{args[:version]}#{build ? " -e BUILD=true" : " "} -e STACK=#{args[:stack]} hone/ruby-builder:#{args[:stack]}
 FILE
     end
   end
