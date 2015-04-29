@@ -24,10 +24,10 @@ FILE
 end
 
 desc "Upload a ruby to S3"
-task :upload, [:version, :stack] do |t, args|
+task :upload, [:version, :stack, :build] do |t, args|
   require 'aws-sdk'
   
-  filename    = "ruby-#{args[:version]}.tgz"
+  filename    = "ruby-#{args[:build] ? "build-" : ""}#{args[:version]}.tgz"
   s3_key      = "#{args[:stack]}/#{filename}"
   bucket_name = "heroku-buildpack-ruby"
   s3          = AWS::S3.new
@@ -41,12 +41,12 @@ task :upload, [:version, :stack] do |t, args|
 end
 
 desc "Make this patchlevel the default for that version"
-task :default, [:version, :stack] do |t, args|
+task :default, [:version, :stack, :build] do |t, args|
   require 'aws-sdk'
 
-  file     = "ruby-#{args[:version]}.tgz"
+  file     = "ruby-#{args[:build] ? "build-" : ""}#{args[:version]}.tgz"
   s3_key   = "#{args[:stack]}/#{file}"
-  dest_key = "#{args[:stack]}/ruby-#{args[:version].split("-").first}.tgz"
+  dest_key = "#{args[:stack]}/ruby-#{args[:build] ? "build-" : ""}#{args[:version].split("-").first}.tgz"
   s3       = AWS::S3.new
   bucket   = s3.buckets['heroku-buildpack-ruby']
   object   = bucket.objects[s3_key]
