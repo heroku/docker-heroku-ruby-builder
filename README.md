@@ -11,44 +11,34 @@ The directory layout used by this script inside the docker container is as follo
 * It builds the binary as tarball and puts it in `/tmp/output`.
 * All the work is performed in a clean room `/tmp/workspace`.
 * The artifacts downloaded for the build are put into `/tmp/cache`.
-* Finally, the `/app` directory is there like in a normal cedar app, so we'll prefix things within this directory so the load paths are useable and fast lookups when using the `--enable-load-relative` flag.
+* Finally, the `/app` directory is there like in a normal cedarish app, so we'll prefix things within this directory so the load paths are useable and fast lookups when using the `--enable-load-relative` flag. We'll need special build rubies for ruby 1.9.2/1.8.7 since `--enable-load-relative` is broken there.
 
+#### Stacks
+This build tool supports heroku's multiple stacks. The built rubies will go in the `builds/` directory. We also have a `rubies/` directory for ensuring consistent builds. In each of these directories, they're split into a stack folder. All of the cedar-14 builds will be in `builds/cedar-14/` for instance.
 
 ### Building
 
-Next you'll need to pull in the [docker image](https://index.docker.io/u/hone/ruby-builder) that's setup to build the binaries.
+First we'll need to generate the docker images needed for building the appropriate stack.
 
 ```sh
-$ docker.io pull hone/ruby-builder
+$ bundle exec rake generate_image[cedar-14]
 ```
 
-Next we need to create a directory where docker will put the build tarball and store the cached files:
+From here, we can now execute a ruby build:
+
+```
+$ bash rubies/cedar-14/ruby-2.2.2.sh
+```
+
+When it's complete you should now see `builds/cedar-14/ruby-2.2.2.tgz`.
+
+If you set the env vars `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, you can upload them to s3. By default, we upload to the `heroku-buildpack-ruby` s3 bucket.
 
 ```sh
-$ mkdir -p /tmp/output
-$ mkdir -p /tmp/cache
+$ bundle exec rake upload[2.2.2,cedar-14]
 ```
 
-We can now build the tarball. docker supports mounting a directory that's shared with the local computer by using `-v $LOCAL_DIR:$DOCKER_DIR`. docker also uses `-e` to pass in environment variables to the compile process. This allows us to specify the version of ruby, in this example it'll be `-e VERSION=2.1.1`. You'll run a command like the one below:
-
-```sh
-$ docker.io run -v /tmp/output:/tmp/output -v /tmp/cache:/tmp/cache -e VERSION=2.1.2 hone/ruby-builder
-```
-
-If everything has been built successful, if we check the local output directory, we should see the tarball.
-
-```sh
-$ ls /tmp/output
-ruby-2.1.2.tgz
-```
-
-To ensure consistent builds, inside the `rubies/` directory will be `.sh` files corresponding to the settings used to build that version of ruby. You can then simply execute the sh file to build that ruby.
-
-```sh
-$ sh rubies/ruby-2.1.2.sh
-```
-
-### Enviroment Variables
+### Docker Enviroment Variables
 To configure the build, we use environment variables. All of them are listed below:
 
 * `VERSION` - This is the ruby version being used. It's expected to be in the format: `"#{MAJOR}.#{MINOR}.#{TEENY}-p#{PATCH}"`. This option is required.
