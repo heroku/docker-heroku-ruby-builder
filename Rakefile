@@ -17,6 +17,7 @@ source `dirname $0`/../common.sh
 docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=#{args[:version]}#{build ? " -e BUILD=true" : " "} -e STACK=#{args[:stack]} hone/ruby-builder:#{args[:stack]}
 FILE
     end
+    File.chmod(0775, file)
   end
 
   write_file.call(args[:version], args[:stack])
