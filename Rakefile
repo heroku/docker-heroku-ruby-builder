@@ -1,3 +1,5 @@
+S3_BUCKET_NAME = "heroku-buildpack-ruby"
+
 desc "Generate a new ruby shell script"
 task :new, [:version, :stack] do |t, args|
   write_file = Proc.new do |version, stack, build=false|
@@ -30,13 +32,12 @@ task :upload, [:version, :stack, :build] do |t, args|
   
   filename    = "ruby-#{args[:build] ? "build-" : ""}#{args[:version]}.tgz"
   s3_key      = "#{args[:stack]}/#{filename}"
-  bucket_name = "heroku-buildpack-ruby"
   s3          = AWS::S3.new
-  bucket      = s3.buckets[bucket_name]
+  bucket      = s3.buckets[S3_BUCKET_NAME]
   object      = bucket.objects[s3_key]
   output_file = "builds/#{args[:stack]}/#{filename}"
 
-  puts "Uploading #{output_file} to s3://#{bucket_name}/#{s3_key}"
+  puts "Uploading #{output_file} to s3://#{S3_BUCKET_NAME}/#{s3_key}"
   object.write(file: output_file)
   object.acl = :public_read
 end
@@ -64,27 +65,55 @@ task :generate_image, [:stack] do |t, args|
   FileUtils.rm("Dockerfile")
 end
 
-desc "Batch build"
-task :batch_build, [:stack, :pattern] do |t, args|
-  rubies = Dir.glob("./rubies/#{args[:stack]}/#{args[:pattern]}")
+namespace :batch do
+  desc "Batch build"
+  task :build, [:stack, :pattern] do |t, args|
+    rubies = Dir.glob("./rubies/#{args[:stack]}/#{args[:pattern]}")
 
-  if rubies.empty?
-    puts "No rubies detected: #{args[:pattern]}"
-    exit 0
+    if rubies.empty?
+      puts "No rubies detected: #{args[:pattern]}"
+      exit 0
+    end
+
+    puts "Building the following rubies:\n* #{rubies.join("\n* ")}"
+
+    rubies.each do |file|
+      puts "\n\n-- Running #{file} --"
+      IO.popen(file) do |io|
+        Signal.trap("QUIT") { io.pid.kill }
+        begin
+          while data = io.readpartial(1024)
+            print(data)
+          end
+        rescue EOFError
+        end
+      end
+    end
   end
 
-  puts "Building the following rubies:\n* #{rubies.join("\n* ")}"
+  desc "Batch upload"
+  task :upload, [:stack, :pattern] do |t, args|
+    rubies = Dir.glob("./builds/#{args[:stack]}/#{args[:pattern]}")
 
-  rubies.each do |file|
-    puts "\n\n-- Running #{file} --"
-    IO.popen(file) do |io|
-      Signal.trap("QUIT") { io.pid.kill }
-      begin
-        while data = io.readpartial(1024)
-          print(data)
-        end
-      rescue EOFError
-      end
+    if rubies.empty?
+      puts "No rubies detected: #{args[:pattern]}"
+      exit 0
+    end
+
+    puts "Uploading the following rubies:\n* #{rubies.join("\n* ")}"
+
+    require 'aws-sdk'
+    s3     = AWS::S3.new
+    bucket = s3.buckets[S3_BUCKET_NAME]
+
+    rubies.each do |ruby_path|
+      s3_key = "#{args[:stack]}/#{File.basename(ruby_path)}"
+      object = bucket.objects[s3_key]
+
+      puts "Uploading #{ruby_path} to s3://#{S3_BUCKET_NAME}/{s3_key}"
+
+      object.write(file: ruby_path)
+      object.acl = :public_read
     end
   end
 end
