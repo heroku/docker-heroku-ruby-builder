@@ -63,3 +63,28 @@ task :generate_image, [:stack] do |t, args|
   system("docker build -t hone/ruby-builder:#{args[:stack]} .")
   FileUtils.rm("Dockerfile")
 end
+
+desc "Batch build"
+task :batch_build, [:stack, :pattern] do |t, args|
+  rubies = Dir.glob("./rubies/#{args[:stack]}/#{args[:pattern]}")
+
+  if rubies.empty?
+    puts "No rubies detected: #{args[:pattern]}"
+    exit 0
+  end
+
+  puts "Building the following rubies:\n* #{rubies.join("\n* ")}"
+
+  rubies.each do |file|
+    puts "\n\n-- Running #{file} --"
+    IO.popen(file) do |io|
+      Signal.trap("QUIT") { io.pid.kill }
+      begin
+        while data = io.readpartial(1024)
+          print(data)
+        end
+      rescue EOFError
+      end
+    end
+  end
+end
