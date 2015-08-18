@@ -1,3 +1,10 @@
+GIT
+  remote: git://github.com/hone/okyakusan.git
+  revision: 764795da233ace9d45a5a0b3b85afa7d826d3b2d
+  specs:
+    okyakusan (0.0.1)
+      netrc (~> 0.7.7)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -8,6 +15,7 @@ GEM
       nokogiri (>= 1.4.4)
     json (1.8.1)
     mini_portile (0.6.1)
+    netrc (0.7.9)
     nokogiri (1.6.4.1)
       mini_portile (~> 0.6.0)
     rake (10.1.0)
@@ -17,4 +25,5 @@ PLATFORMS
 
 DEPENDENCIES
   aws-sdk
+  okyakusan!
   rake
