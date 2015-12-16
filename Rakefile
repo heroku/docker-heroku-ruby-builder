@@ -259,13 +259,14 @@ task :test, [:version, :stack] do |t, args|
     if response.code != "200"
       $stderr.puts "App did not return a 200: #{response.code}"
       exit 1
+    else
+      puts "Successfully returned a 200"
+      puts "Deleting #{app_name}"
+      Okyakusan.start {|heroku| heroku.delete("/apps/#{app_name}") if app_name }
     end
 
     puts response.body
-
   ensure
     FileUtils.remove_entry tmp_dir
-    puts "Deleting #{app_name}"
-    Okyakusan.start {|heroku| heroku.delete("/apps/#{app_name}") if app_name }
   end
 end
