@@ -1,15 +1,18 @@
+require 'fileutils'
+
 S3_BUCKET_NAME = "heroku-buildpack-ruby"
 
 desc "Generate a new ruby shell script"
 task :new, [:version, :stack] do |t, args|
   write_file = Proc.new do |version, stack, build=false|
     file =
-     if build
-       "rubies/#{args[:stack]}/ruby-build-#{args[:version]}.sh"
+      if build
+        "rubies/#{args[:stack]}/ruby-build-#{args[:version]}.sh"
       else
-       "rubies/#{args[:stack]}/ruby-#{args[:version]}.sh"
+        "rubies/#{args[:stack]}/ruby-#{args[:version]}.sh"
       end
     puts "Writing #{file}"
+    FileUtils.mkdir_p(File.dirname(file))
     File.open(file, 'w') do |file|
       file.puts <<FILE
 #!/bin/bash
