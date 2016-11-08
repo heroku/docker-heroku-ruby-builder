@@ -264,6 +264,8 @@ task :test, [:version, :stack] do |t, args|
       exit 1
     else
       puts "Successfully returned a 200"
+      puts `heroku run ruby -v -a #{app_name}`
+      puts `heroku run gem -v -a #{app_name}`
       puts "Deleting #{app_name}"
       Okyakusan.start {|heroku| heroku.delete("/apps/#{app_name}") if app_name }
     end
