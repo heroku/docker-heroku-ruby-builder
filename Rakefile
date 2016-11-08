@@ -189,7 +189,7 @@ task :test, [:version, :stack] do |t, args|
       })
 
       if response.code != "201"
-        $sterr.puts "Error Creating Heroku App (#{resp.code}): #{resp.body}"
+        $stderr.puts "Error Creating Heroku App (#{response.code}): #{response.body}"
         exit 1
       end
       json     = JSON.parse(response.body)
