@@ -34,7 +34,7 @@ task :upload, [:version, :stack, :build] do |t, args|
   require 'aws-sdk'
   
   filename    = "ruby-#{args[:build] ? "build-" : ""}#{args[:version]}.tgz"
-  s3_key      = "#{args[:stack]}/#{filename}"
+  s3_key      = "#{args[:stack]}/#{filename.sub(/-preview\d+/, '')}"
   s3          = AWS::S3.new
   bucket      = s3.buckets[S3_BUCKET_NAME]
   object      = bucket.objects[s3_key]
