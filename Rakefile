@@ -30,17 +30,19 @@ FILE
 end
 
 desc "Upload a ruby to S3"
-task :upload, [:version, :stack, :build] do |t, args|
+task :upload, [:version, :stack, :staging] do |t, args|
   require 'aws-sdk'
-  
-  filename    = "ruby-#{args[:build] ? "build-" : ""}#{args[:version]}.tgz"
-  s3_key      = "#{args[:stack]}/#{filename.sub(/-preview\d+/, '')}"
-  s3          = AWS::S3.new
-  bucket      = s3.buckets[S3_BUCKET_NAME]
-  object      = bucket.objects[s3_key]
-  output_file = "builds/#{args[:stack]}/#{filename}"
 
-  puts "Uploading #{output_file} to s3://#{S3_BUCKET_NAME}/#{s3_key}"
+  profile_name = "#{S3_BUCKET_NAME}#{args[:staging] ? "-staging" : ""}"
+  credentials  = AWS::Core::CredentialProviders::SharedCredentialFileProvider.new(profile_name: profile_name)
+  filename     = "ruby-#{args[:version]}.tgz"
+  s3_key       = "#{args[:stack]}/#{filename.sub(/-preview\d+/, '')}"
+  s3           = AWS::S3.new(credential_provider: credentials)
+  bucket       = s3.buckets[profile_name]
+  object       = bucket.objects[s3_key]
+  output_file  = "builds/#{args[:stack]}/#{filename}"
+
+  puts "Uploading #{output_file} to s3://#{profile_name}/#{s3_key}"
   object.write(file: output_file)
   object.acl = :public_read
 end
