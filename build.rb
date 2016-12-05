@@ -97,8 +97,11 @@ Dir.chdir(cache_dir) do
     fetch("http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{tarball}")
   end
 
-  ["libyaml-#{LIBYAML_VERSION}.tgz", "libffi-#{LIBFFI_VERSION}.tgz"].each do |binary|
-    fetch("#{vendor_url}/#{stack}/#{binary}")
+
+  if stack.match(/cedar/)
+    ["libyaml-#{LIBYAML_VERSION}.tgz", "libffi-#{LIBFFI_VERSION}.tgz"].each do |binary|
+      fetch("#{vendor_url}/#{stack}/#{binary}")
+    end
   end
   if rubygems
     rubygems_binary = "rubygems-#{rubygems}"

@@ -1,4 +1,4 @@
-FROM troels/cedar:16
+FROM heroku/heroku:16-build
 MAINTAINER hone
 
 RUN apt-get update && apt-get install autoconf subversion zip -y
