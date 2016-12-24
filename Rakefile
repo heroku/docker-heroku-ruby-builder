@@ -36,7 +36,7 @@ task :upload, [:version, :stack, :staging] do |t, args|
   profile_name = "#{S3_BUCKET_NAME}#{args[:staging] ? "-staging" : ""}"
   credentials  = AWS::Core::CredentialProviders::SharedCredentialFileProvider.new(profile_name: profile_name)
   filename     = "ruby-#{args[:version]}.tgz"
-  s3_key       = "#{args[:stack]}/#{filename.sub(/-preview\d+/, '')}"
+  s3_key       = "#{args[:stack]}/#{filename.sub(/-(preview|rc)\d+/, '')}"
   s3           = AWS::S3.new(credential_provider: credentials)
   bucket       = s3.buckets[profile_name]
   object       = bucket.objects[s3_key]
