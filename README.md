@@ -39,6 +39,7 @@ $ bundle exec rake upload[2.2.2,cedar-14]
 ```
 
 ### Docker Enviroment Variables
+
 To configure the build, we use environment variables. All of them are listed below:
 
 * `VERSION` - This is the ruby version being used. It's expected to be in the format: `"#{MAJOR}.#{MINOR}.#{TEENY}-p#{PATCH}"`. This option is required.
