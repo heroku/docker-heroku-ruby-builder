@@ -17,7 +17,7 @@ def pipe(command)
   output
 end
 
-def fetch(url, name = nil)
+def fetch(url, filename: nil)
   uri    = URI.parse(url)
   binary = uri.to_s.split("/").last
   if File.exists?(binary)
@@ -25,7 +25,7 @@ def fetch(url, name = nil)
   else
     puts "Fetching #{binary}"
     if name
-      `curl #{uri} -s -o #{name}`
+      `curl #{uri} -s -o #{filename}`
     else
       `curl #{uri} -s -O`
     end
@@ -117,7 +117,7 @@ Dir.chdir(cache_dir) do
     rubygems_binary = "rubygems-#{rubygems}"
     fetch("http://production.cf.rubygems.org/rubygems/#{rubygems_binary}.tgz")
   end
-  fetch(patch, patch_name) if patch
+  fetch(patch, filename: patch_name) if patch
 end
 
 Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
