@@ -17,14 +17,18 @@ def pipe(command)
   output
 end
 
-def fetch(url)
+def fetch(url, filename: nil)
   uri    = URI.parse(url)
   binary = uri.to_s.split("/").last
   if File.exists?(binary)
     puts "Using #{binary}"
   else
     puts "Fetching #{binary}"
-    `curl #{uri} -s -O`
+    if name
+      `curl #{uri} -s -o #{filename}`
+    else
+      `curl #{uri} -s -O`
+    end
   end
 end
 
@@ -52,6 +56,12 @@ svn_url      = ENV["SVN_URL"]
 relname      = ENV["RELNAME"]
 stack        = ENV["STACK"]
 treeish      = nil
+if ENV['PATCH_URL']
+  patch = ENV['PATCH_URL']
+  patch_name = patch.split("/").last
+else
+  patch = nil
+end
 
 # create cache dir if it doesn't exist
 FileUtils.mkdir_p(cache_dir)
@@ -107,6 +117,7 @@ Dir.chdir(cache_dir) do
     rubygems_binary = "rubygems-#{rubygems}"
     fetch("http://production.cf.rubygems.org/rubygems/#{rubygems_binary}.tgz")
   end
+  fetch(patch, filename: patch_name) if patch
 end
 
 Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
@@ -128,6 +139,8 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
 
   Dir.chdir(full_name) do
     pipe "git checkout #{treeish}" if treeish
+
+    pipe "patch -p0 < #{cache_dir}/#{patch_name}" if patch
 
     if debug
       configure_env = "debugflags=\"-ggdb3\""
