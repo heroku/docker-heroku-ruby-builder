@@ -3,11 +3,12 @@ require 'fileutils'
 S3_BUCKET_NAME = "heroku-buildpack-ruby"
 
 desc "Generate a new ruby shell script"
-task :new, [:version, :stack] do |t, args|
-  write_file = Proc.new do |version, stack, build=false|
+task :new, [:version, :stack, :patch] do |t, args|
+  write_file = Proc.new do |version, stack, patch=false|
     file =
-      if build
-        "rubies/#{args[:stack]}/ruby-build-#{args[:version]}.sh"
+      if patch
+        patch_name = File.basename(patch, File.extname(patch))
+        "rubies/#{args[:stack]}/ruby-#{args[:version]}-#{patch_name}.sh"
       else
         "rubies/#{args[:stack]}/ruby-#{args[:version]}.sh"
       end
@@ -19,14 +20,13 @@ task :new, [:version, :stack] do |t, args|
 
 source `dirname $0`/../common.sh
 
-docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=#{args[:version]}#{build ? " -e BUILD=true" : " "} -e STACK=#{args[:stack]} hone/ruby-builder:#{args[:stack]}
+docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=#{args[:version]}#{patch ? " -e PATCH_URL=#{patch}": " "} -e STACK=#{args[:stack]} hone/ruby-builder:#{args[:stack]}
 FILE
     end
     File.chmod(0775, file)
   end
 
-  write_file.call(args[:version], args[:stack])
-  write_file.call(args[:version], args[:stack], true) if args[:version].include?("1.9.2") || args[:version].include?("1.8.7")
+  write_file.call(args[:version], args[:stack], args[:patch])
 end
 
 desc "Upload a ruby to S3"
