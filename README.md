@@ -24,6 +24,12 @@ First we'll need to generate the docker images needed for building the appropria
 $ bundle exec rake generate_image[cedar-14]
 ```
 
+Generate a ruby build script:
+
+```sh
+$ bundle exec rake new[2.2.2,cedar-14]
+```
+
 From here, we can now execute a ruby build:
 
 ```
@@ -36,6 +42,22 @@ If you set the env vars `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, you can
 
 ```sh
 $ bundle exec rake upload[2.2.2,cedar-14]
+```
+
+### Support two stacks
+
+When a new Ruby version releases you will want to build support for all stacks, usually the last two.
+
+```sh
+bundle exec rake rake new[2.5.1,heroku-16]
+bash rubies/heroku-16/ruby-2.5.1.sh
+bundle exec rake upload[2.5.1,heroku-16]
+bundle exec rake test[2.5.1,heroku-16]
+
+bundle exec rake rake new[2.5.1,cedar-14]
+bash rubies/cedar-14/ruby-2.5.1.sh
+bundle exec rake upload[2.5.1,cedar-14]
+bundle exec rake test[2.5.1,cedar-14]
 ```
 
 ### Docker Enviroment Variables
