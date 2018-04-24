@@ -49,12 +49,12 @@ $ bundle exec rake upload[2.2.2,cedar-14]
 When a new Ruby version releases you will want to build support for all stacks, usually the last two.
 
 ```sh
-bundle exec rake rake new[2.5.1,heroku-16]
+bundle exec rake new[2.5.1,heroku-16]
 bash rubies/heroku-16/ruby-2.5.1.sh
 bundle exec rake upload[2.5.1,heroku-16]
 bundle exec rake test[2.5.1,heroku-16]
 
-bundle exec rake rake new[2.5.1,cedar-14]
+bundle exec rake new[2.5.1,cedar-14]
 bash rubies/cedar-14/ruby-2.5.1.sh
 bundle exec rake upload[2.5.1,cedar-14]
 bundle exec rake test[2.5.1,cedar-14]
