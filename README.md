@@ -60,6 +60,26 @@ bundle exec rake upload[2.5.1,cedar-14]
 bundle exec rake test[2.5.1,cedar-14]
 ```
 
+### Building a GIT_URL release
+
+Sometimes a version might need to be tested, for example a commit on Ruby trunk.
+
+If you're building from a specific commit, then fork `ruby/ruby` to your own repo.
+
+To build it first generate a new file:
+
+```
+bundle exec rake new[2.6.0,heroku-18]
+```
+
+Then add in the destination to the GIT_URL:
+
+```
+docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=2.6.0 -e GIT_URL=https://github.com/schneems/ruby#schneems/bundler -e STACK=heroku-18 hone/ruby-builder:heroku-18
+```
+
+If you need to use a branch you can put it in the url after the `#`.
+
 ### Docker Enviroment Variables
 
 To configure the build, we use environment variables. All of them are listed below:
@@ -71,3 +91,8 @@ To configure the build, we use environment variables. All of them are listed bel
 * `GIT_URL` - If this option is used, it will override fetching a source tarball from <http://ftp.ruby-lang.org/pub/ruby> with a git repo. This allows building ruby forks or trunk. This option also supports passing a treeish git object in the URL with the `#` character. For instance, `git://github.com/hone/ruby.git#ruby_1_8_7`.
 * `S3_BUCKET_NAME` - This option is the S3 bucket name containing of dependencies for building ruby. If this option is not specified, hammer-ruby defaults to "heroku-buildpack-ruby". The dependencies needed are `libyaml-0.1.4.tgz` and `libffi-3.0.10.tgz`.
 * `JOBS` - the number of jobs to run in parallel when running make: `make -j<jobs>`. By default this is 2.
+
+
+### How it works
+
+There is a script `build.rb` that was coppied over when the docker container was built. This can be seen in the various `Dockerfile.*` files.

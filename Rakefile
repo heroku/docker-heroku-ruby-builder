@@ -15,7 +15,7 @@ task :new, [:version, :stack, :patch] do |t, args|
     puts "Writing #{file}"
     FileUtils.mkdir_p(File.dirname(file))
     File.open(file, 'w') do |file|
-      file.puts <<FILE
+      file.puts <<-FILE
 #!/bin/bash
 
 source `dirname $0`/../common.sh
