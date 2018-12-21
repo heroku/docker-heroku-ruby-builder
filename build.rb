@@ -150,7 +150,7 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
 
     configure_opts = "--disable-install-doc --prefix #{prefix}"
     configure_opts += " --enable-load-relative" if major_ruby != "1.8" && version != "1.9.2"
-    if stack == "heroku-16"
+    if stack != "cedar-14"
       configure_opts += " --enable-shared"
     end
     puts "configure env:  #{configure_env}"
