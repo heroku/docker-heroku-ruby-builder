@@ -1,11 +1,16 @@
 version: 2.1
 
+executors:
+  ruby-docker:
+
+
 jobs:
-  build-docker:
+  heroku-18:
     docker:
       - image: ruby:2.5-stretch
     environment:
       STACK: heroku-18
+      VERSION: 2.5.3
     steps:
       - checkout
       - setup_remote_docker:
@@ -18,10 +23,15 @@ jobs:
             curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz
             tar -xz -C /tmp -f /tmp/docker-$VER.tgz
             mv /tmp/docker/* /usr/bin
-      - run: docker build -f dockerfiles/Dockerfile.$STACK -t heroku/ruby-builder:$STACK .
+      - run:
+          name: Build Docker Image
+          command: docker build -f dockerfiles/Dockerfile.$STACK -t hone/ruby-builder:$STACK .
+      - run:
+          name: Build Ruby
+          command: bash rubies/$STACK/ruby-$VERSION.sh
 
 workflows:
   version: 2.1
   heroku-18:
     jobs:
-      - build-docker
+      - heroku-18
