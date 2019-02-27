@@ -127,8 +127,10 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
     `tar zxf #{cache_dir}/#{full_name}.tar.gz`
   end
   Dir.chdir(vendor_dir) do
-    `tar zxf #{cache_dir}/libyaml-#{LIBYAML_VERSION}.tgz`
-    `tar zxf #{cache_dir}/libffi-#{LIBFFI_VERSION}.tgz`
+    if stack.match(/cedar/)
+      `tar zxf #{cache_dir}/libyaml-#{LIBYAML_VERSION}.tgz`
+      `tar zxf #{cache_dir}/libffi-#{LIBFFI_VERSION}.tgz`
+    end
     `tar zxf #{cache_dir}/rubygems-#{rubygems}.tgz` if rubygems
   end
 
