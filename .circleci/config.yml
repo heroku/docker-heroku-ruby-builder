@@ -48,8 +48,11 @@ jobs:
 
 workflows:
   version: 2.1
-  heroku-18:
+  ruby-2.5.3:
     jobs:
       - build:
           stack: "heroku-18"
+          version: "2.5.3"
+      - build:
+          stack: "heroku-16"
           version: "2.5.3"
