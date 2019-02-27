@@ -6,29 +6,24 @@ executors:
 
 jobs:
   heroku-18:
-    docker:
-      - image: ruby:2.5-stretch
+    # need to use machine executor for volume mounting in docker
+    # https://circleci.com/docs/2.0/executor-types/#using-machine
+    # can use docker cp instead
+    # https://circleci.com/docs/2.0/building-docker-images/#mounting-folders
+    machine: true
     environment:
       STACK: heroku-18
       VERSION: 2.5.3
     steps:
       - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - run:
-          name: Install Docker Client
-          command: |
-            set -x
-            VER="18.06.3-ce"
-            curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz
-            tar -xz -C /tmp -f /tmp/docker-$VER.tgz
-            mv /tmp/docker/* /usr/bin
       - run:
           name: Build Docker Image
           command: docker build -f dockerfiles/Dockerfile.$STACK -t hone/ruby-builder:$STACK .
       - run:
           name: Build Ruby
           command: bash rubies/$STACK/ruby-$VERSION.sh
+      - store_artifacts:
+          path: builds
 
 workflows:
   version: 2.1
