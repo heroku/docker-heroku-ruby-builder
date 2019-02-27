@@ -1,27 +1,48 @@
 version: 2.1
 
-executors:
-  ruby-docker:
+# reusable commands
+commands:
+  build-docker-image:
+    description: "Build Docker Image"
+    parameters:
+      stack:
+        type: string
+    steps:
+      - run:
+          name: Build Docker Image
+          command: docker build -f dockerfiles/Dockerfile.<< parameters.stack >> -t hone/ruby-builder:<< parameters.stack >> .
 
+  build-ruby:
+    description: "Build Ruby"
+    parameters:
+      stack:
+        type: string
+      version:
+        type: string
+    steps:
+      - run:
+          name: Build Ruby
+          command: bash rubies/<< parameters.stack >>/ruby-<< parameters.version >>.sh
 
 jobs:
-  heroku-18:
+  build:
     # need to use machine executor for volume mounting in docker
     # https://circleci.com/docs/2.0/executor-types/#using-machine
     # can use docker cp instead
     # https://circleci.com/docs/2.0/building-docker-images/#mounting-folders
     machine: true
-    environment:
-      STACK: heroku-18
-      VERSION: 2.5.3
+    parameters:
+      stack:
+        type: string
+      version:
+        type: string
     steps:
       - checkout
-      - run:
-          name: Build Docker Image
-          command: docker build -f dockerfiles/Dockerfile.$STACK -t hone/ruby-builder:$STACK .
-      - run:
-          name: Build Ruby
-          command: bash rubies/$STACK/ruby-$VERSION.sh
+      - build-docker-image:
+          stack: << parameters.stack >>
+      - build-ruby:
+          stack: << parameters.stack >>
+          version: << parameters.version >>
       - store_artifacts:
           path: builds
 
@@ -29,4 +50,6 @@ workflows:
   version: 2.1
   heroku-18:
     jobs:
-      - heroku-18
+      - build:
+          stack: "heroku-18"
+          version: "2.5.3"
