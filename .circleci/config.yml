@@ -58,3 +58,8 @@ workflows:
       - build:
           stack: "heroku-16"
           version: "2.5.3"
+  cedar-14:
+    jobs:
+      - build:
+          stack: "cedar-14"
+          version: "2.5.3"
