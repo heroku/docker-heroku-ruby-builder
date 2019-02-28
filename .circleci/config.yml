@@ -45,6 +45,40 @@ jobs:
           version: << parameters.version >>
       - store_artifacts:
           path: builds
+      - run:
+          name: Save Circle CI Build Number
+          command: |
+            mkdir -p store/
+            echo $CIRCLE_BUILD_NUM > store/circle_build_num
+      - persist_to_workspace:
+          root: store
+          paths:
+            - circle_build_num
+
+  test:
+    docker:
+      - image: ruby:2.5-stretch
+    parameters:
+      stack:
+        type: string
+      version:
+        type: string
+    steps:
+      - run:
+          name: Setup Heroku
+          command: |
+            curl https://cli-assets.heroku.com/install.sh | sh
+            printf "machine api.heroku.com\n  login jkutner+tunnels@gmail.com\n  password $HEROKU_API_KEY\n" > ~/.netrc
+            chmod 0600 ~/.netrc
+      - checkout
+      - run: bundle install
+      - attach_workspace:
+          at: /tmp/store/
+      - run:
+          name: Test
+          command: |
+            CIRCLE_PREVIOUS_BUILD_NUM=`cat /tmp/store/circle_build_num`
+            bundle exec rake test[<< parameters.version >>,<< parameters.stack >>]
 
 workflows:
   version: 2.1
@@ -53,13 +87,28 @@ workflows:
       - build:
           stack: "heroku-18"
           version: "2.5.3"
+      - test:
+          stack: "heroku-18"
+          version: "2.5.3"
+          requires:
+            - build
   heroku-16:
     jobs:
       - build:
           stack: "heroku-16"
           version: "2.5.3"
+      - test:
+          stack: "heroku-16"
+          version: "2.5.3"
+          requires:
+            - build
   cedar-14:
     jobs:
       - build:
           stack: "cedar-14"
           version: "2.5.3"
+      - test:
+          stack: "cedar-14"
+          version: "2.5.3"
+          requires:
+            - build

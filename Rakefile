@@ -198,6 +198,27 @@ task :test, [:version, :stack] do |t, args|
       app_name = json["name"]
       web_url  = json["web_url"]
 
+      if (build_number = ENV['CIRCLE_PREVIOUS_BUILD_NUM'].chomp) && (circle_token = ENV['CIRCLE_TOKEN'].chomp)
+        response = Net::HTTP.get(URI("https://circleci.com/api/v1.1/project/github/hone/docker-heroku-ruby-builder/#{build_number}/artifacts?circle-token=#{circle_token}"))
+        artifacts = JSON.parse(response)
+
+        if artifacts.any?
+          response = heroku.patch("/apps/#{app_name}/config-vars", data: {
+            HEROKU_RUBY_BINARY_OVERRIDE: artifacts.first["url"]
+          })
+          if response.code != "200"
+            $stderr.puts "Error could not set HEROKU_RUBY_BINARY_OVERRIDE env var"
+            exit 1
+          end
+
+          response = heroku.put("/apps/#{app_name}/buildpack-installations", data: {
+            updates: [
+              buildpack: "https://github.com/heroku/heroku-buildpack-ruby#3rd-party-ruby"
+            ]
+          })
+        end
+      end
+
       # upload source
       response = heroku.post("/apps/#{app_name}/sources")
       if response.code != "201"
@@ -238,7 +259,7 @@ task :test, [:version, :stack] do |t, args|
         }
       })
       if response.code != "201"
-        $stderr.puts "Could create build"
+        $stderr.puts "Couldn't create build: #{response.body}"
         exit 1
       end
 

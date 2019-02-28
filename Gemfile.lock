@@ -1,6 +1,6 @@
 GIT
   remote: git://github.com/hone/okyakusan.git
-  revision: 764795da233ace9d45a5a0b3b85afa7d826d3b2d
+  revision: d32fd91e07c71cf54670a2802165de361f7a5d12
   specs:
     okyakusan (0.0.1)
       netrc (~> 0.7.7)
