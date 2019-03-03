@@ -46,14 +46,16 @@ jobs:
       - store_artifacts:
           path: builds
       - run:
-          name: Save Circle CI Build Number
+          name: Setup Circle CI Workspace
           command: |
             mkdir -p store/
             echo $CIRCLE_BUILD_NUM > store/circle_build_num
+            cp -rf builds/ store/
       - persist_to_workspace:
           root: store
           paths:
             - circle_build_num
+            - builds
 
   test:
     docker:
@@ -80,6 +82,36 @@ jobs:
             CIRCLE_PREVIOUS_BUILD_NUM=`cat /tmp/store/circle_build_num`
             bundle exec rake test[<< parameters.version >>,<< parameters.stack >>]
 
+  upload-to-s3:
+    docker:
+      - image: circleci/python:2.7-stretch
+    parameters:
+      profile:
+        type: string
+      stack:
+        type: string
+      version:
+        type: string
+    steps:
+      - attach_workspace:
+          at: /tmp/store
+      - run:
+          name: Install AWS CLI
+          command: sudo pip install awscli
+      - run:
+          name: Setup AWS Credentials
+          command: |
+            mkdir -p ~/.aws/
+            printf "[$STAGING_BUCKET_NAME]\naws_access_key_id = $STAGING_AWS_ACCESS_KEY_ID\naws_secret_access_key=$STAGING_AWS_SECRET_ACCESS_KEY" > ~/.aws/credentials
+      - run:
+          name: Upload Binary to S3
+          command: |
+            aws s3 cp \
+              /tmp/store/builds/<< parameters.stack >>/ruby-<< parameters.version >>.tgz \
+              s3://<< parameters.profile >>/<< parameters.stack >>/ruby-<< parameters.version >>.tgz \
+              --profile << parameters.profile >> \
+              --acl public-read
+
 workflows:
   version: 2.1
   heroku-18:
@@ -92,6 +124,13 @@ workflows:
           version: "2.5.3"
           requires:
             - build
+      - upload-to-s3:
+          stack: "heroku-18"
+          version: "2.5.3"
+          profile: $STAGING_BUCKET_NAME
+          name: Upload to S3 Staging
+          requires:
+            - test
   heroku-16:
     jobs:
       - build:
@@ -102,6 +141,13 @@ workflows:
           version: "2.5.3"
           requires:
             - build
+      - upload-to-s3:
+          stack: "heroku-16"
+          version: "2.5.3"
+          profile: $STAGING_BUCKET_NAME
+          name: Upload to S3 Staging
+          requires:
+            - test
   cedar-14:
     jobs:
       - build:
@@ -112,3 +158,10 @@ workflows:
           version: "2.5.3"
           requires:
             - build
+      - upload-to-s3:
+          stack: "cedar-14"
+          version: "2.5.3"
+          profile: $STAGING_BUCKET_NAME
+          name: Upload to S3 Staging
+          requires:
+            - test
