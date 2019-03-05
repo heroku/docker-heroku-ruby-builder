@@ -2,4 +2,9 @@
 
 source `dirname $0`/../common.sh
 
-VERSION=2.5.3  STACK=cedar-14 ruby build.rb /tmp/workspace $OUTPUT_DIR $CACHE_DIR
+docker run -v $OUTPUT_DIR:/tmp/output \
+           -v $CACHE_DIR:/tmp/cache \
+           -e VERSION=2.5.3 \
+           -e STACK=cedar-14 \
+           -e PATCH_URL=https://gist.githubusercontent.com/schneems/fd2bd841515367871e5b332afe9455ea/raw/1de62a84bce330c9ca8336fddb7c143c36a01a1d/ruby-2.5.3-rubygems.patch \
+           hone/ruby-builder:cedar-14
