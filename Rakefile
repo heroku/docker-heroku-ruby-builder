@@ -277,7 +277,7 @@ task :test, [:version, :stack] do |t, args|
 
     # test app
     puts web_url
-    sleep(1)
+    sleep(5)
     response = network_retry(20) do
       Net::HTTP.get_response(URI(web_url))
     end
