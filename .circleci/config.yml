@@ -12,10 +12,26 @@ jobs:
         type: string
     steps:
       - checkout
+      - run: ruby -v > /tmp/ruby_version
+      - restore_cache:
+          keys:
+            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}
+      - run:
+          name: Bundler
+          command: |
+            bundle install --path vendor/bundle
+            bundle clean
+      - save_cache:
+          key: gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
       - run:
           name: Build Docker Image
-          command: docker build -f dockerfiles/Dockerfile.<< parameters.stack >> -t hone/ruby-builder:<< parameters.stack >> .
-          stack: << parameters.stack >>
+          command: bundle exec rake generate_image[<< parameters.stack >>]
+      - run:
+          name: Generate Build Script
+          command: bundle exec rake new[$RUBY_VERSION,<< parameters.stack >>]
       - run:
           name: Build Ruby
           command: bash rubies/<< parameters.stack >>/ruby-$RUBY_VERSION.sh
@@ -27,11 +43,13 @@ jobs:
             mkdir -p store/
             echo $CIRCLE_BUILD_NUM > store/circle_build_num
             cp -rf builds/ store/
+            cp /tmp/ruby_version store/
       - persist_to_workspace:
           root: store
           paths:
             - circle_build_num
             - builds
+            - ruby_version
 
   test:
     docker:
@@ -47,9 +65,17 @@ jobs:
             printf "machine api.heroku.com\n  login jkutner+tunnels@gmail.com\n  password $HEROKU_API_KEY\n" > ~/.netrc
             chmod 0600 ~/.netrc
       - checkout
-      - run: bundle install
       - attach_workspace:
           at: /tmp/store/
+      - restore_cache:
+          keys:
+            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/store/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/store/ruby_version" }}-{{ .Branch }}
+      - run: bundle install --path vendor/bundle
+      - save_cache:
+          key: gem-cache-v1-{{ arch }}-{{ checksum "/tmp/store/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
       - run:
           name: Test
           command: |
