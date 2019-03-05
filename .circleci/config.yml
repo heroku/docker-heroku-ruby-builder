@@ -1,29 +1,5 @@
 version: 2.1
 
-# reusable commands
-commands:
-  build-docker-image:
-    description: "Build Docker Image"
-    parameters:
-      stack:
-        type: string
-    steps:
-      - run:
-          name: Build Docker Image
-          command: docker build -f dockerfiles/Dockerfile.<< parameters.stack >> -t hone/ruby-builder:<< parameters.stack >> .
-
-  build-ruby:
-    description: "Build Ruby"
-    parameters:
-      stack:
-        type: string
-      version:
-        type: string
-    steps:
-      - run:
-          name: Build Ruby
-          command: bash rubies/<< parameters.stack >>/ruby-<< parameters.version >>.sh
-
 jobs:
   build:
     # need to use machine executor for volume mounting in docker
@@ -34,15 +10,15 @@ jobs:
     parameters:
       stack:
         type: string
-      version:
-        type: string
     steps:
       - checkout
-      - build-docker-image:
+      - run:
+          name: Build Docker Image
+          command: docker build -f dockerfiles/Dockerfile.<< parameters.stack >> -t hone/ruby-builder:<< parameters.stack >> .
           stack: << parameters.stack >>
-      - build-ruby:
-          stack: << parameters.stack >>
-          version: << parameters.version >>
+      - run:
+          name: Build Ruby
+          command: bash rubies/<< parameters.stack >>/ruby-$RUBY_VERSION.sh
       - store_artifacts:
           path: builds
       - run:
@@ -63,8 +39,6 @@ jobs:
     parameters:
       stack:
         type: string
-      version:
-        type: string
     steps:
       - run:
           name: Setup Heroku
@@ -80,7 +54,7 @@ jobs:
           name: Test
           command: |
             CIRCLE_PREVIOUS_BUILD_NUM=`cat /tmp/store/circle_build_num`
-            bundle exec rake test[<< parameters.version >>,<< parameters.stack >>]
+            bundle exec rake test[$RUBY_VERSION,<< parameters.stack >>]
 
   upload-to-s3:
     docker:
@@ -89,8 +63,6 @@ jobs:
       profile:
         type: string
       stack:
-        type: string
-      version:
         type: string
     steps:
       - attach_workspace:
@@ -107,8 +79,8 @@ jobs:
           name: Upload Binary to S3
           command: |
             aws s3 cp \
-              /tmp/store/builds/<< parameters.stack >>/ruby-<< parameters.version >>.tgz \
-              s3://<< parameters.profile >>/<< parameters.stack >>/ruby-<< parameters.version >>.tgz \
+              /tmp/store/builds/<< parameters.stack >>/ruby-$RUBY_VERSION.tgz \
+              s3://<< parameters.profile >>/<< parameters.stack >>/ruby-$RUBY_VERSION.tgz \
               --profile << parameters.profile >> \
               --acl public-read
 
@@ -118,15 +90,12 @@ workflows:
     jobs:
       - build:
           stack: "heroku-18"
-          version: "2.5.3"
       - test:
           stack: "heroku-18"
-          version: "2.5.3"
           requires:
             - build
       - upload-to-s3:
           stack: "heroku-18"
-          version: "2.5.3"
           profile: $STAGING_BUCKET_NAME
           name: Upload to S3 Staging
           requires:
@@ -135,15 +104,12 @@ workflows:
     jobs:
       - build:
           stack: "heroku-16"
-          version: "2.5.3"
       - test:
           stack: "heroku-16"
-          version: "2.5.3"
           requires:
             - build
       - upload-to-s3:
           stack: "heroku-16"
-          version: "2.5.3"
           profile: $STAGING_BUCKET_NAME
           name: Upload to S3 Staging
           requires:
@@ -152,15 +118,12 @@ workflows:
     jobs:
       - build:
           stack: "cedar-14"
-          version: "2.5.3"
       - test:
           stack: "cedar-14"
-          version: "2.5.3"
           requires:
             - build
       - upload-to-s3:
           stack: "cedar-14"
-          version: "2.5.3"
           profile: $STAGING_BUCKET_NAME
           name: Upload to S3 Staging
           requires:
