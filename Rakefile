@@ -198,7 +198,7 @@ task :test, [:version, :stack] do |t, args|
       app_name = json["name"]
       web_url  = json["web_url"]
 
-      if (build_number = ENV['CIRCLE_PREVIOUS_BUILD_NUM'].chomp) && (circle_token = ENV['CIRCLE_TOKEN'].chomp)
+      if (build_number = ENV['CIRCLE_PREVIOUS_BUILD_NUM']) && (circle_token = ENV['CIRCLE_TOKEN'])
         response = Net::HTTP.get(URI("https://circleci.com/api/v1.1/project/github/hone/docker-heroku-ruby-builder/#{build_number}/artifacts?circle-token=#{circle_token}"))
         artifacts = JSON.parse(response)
 
@@ -289,12 +289,12 @@ task :test, [:version, :stack] do |t, args|
       puts "Successfully returned a 200"
       puts `heroku run ruby -v -a #{app_name}`
       puts `heroku run gem -v -a #{app_name}`
-      puts "Deleting #{app_name}"
-      Okyakusan.start {|heroku| heroku.delete("/apps/#{app_name}") if app_name }
     end
 
     puts response.body
   ensure
     FileUtils.remove_entry tmp_dir
+    puts "Deleting #{app_name}"
+    Okyakusan.start {|heroku| heroku.delete("/apps/#{app_name}") if app_name }
   end
 end
