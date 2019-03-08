@@ -6,5 +6,5 @@ docker run -v $OUTPUT_DIR:/tmp/output \
            -v $CACHE_DIR:/tmp/cache \
            -e VERSION=2.5.3 \
            -e STACK=heroku-18 \
-           -e PATCH_URL=https://gist.githubusercontent.com/schneems/fd2bd841515367871e5b332afe9455ea/raw/1de62a84bce330c9ca8336fddb7c143c36a01a1d/ruby-2.5.3-rubygems.patch \
+           -e PATCH_URL=https://gist.githubusercontent.com/schneems/374157aff12e92babb1c6a3c6b744392/raw/c70aceeb7a97b8d8858234104afad0b7daccb8a7/ruby-25x-bundler2-rubygems-secure \
            hone/ruby-builder:heroku-18
