@@ -1,0 +1,4 @@
+build:
+	bundle install --path vendor/bundle
+	bundle exec rake new[$(RUBY_VERSION),$(STACK)]
+	bash rubies/$(STACK)/ruby-$(RUBY_VERSION).sh

@@ -20,7 +20,7 @@ task :new, [:version, :stack, :patch] do |t, args|
 
 source `dirname $0`/../common.sh
 
-docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=#{args[:version]}#{patch ? " -e PATCH_URL=#{patch}": " "} -e STACK=#{args[:stack]} hone/ruby-builder:#{args[:stack]}
+VERSION=#{args[:version]}#{patch ? " PATCH_URL=#{patch}": " "} STACK=#{args[:stack]} ruby build.rb /tmp/workspace $OUTPUT_DIR $CACHE_DIR
 FILE
     end
     File.chmod(0775, file)
@@ -66,7 +66,7 @@ desc "Build docker image for stack"
 task :generate_image, [:stack] do |t, args|
   require 'fileutils'
   FileUtils.cp("dockerfiles/Dockerfile.#{args[:stack]}", "Dockerfile")
-  system("docker build -t hone/ruby-builder:#{args[:stack]} .")
+  system("docker build -t hone/ruby-builder:#{args[:stack]} --pull .")
   FileUtils.rm("Dockerfile")
 end
 

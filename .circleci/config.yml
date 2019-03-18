@@ -1,15 +1,23 @@
 version: 2.1
 
 jobs:
-  build:
-    # need to use machine executor for volume mounting in docker
-    # https://circleci.com/docs/2.0/executor-types/#using-machine
-    # can use docker cp instead
-    # https://circleci.com/docs/2.0/building-docker-images/#mounting-folders
+  build-docker-image:
     machine: true
     parameters:
       stack:
         type: string
+    steps:
+      - checkout
+      - run: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+      - run: make docker-image STACK=<< parameters.stack >>
+      - run: make docker-push STACK=<< parameters.stack >>
+
+  build-binary:
+    parameters:
+      stack:
+        type: string
+    docker:
+      - image: hone/ruby-builder:<< parameters.stack >>
     steps:
       - checkout
       - run: ruby -v > /tmp/ruby_version
@@ -18,23 +26,17 @@ jobs:
             - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
             - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}
       - run:
-          name: Bundler
-          command: |
-            bundle install --path vendor/bundle
-            bundle clean
+          name: Setup in Docker Makefile
+          command: cp dockerfiles/support/Makefile.docker Makefile
+      - run:
+          name: Build Ruby
+          command: OUTPUT_DIR=`pwd`/builds/ make build STACK=<< parameters.stack >> RUBY_VERSION=$RUBY_VERSION
+      - run:
+          command: bundle clean
       - save_cache:
           key: gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
           paths:
             - vendor/bundle
-      - run:
-          name: Build Docker Image
-          command: bundle exec rake generate_image[<< parameters.stack >>]
-      - run:
-          name: Generate Build Script
-          command: bundle exec rake new[$RUBY_VERSION,<< parameters.stack >>]
-      - run:
-          name: Build Ruby
-          command: bash rubies/<< parameters.stack >>/ruby-$RUBY_VERSION.sh
       - store_artifacts:
           path: builds
       - run:
@@ -43,13 +45,11 @@ jobs:
             mkdir -p store/
             echo $CIRCLE_BUILD_NUM > store/circle_build_num
             cp -rf builds/ store/
-            cp /tmp/ruby_version store/
       - persist_to_workspace:
           root: store
           paths:
             - circle_build_num
             - builds
-            - ruby_version
 
   test:
     docker:
@@ -67,13 +67,14 @@ jobs:
       - checkout
       - attach_workspace:
           at: /tmp/store/
+      - run: ruby -v > /tmp/ruby_version
       - restore_cache:
           keys:
-            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/store/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
-            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/store/ruby_version" }}-{{ .Branch }}
+            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}
       - run: bundle install --path vendor/bundle
       - save_cache:
-          key: gem-cache-v1-{{ arch }}-{{ checksum "/tmp/store/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+          key: gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
           paths:
             - vendor/bundle
       - run:
@@ -114,12 +115,16 @@ workflows:
   version: 2.1
   heroku-18:
     jobs:
-      - build:
+      - build-docker-image:
           stack: "heroku-18"
+      - build-binary:
+          stack: "heroku-18"
+          requires:
+            - build-docker-image
       - test:
           stack: "heroku-18"
           requires:
-            - build
+            - build-binary
       - upload-to-s3:
           stack: "heroku-18"
           profile: $STAGING_BUCKET_NAME
@@ -128,12 +133,16 @@ workflows:
             - test
   heroku-16:
     jobs:
-      - build:
+      - build-docker-image:
           stack: "heroku-16"
+      - build-binary:
+          stack: "heroku-16"
+          requires:
+            - build-docker-image
       - test:
           stack: "heroku-16"
           requires:
-            - build
+            - build-binary
       - upload-to-s3:
           stack: "heroku-16"
           profile: $STAGING_BUCKET_NAME
@@ -142,12 +151,16 @@ workflows:
             - test
   cedar-14:
     jobs:
-      - build:
+      - build-docker-image:
           stack: "cedar-14"
+      - build-binary:
+          stack: "cedar-14"
+          requires:
+            - build-docker-image
       - test:
           stack: "cedar-14"
           requires:
-            - build
+            - build-binary
       - upload-to-s3:
           stack: "cedar-14"
           profile: $STAGING_BUCKET_NAME

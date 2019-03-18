@@ -2,4 +2,4 @@
 
 source `dirname $0`/../common.sh
 
-docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=2.5.3  -e STACK=cedar-14 hone/ruby-builder:cedar-14
+VERSION=2.5.3  STACK=cedar-14 ruby build.rb /tmp/workspace $OUTPUT_DIR $CACHE_DIR
