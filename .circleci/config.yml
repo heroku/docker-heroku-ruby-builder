@@ -1,5 +1,62 @@
 version: 2.1
 
+workflows:
+  version: 2.1
+  heroku-18:
+    jobs:
+      - build-docker-image:
+          stack: "heroku-18"
+      - build-binary:
+          stack: "heroku-18"
+          requires:
+            - build-docker-image
+      - test:
+          stack: "heroku-18"
+          requires:
+            - build-binary
+      - upload-to-s3:
+          stack: "heroku-18"
+          profile: $STAGING_BUCKET_NAME
+          name: Upload to S3 Staging
+          requires:
+            - test
+  heroku-16:
+    jobs:
+      - build-docker-image:
+          stack: "heroku-16"
+      - build-binary:
+          stack: "heroku-16"
+          requires:
+            - build-docker-image
+      - test:
+          stack: "heroku-16"
+          requires:
+            - build-binary
+      - upload-to-s3:
+          stack: "heroku-16"
+          profile: $STAGING_BUCKET_NAME
+          name: Upload to S3 Staging
+          requires:
+            - test
+  cedar-14:
+    jobs:
+      - build-docker-image:
+          stack: "cedar-14"
+      - build-binary:
+          stack: "cedar-14"
+          requires:
+            - build-docker-image
+      - test:
+          stack: "cedar-14"
+          requires:
+            - build-binary
+      - upload-to-s3:
+          stack: "cedar-14"
+          profile: $STAGING_BUCKET_NAME
+          name: Upload to S3 Staging
+          requires:
+            - test
+
 jobs:
   build-docker-image:
     machine: true
@@ -110,60 +167,3 @@ jobs:
               s3://<< parameters.profile >>/<< parameters.stack >>/ruby-$RUBY_VERSION.tgz \
               --profile << parameters.profile >> \
               --acl public-read
-
-workflows:
-  version: 2.1
-  heroku-18:
-    jobs:
-      - build-docker-image:
-          stack: "heroku-18"
-      - build-binary:
-          stack: "heroku-18"
-          requires:
-            - build-docker-image
-      - test:
-          stack: "heroku-18"
-          requires:
-            - build-binary
-      - upload-to-s3:
-          stack: "heroku-18"
-          profile: $STAGING_BUCKET_NAME
-          name: Upload to S3 Staging
-          requires:
-            - test
-  heroku-16:
-    jobs:
-      - build-docker-image:
-          stack: "heroku-16"
-      - build-binary:
-          stack: "heroku-16"
-          requires:
-            - build-docker-image
-      - test:
-          stack: "heroku-16"
-          requires:
-            - build-binary
-      - upload-to-s3:
-          stack: "heroku-16"
-          profile: $STAGING_BUCKET_NAME
-          name: Upload to S3 Staging
-          requires:
-            - test
-  cedar-14:
-    jobs:
-      - build-docker-image:
-          stack: "cedar-14"
-      - build-binary:
-          stack: "cedar-14"
-          requires:
-            - build-docker-image
-      - test:
-          stack: "cedar-14"
-          requires:
-            - build-binary
-      - upload-to-s3:
-          stack: "cedar-14"
-          profile: $STAGING_BUCKET_NAME
-          name: Upload to S3 Staging
-          requires:
-            - test
