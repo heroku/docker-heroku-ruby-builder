@@ -59,7 +59,8 @@ workflows:
 
 jobs:
   build-docker-image:
-    machine: true
+    machine:
+      docker_layer_caching: true
     parameters:
       stack:
         type: string
