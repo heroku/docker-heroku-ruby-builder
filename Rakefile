@@ -199,7 +199,7 @@ task :test, [:version, :stack] do |t, args|
       web_url  = json["web_url"]
 
       if (build_number = ENV['CIRCLE_PREVIOUS_BUILD_NUM']) && (circle_token = ENV['CIRCLE_TOKEN'])
-        response = Net::HTTP.get(URI("https://circleci.com/api/v1.1/project/github/hone/docker-heroku-ruby-builder/#{build_number}/artifacts?circle-token=#{circle_token}"))
+        response = Net::HTTP.get(URI("https://circleci.com/api/v1.1/project/github/#{ENV['CIRCLE_PROJECT_USERNAME']}/#{ENV['CIRCLE_PROJECT_REPONAME']}/#{build_number}/artifacts?circle-token=#{circle_token}"))
         artifacts = JSON.parse(response)
 
         if artifacts.any?
