@@ -1,4 +1,4 @@
-FROM heroku/heroku:18-build
+FROM heroku/heroku:18-build.v16
 MAINTAINER hone
 
 RUN apt-get update && apt-get install autoconf subversion zip -y
