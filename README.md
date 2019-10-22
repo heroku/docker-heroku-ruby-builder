@@ -52,8 +52,8 @@ When a new Ruby version releases you will want to build support for all stacks.
 bundle exec rake new[2.6.0,heroku-18] && \
 bash rubies/heroku-18/ruby-2.6.0.sh && \
 bundle exec rake upload[2.6.0,heroku-18] && \
-\
 bundle exec rake test[2.6.0,heroku-18] && \
+\
 bundle exec rake new[2.6.0,heroku-16] && \
 bash rubies/heroku-16/ruby-2.6.0.sh && \
 bundle exec rake upload[2.6.0,heroku-16] && \
