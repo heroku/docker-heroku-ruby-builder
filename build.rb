@@ -17,6 +17,12 @@ def pipe(command)
   output
 end
 
+def run!(cmd)
+  result = `#{cmd}`
+  raise "Error running #{cmd}, result: #{result}" unless $?.success
+  result
+end
+
 def fetch(url, name = nil)
   uri    = URI.parse(url)
   binary = uri.to_s.split("/").last
@@ -25,9 +31,9 @@ def fetch(url, name = nil)
   else
     puts "Fetching #{binary}"
     if name
-      `curl #{uri} -s -o #{name}`
+      run!("curl #{uri} -s -o #{name}")
     else
-      `curl #{uri} -s -O`
+      run!("curl #{uri} -s -O")
     end
   end
 end
@@ -85,7 +91,6 @@ Dir.chdir(cache_dir) do
       puts "Fetching #{git_url}"
       pipe "git clone #{uri}"
     end
-
   elsif svn_url
     uri = URI.parse(svn_url)
 
@@ -107,12 +112,12 @@ Dir.chdir(cache_dir) do
     fetch("http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{tarball}")
   end
 
-
   if stack.match(/cedar/)
     ["libyaml-#{LIBYAML_VERSION}.tgz", "libffi-#{LIBFFI_VERSION}.tgz"].each do |binary|
       fetch("#{vendor_url}/#{stack}/#{binary}")
     end
   end
+
   if rubygems
     rubygems_binary = "rubygems-#{rubygems}"
     fetch("http://production.cf.rubygems.org/rubygems/#{rubygems_binary}.tgz")
@@ -124,14 +129,15 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
   if git_url
     FileUtils.cp_r("#{cache_dir}/#{full_name}", ".")
   else
-    `tar zxf #{cache_dir}/#{full_name}.tar.gz`
+    run!("tar zxf #{cache_dir}/#{full_name}.tar.gz")
   end
+
   Dir.chdir(vendor_dir) do
     if stack.match(/cedar/)
-      `tar zxf #{cache_dir}/libyaml-#{LIBYAML_VERSION}.tgz`
-      `tar zxf #{cache_dir}/libffi-#{LIBFFI_VERSION}.tgz`
+      run!("tar zxf #{cache_dir}/libyaml-#{LIBYAML_VERSION}.tgz")
+      run!("tar zxf #{cache_dir}/libffi-#{LIBFFI_VERSION}.tgz")
     end
-    `tar zxf #{cache_dir}/rubygems-#{rubygems}.tgz` if rubygems
+    run!("tar zxf #{cache_dir}/rubygems-#{rubygems}.tgz") if rubygems
   end
 
   prefix = "/app/vendor/#{name}"
@@ -166,12 +172,15 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
     cmds.unshift("chmod +x ./tool/*") if git_url
     pipe(cmds.join(" && "))
   end
+
   if rubygems
     Dir.chdir("#{vendor_dir}/rubygems-#{rubygems}") do
       pipe("#{prefix}/bin/ruby setup.rb")
     end
+
     gem_bin_file = "#{prefix}/bin/gem"
     gem = File.read(gem_bin_file)
+
     File.open(gem_bin_file, 'w') do |file|
       file.puts "#!/usr/bin/env ruby"
       lines = gem.split("\n")
@@ -179,6 +188,7 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
       lines.each {|line| file.puts line }
     end
   end
+
   Dir.chdir(prefix) do
     filename =
       if build
