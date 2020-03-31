@@ -3,7 +3,47 @@ This uses [Docker](http://docker.io) to build MRI ruby binaries locally for the 
 
 ## Building a Ruby
 
-### Assumptions
+### Building on CircleCI
+
+In order to build, the rubies script must exist and be committed to master.
+
+```
+$ bundle exec rake new[2.7.0,heroku-18]
+$ git add rubies/
+$ git commit -m "ruby 2.7.0"
+$ git push origin master
+```
+
+Pass the Ruby version to the build script:
+
+```
+$ bash circleci-build.sh "2.7.0"
+```
+
+This assumes you have a [`CIRCLECI_TOKEN` environment variable](https://circleci.com/docs/2.0/managing-api-tokens/) that contains a GPG encrypted token. You can create this like:
+
+```
+$ export CIRCLECI_TOKEN="$(echo "token" | gpg --encrypt --armor)"
+```
+
+You can replace "2.7.0" with any Ruby version.
+
+#### Environment Variables
+
+These enivronment variables are used by the CircleCI project:
+
+* RUBY_VERSION
+* PRODUCTION_BUCKET_NAME
+* PRODUCTION_AWS_ACCESS_KEY_ID
+* PRODUCTION_AWS_SECRET_ACCESS_KEY
+* STAGING_BUCKET_NAME
+* STAGING_AWS_ACCESS_KEY_ID
+* STAGING_AWS_SECRET_ACCESS_KEY
+* HEROKU_API_KEY
+
+### Building Locally
+
+#### Assumptions
 I'm assuming you've [already setup Docker](https://www.docker.io/gettingstarted/).
 
 The directory layout used by this script inside the docker container is as follows:
@@ -17,6 +57,7 @@ The directory layout used by this script inside the docker container is as follo
 This build tool supports heroku's multiple stacks. The built rubies will go in the `builds/` directory.
 
 ### CircleCI Building
+
 The binaries are [can be built on CircleCI](https://circleci.com/workflow-run/7a131583-15ba-4247-a10f-50dd7a7082a6) using [Workflows](https://circleci.com/docs/2.0/workflows/). There are 4 jobs that are linked into a single workflow:
 
 * Build a Docker Image using the Heroku Stack Image
@@ -38,6 +79,7 @@ curl -X POST --header "Content-Type: application/json" -d '{"branch": "automatio
 ```
 
 #### Environment Variables
+
 These enivronment variables are used by the CircleCI project:
 
 * CIRCLE_TOKEN
@@ -56,6 +98,10 @@ CircleCI [builds and publishes](https://circleci.com/gh/hone/docker-heroku-ruby-
 ```sh
 make docker-image STACK=cedar-14
 ```
+
+#### Build locally
+
+You can manually build and run individual scripts
 
 ```sh
 bundle exec rake new[2.6.0,heroku-18] && \
@@ -76,13 +122,33 @@ bundle exec rake test[2.6.0,cedar-14] && \
 echo "Done building 2.6.0 for cedar-14, heroku-16, and heroku-18"
 ```
 
+or:
+
+```
+make docker-build STACK=<stack> RUBY_VERSION=<ruby-version>
+```
+
 When it's complete you should now see `builds/<stack>/ruby-<ruby-version>.tgz`.
 
-If you set the env vars `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, you can upload them to s3. By default, we upload to the `heroku-buildpack-ruby` s3 bucket.
+#### Building a GIT_URL release
 
-```sh
-$ bundle exec rake upload[2.2.2,cedar-14]
+Sometimes a version might need to be tested, for example a commit on Ruby trunk.
+
+If you're building from a specific commit, then fork `ruby/ruby` to your own repo.
+
+To build it first generate a new file:
+
 ```
+bundle exec rake new[2.6.0,heroku-18]
+```
+
+Then add in the destination to the GIT_URL:
+
+```
+docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=2.6.0 -e GIT_URL=https://github.com/schneems/ruby#schneems/bundler -e STACK=heroku-18 hone/ruby-builder:heroku-18
+```
+
+If you need to use a branch you can put it in the url after the `#`.
 
 #### Docker Enviroment Variables
 
@@ -95,3 +161,7 @@ To configure the build, we use environment variables. All of them are listed bel
 * `GIT_URL` - If this option is used, it will override fetching a source tarball from <http://ftp.ruby-lang.org/pub/ruby> with a git repo. This allows building ruby forks or trunk. This option also supports passing a treeish git object in the URL with the `#` character. For instance, `git://github.com/hone/ruby.git#ruby_1_8_7`.
 * `S3_BUCKET_NAME` - This option is the S3 bucket name containing of dependencies for building ruby. If this option is not specified, hammer-ruby defaults to "heroku-buildpack-ruby". The dependencies needed are `libyaml-0.1.4.tgz` and `libffi-3.0.10.tgz`.
 * `JOBS` - the number of jobs to run in parallel when running make: `make -j<jobs>`. By default this is 2.
+
+#### How it works
+
+There is a script `build.rb` that was coppied over when the docker container was built. This can be seen in the various `Dockerfile.*` files.
