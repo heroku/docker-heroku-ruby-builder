@@ -3,7 +3,47 @@ This uses [Docker](http://docker.io) to build MRI ruby binaries locally in a ced
 
 ## Building a Ruby
 
-### Assumptions
+### Building on CircleCI
+
+In order to build, the rubies script must exist and be committed to master.
+
+```
+$ bundle exec rake new[2.7.0,heroku-18]
+$ git add rubies/
+$ git commit -m "ruby 2.7.0"
+$ git push origin master
+```
+
+Pass the Ruby version to the build script:
+
+```
+$ bash circleci-build.sh "2.7.0"
+```
+
+This assumes you have a [`CIRCLECI_TOKEN` environment variable](https://circleci.com/docs/2.0/managing-api-tokens/) that contains a GPG encrypted token. You can create this like:
+
+```
+$ export CIRCLECI_TOKEN="$(echo "token" | gpg --encrypt --armor)"
+```
+
+You can replace "2.7.0" with any Ruby version.
+
+#### Environment Variables
+
+These enivronment variables are used by the CircleCI project:
+
+* RUBY_VERSION
+* PRODUCTION_BUCKET_NAME
+* PRODUCTION_AWS_ACCESS_KEY_ID
+* PRODUCTION_AWS_SECRET_ACCESS_KEY
+* STAGING_BUCKET_NAME
+* STAGING_AWS_ACCESS_KEY_ID
+* STAGING_AWS_SECRET_ACCESS_KEY
+* HEROKU_API_KEY
+
+### Building Locally
+
+#### Assumptions
 I'm assuming you've [already setup Docker](https://www.docker.io/gettingstarted/).
 
 The directory layout used by this script inside the docker container is as follows:
@@ -16,7 +56,7 @@ The directory layout used by this script inside the docker container is as follo
 #### Stacks
 This build tool supports heroku's multiple stacks. The built rubies will go in the `builds/` directory. We also have a `rubies/` directory for ensuring consistent builds. In each of these directories, they're split into a stack folder. All of the cedar-14 builds will be in `builds/cedar-14/` for instance.
 
-### Building
+#### Building
 
 First we'll need to generate the docker images needed for building the appropriate stack.
 
@@ -44,7 +84,7 @@ If you set the env vars `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, you can
 $ bundle exec rake upload[2.2.2,cedar-14]
 ```
 
-### Support two stacks
+#### Support two stacks
 
 When a new Ruby version releases you will want to build support for all stacks.
 
@@ -67,7 +107,7 @@ bundle exec rake test[2.6.0,cedar-14] && \
 echo "Done building 2.6.0 for cedar-14, heroku-16, and heroku-18"
 ```
 
-### Building a GIT_URL release
+#### Building a GIT_URL release
 
 Sometimes a version might need to be tested, for example a commit on Ruby trunk.
 
@@ -87,7 +127,7 @@ docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=2.6.0 
 
 If you need to use a branch you can put it in the url after the `#`.
 
-### Docker Enviroment Variables
+#### Docker Enviroment Variables
 
 To configure the build, we use environment variables. All of them are listed below:
 
@@ -100,6 +140,6 @@ To configure the build, we use environment variables. All of them are listed bel
 * `JOBS` - the number of jobs to run in parallel when running make: `make -j<jobs>`. By default this is 2.
 
 
-### How it works
+#### How it works
 
 There is a script `build.rb` that was coppied over when the docker container was built. This can be seen in the various `Dockerfile.*` files.
