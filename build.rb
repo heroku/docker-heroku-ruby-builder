@@ -19,7 +19,7 @@ end
 
 def run!(cmd)
   result = `#{cmd}`
-  raise "Error running #{cmd}, result: #{result}" unless $?.success
+  raise "Error running #{cmd}, result: #{result}" unless $?.success?
   result
 end
 
