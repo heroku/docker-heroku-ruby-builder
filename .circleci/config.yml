@@ -4,12 +4,8 @@ workflows:
   version: 2.1
   heroku-20:
     jobs:
-      - build-docker-image:
-          stack: "heroku-20"
       - build-binary:
           stack: "heroku-20"
-          requires:
-            - build-docker-image
       # Tests are expected to fail since heroku-20 is marked as internal-only in API for now,
       # so requires a privileged API call to create apps with that stack.
       # - test:
@@ -40,24 +36,12 @@ workflows:
             - production-hold
 
 jobs:
-  build-docker-image:
-    machine:
-      docker_layer_caching: true
-    parameters:
-      stack:
-        type: string
-    steps:
-      - checkout
-      - run: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-      - run: make docker-image STACK=<< parameters.stack >>
-      - run: make docker-push STACK=<< parameters.stack >>
-
   build-binary:
     parameters:
       stack:
         type: string
     docker:
-      - image: hone/ruby-builder:<< parameters.stack >>
+      - image: edmorley/ruby-builder:<< parameters.stack >>
     steps:
       - checkout
       - run: ruby -v > /tmp/ruby_version
