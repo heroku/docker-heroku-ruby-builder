@@ -20,7 +20,7 @@ task :new, [:version, :stack, :patch] do |t, args|
 
 source `dirname $0`/../common.sh
 
-docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=#{args[:version]}#{patch ? " -e PATCH_URL=#{patch}": " "} -e STACK=#{args[:stack]} hone/ruby-builder:#{args[:stack]}
+VERSION=#{args[:version]}#{patch ? " PATCH_URL=#{patch}": " "} STACK=#{args[:stack]} ruby build.rb /tmp/workspace $OUTPUT_DIR $CACHE_DIR
 FILE
     end
     File.chmod(0775, file)
@@ -66,7 +66,7 @@ desc "Build docker image for stack"
 task :generate_image, [:stack] do |t, args|
   require 'fileutils'
   FileUtils.cp("dockerfiles/Dockerfile.#{args[:stack]}", "Dockerfile")
-  system("docker build -t hone/ruby-builder:#{args[:stack]} .")
+  system("docker build -t hone/ruby-builder:#{args[:stack]} --pull .")
   FileUtils.rm("Dockerfile")
 end
 
@@ -198,6 +198,27 @@ task :test, [:version, :stack] do |t, args|
       app_name = json["name"]
       web_url  = json["web_url"]
 
+      if (build_number = ENV['CIRCLE_PREVIOUS_BUILD_NUM']) && (circle_token = ENV['CIRCLE_TOKEN'])
+        response = Net::HTTP.get(URI("https://circleci.com/api/v1.1/project/github/#{ENV['CIRCLE_PROJECT_USERNAME']}/#{ENV['CIRCLE_PROJECT_REPONAME']}/#{build_number}/artifacts?circle-token=#{circle_token}"))
+        artifacts = JSON.parse(response)
+
+        if artifacts.any?
+          response = heroku.patch("/apps/#{app_name}/config-vars", data: {
+            HEROKU_RUBY_BINARY_OVERRIDE: artifacts.first["url"]
+          })
+          if response.code != "200"
+            $stderr.puts "Error could not set HEROKU_RUBY_BINARY_OVERRIDE env var"
+            exit 1
+          end
+
+          response = heroku.put("/apps/#{app_name}/buildpack-installations", data: {
+            updates: [
+              buildpack: "https://github.com/heroku/heroku-buildpack-ruby#3rd-party-ruby"
+            ]
+          })
+        end
+      end
+
       # upload source
       response = heroku.post("/apps/#{app_name}/sources")
       if response.code != "201"
@@ -238,7 +259,7 @@ task :test, [:version, :stack] do |t, args|
         }
       })
       if response.code != "201"
-        $stderr.puts "Could create build"
+        $stderr.puts "Couldn't create build: #{response.body}"
         exit 1
       end
 
@@ -256,7 +277,7 @@ task :test, [:version, :stack] do |t, args|
 
     # test app
     puts web_url
-    sleep(1)
+    sleep(5)
     response = network_retry(20) do
       Net::HTTP.get_response(URI(web_url))
     end
@@ -268,12 +289,12 @@ task :test, [:version, :stack] do |t, args|
       puts "Successfully returned a 200"
       puts `heroku run ruby -v -a #{app_name}`
       puts `heroku run gem -v -a #{app_name}`
-      puts "Deleting #{app_name}"
-      Okyakusan.start {|heroku| heroku.delete("/apps/#{app_name}") if app_name }
     end
 
     puts response.body
   ensure
     FileUtils.remove_entry tmp_dir
+    puts "Deleting #{app_name}"
+    Okyakusan.start {|heroku| heroku.delete("/apps/#{app_name}") if app_name }
   end
 end

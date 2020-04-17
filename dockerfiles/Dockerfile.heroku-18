@@ -2,12 +2,18 @@ FROM heroku/heroku:18-build.v16
 MAINTAINER hone
 
 RUN apt-get update && apt-get install autoconf subversion zip -y
+RUN gem install bundler --version 1.17.3 --no-ri
 
 # setup workspace
 RUN rm -rf /tmp/workspace
 RUN mkdir -p /tmp/workspace
 
-# output dir is mounted
+WORKDIR /root/work
 
+# output dir is mounted
 ADD build.rb /tmp/build.rb
 CMD ["ruby", "/tmp/build.rb", "/tmp/workspace", "/tmp/output", "/tmp/cache"]
+
+COPY dockerfiles/support/entrypoint.sh /usr/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/bin/entrypoint.sh"]
