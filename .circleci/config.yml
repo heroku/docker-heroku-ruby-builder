@@ -2,96 +2,36 @@ version: 2.1
 
 workflows:
   version: 2.1
-  heroku-18:
+  heroku-20:
     jobs:
       - build-docker-image:
-          stack: "heroku-18"
+          stack: "heroku-20"
       - build-binary:
-          stack: "heroku-18"
+          stack: "heroku-20"
           requires:
             - build-docker-image
-      - test:
-          stack: "heroku-18"
-          requires:
-            - build-binary
+      # Tests are expected to fail since heroku-20 is marked as internal-only in API for now,
+      # so requires a privileged API call to create apps with that stack.
+      # - test:
+      #     stack: "heroku-20"
+      #     requires:
+      #       - build-binary
       - upload-to-s3:
-          stack: "heroku-18"
+          stack: "heroku-20"
           bucket_name: $STAGING_BUCKET_NAME
           aws_access_key_id: $STAGING_AWS_ACCESS_KEY_ID
           aws_secret_access_key: $STAGING_AWS_SECRET_ACCESS_KEY
           name: Upload to S3 Staging
           requires:
-            - test
+            # - test
+            - build-binary
       - production-hold:
           type: approval
           requires:
-            - test
-      - upload-to-s3:
-          stack: "heroku-18"
-          bucket_name: $PRODUCTION_BUCKET_NAME
-          aws_access_key_id: $PRODUCTION_AWS_ACCESS_KEY_ID
-          aws_secret_access_key: $PRODUCTION_AWS_SECRET_ACCESS_KEY
-          name: Upload to S3 Production
-          requires:
-            - production-hold
-  heroku-16:
-    jobs:
-      - build-docker-image:
-          stack: "heroku-16"
-      - build-binary:
-          stack: "heroku-16"
-          requires:
-            - build-docker-image
-      - test:
-          stack: "heroku-16"
-          requires:
+            # - test
             - build-binary
       - upload-to-s3:
-          stack: "heroku-16"
-          bucket_name: $STAGING_BUCKET_NAME
-          aws_access_key_id: $STAGING_AWS_ACCESS_KEY_ID
-          aws_secret_access_key: $STAGING_AWS_SECRET_ACCESS_KEY
-          name: Upload to S3 Staging
-          requires:
-            - test
-      - production-hold:
-          type: approval
-          requires:
-            - test
-      - upload-to-s3:
-          stack: "heroku-16"
-          bucket_name: $PRODUCTION_BUCKET_NAME
-          aws_access_key_id: $PRODUCTION_AWS_ACCESS_KEY_ID
-          aws_secret_access_key: $PRODUCTION_AWS_SECRET_ACCESS_KEY
-          name: Upload to S3 Production
-          requires:
-            - production-hold
-  cedar-14:
-    jobs:
-      - build-docker-image:
-          stack: "cedar-14"
-      - build-binary:
-          stack: "cedar-14"
-          requires:
-            - build-docker-image
-      - test:
-          stack: "cedar-14"
-          requires:
-            - build-binary
-      - upload-to-s3:
-          stack: "cedar-14"
-          bucket_name: $STAGING_BUCKET_NAME
-          aws_access_key_id: $STAGING_AWS_ACCESS_KEY_ID
-          aws_secret_access_key: $STAGING_AWS_SECRET_ACCESS_KEY
-          name: Upload to S3 Staging
-          requires:
-            - test
-      - production-hold:
-          type: approval
-          requires:
-            - test
-      - upload-to-s3:
-          stack: "cedar-14"
+          stack: "heroku-20"
           bucket_name: $PRODUCTION_BUCKET_NAME
           aws_access_key_id: $PRODUCTION_AWS_ACCESS_KEY_ID
           aws_secret_access_key: $PRODUCTION_AWS_SECRET_ACCESS_KEY
@@ -150,38 +90,6 @@ jobs:
           paths:
             - circle_build_num
             - builds
-
-  test:
-    docker:
-      - image: ruby:2.5-stretch
-    parameters:
-      stack:
-        type: string
-    steps:
-      - run:
-          name: Setup Heroku
-          command: |
-            curl https://cli-assets.heroku.com/install.sh | sh
-            printf "machine api.heroku.com\n  login jkutner+tunnels@gmail.com\n  password $HEROKU_API_KEY\n" > ~/.netrc
-            chmod 0600 ~/.netrc
-      - checkout
-      - attach_workspace:
-          at: /tmp/store/
-      - run: ruby -v > /tmp/ruby_version
-      - restore_cache:
-          keys:
-            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
-            - gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}
-      - run: bundle install --path vendor/bundle
-      - save_cache:
-          key: gem-cache-v1-{{ arch }}-{{ checksum "/tmp/ruby_version" }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
-          paths:
-            - vendor/bundle
-      - run:
-          name: Test
-          command: |
-            CIRCLE_PREVIOUS_BUILD_NUM=`cat /tmp/store/circle_build_num`
-            bundle exec rake test[$RUBY_VERSION,<< parameters.stack >>]
 
   upload-to-s3:
     docker:
