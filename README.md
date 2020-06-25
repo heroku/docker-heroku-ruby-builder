@@ -90,7 +90,7 @@ When a new Ruby version releases you will want to build support for all stacks.
 
 ```sh
 bundle exec rake new[2.6.0,heroku-20] && \
-bash rubies/heroku-18/ruby-2.6.0.sh && \
+bash rubies/heroku-20/ruby-2.6.0.sh && \
 bundle exec rake upload[2.6.0,heroku-20] && \
 bundle exec rake test[2.6.0,heroku-20] && \
 \
