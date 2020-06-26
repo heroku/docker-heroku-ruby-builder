@@ -1,0 +1,6 @@
+{
+  "hatchet": {"directory": "test/fixtures"},
+  "ruby": [
+    "sharpstone/default_ruby"
+  ]
+}

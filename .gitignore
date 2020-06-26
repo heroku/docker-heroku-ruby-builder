@@ -3,3 +3,5 @@ builds/
 cache/
 vendor/
 .DS_Store
+
+test/fixtures/repos/*
