@@ -31,20 +31,22 @@ end
 
 desc "Upload a ruby to S3"
 task :upload, [:version, :stack, :staging] do |t, args|
-  require 'aws-sdk'
+  require 'aws-sdk-s3'
 
   profile_name = "#{S3_BUCKET_NAME}#{args[:staging] ? "-staging" : ""}"
-  credentials  = AWS::Core::CredentialProviders::SharedCredentialFileProvider.new(profile_name: profile_name)
+
   filename     = "ruby-#{args[:version]}.tgz"
   s3_key       = "#{args[:stack]}/#{filename.sub(/-(preview|rc)\d+/, '')}"
-  s3           = AWS::S3.new(access_key_id: ENV.fetch("AWS_ACCESS_KEY_ID"), secret_access_key: ENV.fetch("AWS_SECRET_ACCESS_KEY"))
-  bucket       = s3.buckets[profile_name]
-  object       = bucket.objects[s3_key]
+
+  s3 = Aws::S3::Resource.new(region: "us-east-1", access_key_id: ENV.fetch("AWS_ACCESS_KEY_ID"), secret_access_key: ENV.fetch("AWS_SECRET_ACCESS_KEY"))
+  bucket       = s3.bucket(profile_name)
+  s3_object    = bucket.object(s3_key)
   output_file  = "builds/#{args[:stack]}/#{filename}"
 
   puts "Uploading #{output_file} to s3://#{profile_name}/#{s3_key}"
-  object.write(file: output_file)
-  object.acl = :public_read
+  File.open(output_file, 'rb') do |file|
+    s3_object.put(body: file, acl: "public-read")
+  end
 end
 
 desc "Make this patchlevel the default for that version"
@@ -107,18 +109,10 @@ namespace :batch do
 
     puts "Uploading the following rubies:\n* #{rubies.join("\n* ")}"
 
-    require 'aws-sdk'
-    s3     = AWS::S3.new
-    bucket = s3.buckets[S3_BUCKET_NAME]
-
     rubies.each do |ruby_path|
-      s3_key = "#{args[:stack]}/#{File.basename(ruby_path)}"
-      object = bucket.objects[s3_key]
-
+      version = ruby_path.gsub("ruby-")
       puts "Uploading #{ruby_path} to s3://#{S3_BUCKET_NAME}/{s3_key}"
-
-      object.write(file: ruby_path)
-      object.acl = :public_read
+      Rake::Task[:upload].invoke(version, stack)
     end
   end
 end
