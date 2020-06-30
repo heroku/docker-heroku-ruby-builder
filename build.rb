@@ -187,7 +187,23 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
     end
   end
 
+
   Dir.chdir(prefix) do
+    # Fix malformed binstubs
+    Dir.entries("bin").each do |entry|
+      next unless File.file?("bin/#{entry}")
+
+      shebang = `cat bin/#{entry} | head -n 1`
+      next unless shebang.force_encoding("UTF-8").valid_encoding? # Check if binstub is a binary file
+
+      regex = /#{Regexp.escape("#!/app/vendor/#{full_name}/bin/ruby")}/
+      next unless shebang =~ regex
+
+      puts "Fixing binstub for bin/#{entry}"
+      contents = File.read("bin/#{entry}").gsub(regex, "#!/usr/bin/env ruby")
+      File.open("bin/#{entry}", "w") {|f| f.write(contents) }
+    end
+
     filename =
       if build
         "ruby-build-#{full_version}.tgz"
@@ -195,7 +211,6 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
         "#{full_name}.tgz"
       end
 
-    pipe "ls"
     puts "Writing #{filename}"
     FileUtils.mkdir_p("#{output_dir}/#{stack}")
     pipe("tar czf #{output_dir}/#{stack}/#{filename} *")
