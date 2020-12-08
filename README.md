@@ -104,12 +104,7 @@ bash rubies/heroku-16/ruby-2.6.0.sh && \
 bundle exec rake upload[2.6.0,heroku-16] && \
 bundle exec rake test[2.6.0,heroku-16] && \
 \
-bundle exec rake new[2.6.0,cedar-14] && \
-bash rubies/cedar-14/ruby-2.6.0.sh && \
-bundle exec rake upload[2.6.0,cedar-14] && \
-bundle exec rake test[2.6.0,cedar-14] && \
-\
-echo "Done building 2.6.0 for cedar-14, heroku-16, heroku-18 and heroku-20"
+echo "Done building 2.6.0 for heroku-16, heroku-18 and heroku-20"
 ```
 
 #### Building a GIT_URL release
