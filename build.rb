@@ -109,7 +109,9 @@ Dir.chdir(cache_dir) do
 
     FileUtils.mv("#{full_name}/build/#{tarball}", ".")
   else
-    fetch("http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{tarball}")
+    url = "http://ftp.ruby-lang.org/pub/ruby/#{major_ruby}/#{tarball}"
+    puts "Downloading #{url}"
+    fetch(url)
   end
 
   if stack.match(/cedar/)

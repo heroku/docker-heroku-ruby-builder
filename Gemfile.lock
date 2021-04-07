@@ -916,30 +916,32 @@ GEM
     aws-sigv4 (1.2.1)
       aws-eventstream (~> 1, >= 1.0.2)
     erubis (2.7.0)
-    excon (0.76.0)
-    heroics (0.1.1)
+    excon (0.79.0)
+    heroics (0.1.2)
       erubis (~> 2.0)
       excon
       moneta
       multi_json (>= 1.9.2)
-    heroku_hatchet (7.3.0)
+      webrick
+    heroku_hatchet (7.3.4)
       excon (~> 0)
       platform-api (~> 3)
       rrrretry (~> 1)
-      thor (~> 0)
+      thor (~> 1)
       threaded (~> 0)
     jmespath (1.4.0)
     moneta (1.0.0)
     multi_json (1.15.0)
-    platform-api (3.0.0)
+    platform-api (3.3.0)
       heroics (~> 0.1.1)
       moneta (~> 1.0.0)
       rate_throttle_client (~> 0.1.0)
     rake (13.0.1)
     rate_throttle_client (0.1.2)
     rrrretry (1.0.0)
-    thor (0.20.3)
+    thor (1.1.0)
     threaded (0.0.4)
+    webrick (1.7.0)
 
 PLATFORMS
   ruby
@@ -948,6 +950,7 @@ DEPENDENCIES
   aws-sdk
   heroku_hatchet
   rake
+  webrick
 
 BUNDLED WITH
    2.1.4
