@@ -141,9 +141,6 @@ task :test, [:version, :stack, :staging] do |t, args|
       raise "Could not modify Gemfile: #{out}" unless $?.success?
     end
     app.deploy do
-      out = app.run("cat bin/rake | head -n 1").chomp
-      raise "Expected #{out} to not include shebang with `bin/ruby` but it did" if out =~ /bin\/ruby/
-
       out = app.run("echo 'Ruby version: $(ruby -v), Gem version: $(gem -v)'", raw: true).chomp
       puts "Stack: #{stack}, #{out}, s3_bucket: #{staging ? "staging" : "production"}"
     end
