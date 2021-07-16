@@ -84,7 +84,7 @@ If you set the env vars `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, you can
 $ bundle exec rake upload[2.2.2,cedar-14]
 ```
 
-#### Support two stacks
+#### Support latest stacks (and 2.6.x for cedar-14)
 
 When a new Ruby version releases you will want to build support for all stacks.
 
@@ -93,14 +93,20 @@ bundle exec rake new[2.6.0,heroku-20] && \
 bash rubies/heroku-20/ruby-2.6.0.sh && \
 bundle exec rake upload[2.6.0,heroku-20] && \
 bundle exec rake test[2.6.0,heroku-20] && \
-\
+echo "Done building 2.6.0 for heroku-20"
+
 bundle exec rake new[2.6.0,heroku-18] && \
 bash rubies/heroku-18/ruby-2.6.0.sh && \
 bundle exec rake upload[2.6.0,heroku-18] && \
 bundle exec rake test[2.6.0,heroku-18] && \
-\
-echo "Done building 2.6.0 for heroku-18 and heroku-20"
+echo "Done building 2.6.0 for heroku-18"
 ```
+
+#### 2.6.x for cedar-14
+
+2.6.x needs to be built for cedar-14 until June 2022 for **reasons** context:
+
+https://heroku.slack.com/archives/CCHLHGYN4/p1626453674261400?thread_ts=1594401389.161100&cid=CCHLHGYN4
 
 #### Building a GIT_URL release
 
