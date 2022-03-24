@@ -61,7 +61,7 @@ This build tool supports heroku's multiple stacks. The built rubies will go in t
 First we'll need to generate the docker images needed for building the appropriate stack.
 
 ```sh
-$ bundle exec rake generate_image[cedar-14]
+$ bundle exec rake "generate_image[cedar-14]"
 ```
 
 Generate a ruby build script:
