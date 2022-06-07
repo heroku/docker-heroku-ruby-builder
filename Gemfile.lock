@@ -929,7 +929,7 @@ GEM
       rrrretry (~> 1)
       thor (~> 1)
       threaded (~> 0)
-    jmespath (1.4.0)
+    jmespath (1.6.1)
     moneta (1.0.0)
     multi_json (1.15.0)
     platform-api (3.3.0)
