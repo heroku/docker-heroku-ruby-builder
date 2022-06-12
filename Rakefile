@@ -127,7 +127,7 @@ task :test, [:version, :stack, :staging] do |t, args|
 
   if staging
     buildpacks = ["https://github.com/sharpstone/sudo_set_config_var_buildpack", "heroku/ruby"]
-    config = {"__SUDO_BUILDPACK_VENDOR_URL" => "https://heroku-buildpack-ruby-staging.s3.amazonaws.com"}
+    config = {"__SUDO_BUILDPACK_VENDOR_URL" => "https://heroku-buildpack-ruby-staging.s3.us-east-1.amazonaws.com"}
   else
     buildpacks = ["heroku/ruby"]
     config = {}
