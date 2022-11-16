@@ -2,6 +2,8 @@ FROM heroku/heroku:18-build.v16
 MAINTAINER hone
 
 RUN apt-get update && apt-get install autoconf subversion zip -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # setup workspace
 RUN rm -rf /tmp/workspace

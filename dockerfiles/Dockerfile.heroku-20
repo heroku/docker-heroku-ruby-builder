@@ -4,6 +4,9 @@ FROM heroku/heroku:20-build
 RUN rm -rf /tmp/workspace
 RUN mkdir -p /tmp/workspace
 
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
 # output dir is mounted
 
 ADD build.rb /tmp/build.rb

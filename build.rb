@@ -160,6 +160,8 @@ Dir.mktmpdir("ruby-vendor-") do |vendor_dir|
 
     configure_opts = "--disable-install-doc --prefix #{prefix}"
     configure_opts += " --enable-load-relative" if major_ruby != "1.8" && version != "1.9.2"
+    configure_opts += " --enable-yjit" if Gem::Version.new(version) >= Gem::Version.new("3.2")
+
     if stack != "cedar-14"
       configure_opts += " --enable-shared"
     end
