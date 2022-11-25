@@ -38,7 +38,12 @@ task :upload, [:version, :stack, :staging] do |t, args|
   filename     = "ruby-#{args[:version]}.tgz"
   s3_key       = "#{args[:stack]}/#{filename.sub(/-(preview|rc)\d+/, '')}"
 
-  s3 = Aws::S3::Resource.new(region: "us-east-1", access_key_id: ENV.fetch("AWS_ACCESS_KEY_ID"), secret_access_key: ENV.fetch("AWS_SECRET_ACCESS_KEY"))
+  s3 = Aws::S3::Resource.new(
+    region: "us-east-1",
+    access_key_id: ENV.fetch("AWS_ACCESS_KEY_ID"),
+    secret_access_key: ENV.fetch("AWS_SECRET_ACCESS_KEY"),
+    session_token: ENV.fetch("AWS_SESSION_TOKEN")
+  )
   bucket       = s3.bucket(profile_name)
   s3_object    = bucket.object(s3_key)
   output_file  = "builds/#{args[:stack]}/#{filename}"
