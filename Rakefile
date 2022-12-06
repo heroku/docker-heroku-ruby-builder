@@ -36,7 +36,7 @@ task :upload, [:version, :stack, :staging] do |t, args|
   profile_name = "#{S3_BUCKET_NAME}#{args[:staging] ? "-staging" : ""}"
 
   filename     = "ruby-#{args[:version]}.tgz"
-  s3_key       = "#{args[:stack]}/#{filename.sub(/-(preview|rc)\d+/, '')}"
+  s3_key       = "#{args[:stack]}/#{filename.sub(/-((preview|rc)\d+)/, '\1')}"
 
   s3 = Aws::S3::Resource.new(
     region: "us-east-1",
