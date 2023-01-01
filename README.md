@@ -107,3 +107,4 @@ To configure the build, we use environment variables. All of them are listed bel
 #### How it works
 
 There is a script `build.rb` that was coppied over when the docker container was built. This can be seen in the various `Dockerfile.*` files.
+test
