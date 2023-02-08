@@ -930,12 +930,17 @@ GEM
       thor (~> 1)
       threaded (~> 0)
     jmespath (1.6.2)
+    mini_portile2 (2.8.1)
     moneta (1.0.0)
     multi_json (1.15.0)
+    nokogiri (1.14.1)
+      mini_portile2 (~> 2.8.0)
+      racc (~> 1.4)
     platform-api (3.3.0)
       heroics (~> 0.1.1)
       moneta (~> 1.0.0)
       rate_throttle_client (~> 0.1.0)
+    racc (1.6.2)
     rake (13.0.1)
     rate_throttle_client (0.1.2)
     rrrretry (1.0.0)
@@ -949,6 +954,7 @@ PLATFORMS
 DEPENDENCIES
   aws-sdk
   heroku_hatchet
+  nokogiri
   rake
   webrick
 
