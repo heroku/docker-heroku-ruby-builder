@@ -52,24 +52,21 @@ $ bundle exec rake upload[2.2.2,cedar-14]
 When a new Ruby version releases you will want to build support for all stacks.
 
 ```sh
-bundle exec rake "new[2.6.0,heroku-20]" && \
-bash rubies/heroku-20/ruby-2.6.0.sh && \
-bundle exec rake "upload[2.6.0,heroku-20]" && \
-bundle exec rake "test[2.6.0,heroku-20]" && \
-echo "Done building 2.6.0 for heroku-20"
+bundle exec rake "new[3.1.2,heroku-20]" &&
+bundle exec rake "new[3.1.2,heroku-22]" &&
+bash rubies/heroku-20/ruby-3.1.2.sh &&
+bash rubies/heroku-22/ruby-3.1.2.sh &&
+echo "Done building"
+say "Done building"
 
-bundle exec rake "new[2.6.0,heroku-18]" && \
-bash rubies/heroku-18/ruby-2.6.0.sh && \
-bundle exec rake "upload[2.6.0,heroku-18]" && \
-bundle exec rake "test[2.6.0,heroku-18]" && \
-echo "Done building 2.6.0 for heroku-18"
+
+bundle exec rake "upload[3.1.2,heroku-20]" &&
+bundle exec rake "upload[3.1.2,heroku-22]" &&
+bundle exec rake "test[3.1.2,heroku-20]" &&
+bundle exec rake "test[3.1.2,heroku-22]" &&
+echo "Done uploading"
+say "Done uploading"
 ```
-
-#### 2.7.x for cedar-14
-
-2.7.x needs to be built for cedar-14 until June 2022 for **reasons** context:
-
-https://heroku.slack.com/archives/CCHLHGYN4/p1626453674261400?thread_ts=1594401389.161100&cid=CCHLHGYN4
 
 #### Building a GIT_URL release
 
