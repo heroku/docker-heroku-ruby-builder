@@ -1,11 +1,43 @@
 # Ruby Builder for Heroku
-This uses [Docker](http://docker.io) to build MRI ruby binaries locally in a cedar image for the [heroku ruby buildpack](https://github.com/heroku/heroku-buildpack-ruby).
 
-## Building a Ruby
+This repo contains scripts to build binaries locally and on GitHub Actions.
 
-### Building Locally
+## Building with GitHub actions
 
-#### Assumptions
+Navigate to GithHub actions. Select the workflow "Build and upload Ruby runtime" then click the drop down "Run workflow" and enter the desired Ruby version. This will trigger a build for all supported stacks. If a version is not supported on a specific stack, add that logic to the `build.rb` file and to the GitHub action yaml logic.
+
+Employees of Heroku see: [The Ruby language guides](https://github.com/heroku/languages-team/tree/main/languages/ruby) (not public) for additional details on building and deploying Ruby versions.
+
+## How it works
+
+Logic lives in the `build.rb` script at the root of this project. It will call `./configure` and `make` with the corresponding inputs. This file is coppied into a docker image when `$ bundle exec rake "generate_image[heroku-22]"` is called. See `dockerfiles/Dockerfile.heroku-22` for an example.
+
+You can see the rake code:
+
+```ruby
+desc "Build docker image for stack"
+task :generate_image, [:stack] do |t, args|
+  require 'fileutils'
+  FileUtils.cp("dockerfiles/Dockerfile.#{args[:stack]}", "Dockerfile")
+  system("docker build -t hone/ruby-builder:#{args[:stack]} .")
+  FileUtils.rm("Dockerfile")
+end
+```
+
+Once built it can be invoked with different inputs like:
+
+```
+$ export OUTPUT_DIR="./builds"
+$ export CACHE_DIR="./cache"
+$ docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=3.2.2  -e STACK=heroku-22 hone/ruby-builder:heroku-22
+```
+
+This generates a file in the `builds` directory with the given binary. From there it can be uploaded to S3 so customers of the `heroku/ruby` buildpack can download the pre-built binary and put it on the PATH.
+
+## Building Locally
+
+### Assumptions
+
 I'm assuming you've [already setup Docker](https://www.docker.io/gettingstarted/).
 
 The directory layout used by this script inside the docker container is as follows:
@@ -15,60 +47,39 @@ The directory layout used by this script inside the docker container is as follo
 * The artifacts downloaded for the build are put into `/tmp/cache`.
 * Finally, the `/app` directory is there like in a normal cedarish app, so we'll prefix things within this directory so the load paths are useable and fast lookups when using the `--enable-load-relative` flag. We'll need special build rubies for ruby 1.9.2/1.8.7 since `--enable-load-relative` is broken there.
 
-#### Stacks
+### Stacks
 
-This build tool supports heroku's multiple stacks. The built rubies will go in the `builds/` directory. We also have a `rubies/` directory for ensuring consistent builds. In each of these directories, they're split into a stack folder. All of the cedar-14 builds will be in `builds/cedar-14/` for instance.
+This build tool supports heroku's multiple stacks. The built rubies will go in the `builds/` directory. We also have a `rubies/` directory for ensuring consistent builds. In each of these directories, they're split into a stack folder. All of the heroku-22 builds will be in `builds/heroku-22/` for instance.
 
-#### Building
+### Building
 
 First we'll need to generate the docker images needed for building the appropriate stack.
 
 ```sh
-$ bundle exec rake "generate_image[cedar-14]"
+$ bundle exec rake "generate_image[heroku-22]"
 ```
 
 Generate a ruby build script:
 
 ```sh
-$ bundle exec rake new[2.2.2,cedar-14]
+$ bundle exec rake "new[3.1.3,heroku-22]"
 ```
 
 From here, we can now execute a ruby build:
 
 ```
-$ bash rubies/cedar-14/ruby-2.2.2.sh
+$ bash rubies/heroku-22/ruby-3.1.3.sh
 ```
 
-When it's complete you should now see `builds/cedar-14/ruby-2.2.2.tgz`.
+When it's complete you should now see `builds/heroku-22/ruby-3.1.3.tgz`.
 
 If you set the env vars `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, you can upload them to s3. By default, we upload to the `heroku-buildpack-ruby` s3 bucket.
 
 ```sh
-$ bundle exec rake upload[2.2.2,cedar-14]
+$ bundle exec rake upload[3.1.3,heroku-22]
 ```
 
-#### Support latest stacks (and 2.7.x for cedar-14)
-
-When a new Ruby version releases you will want to build support for all stacks.
-
-```sh
-bundle exec rake "new[3.1.2,heroku-20]" &&
-bundle exec rake "new[3.1.2,heroku-22]" &&
-bash rubies/heroku-20/ruby-3.1.2.sh &&
-bash rubies/heroku-22/ruby-3.1.2.sh &&
-echo "Done building"
-say "Done building"
-
-
-bundle exec rake "upload[3.1.2,heroku-20]" &&
-bundle exec rake "upload[3.1.2,heroku-22]" &&
-bundle exec rake "test[3.1.2,heroku-20]" &&
-bundle exec rake "test[3.1.2,heroku-22]" &&
-echo "Done uploading"
-say "Done uploading"
-```
-
-#### Building a GIT_URL release
+### Building a GIT_URL release
 
 Sometimes a version might need to be tested, for example a commit on Ruby trunk.
 
@@ -88,7 +99,7 @@ docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=2.6.0 
 
 If you need to use a branch you can put it in the url after the `#`.
 
-#### Docker Enviroment Variables
+### Docker Enviroment Variables
 
 To configure the build, we use environment variables. All of them are listed below:
 
@@ -99,8 +110,3 @@ To configure the build, we use environment variables. All of them are listed bel
 * `GIT_URL` - If this option is used, it will override fetching a source tarball from <http://ftp.ruby-lang.org/pub/ruby> with a git repo. This allows building ruby forks or trunk. This option also supports passing a treeish git object in the URL with the `#` character. For instance, `git://github.com/hone/ruby.git#ruby_1_8_7`.
 * `S3_BUCKET_NAME` - This option is the S3 bucket name containing of dependencies for building ruby. If this option is not specified, hammer-ruby defaults to "heroku-buildpack-ruby". The dependencies needed are `libyaml-0.1.4.tgz` and `libffi-3.0.10.tgz`.
 * `JOBS` - the number of jobs to run in parallel when running make: `make -j<jobs>`. By default this is 2.
-
-
-#### How it works
-
-There is a script `build.rb` that was coppied over when the docker container was built. This can be seen in the various `Dockerfile.*` files.
