@@ -2,6 +2,9 @@ name: Build and upload Ruby runtime
 run-name: "Build and upload Ruby ${{ inputs.ruby_version }}${{ inputs.dry_run && ' (dry run)' || '' }}"
 
 on:
+  push:
+    paths:
+      - ".github/workflows/**/*"
   workflow_dispatch:
     inputs:
       ruby_version:
