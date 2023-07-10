@@ -71,6 +71,11 @@ else
   patch = nil
 end
 
+# https://bugs.ruby-lang.org/issues/18658
+if stack == "heroku-22" && version.starts_with?("3.0")
+  raise "Cannot build Ruby 3.0 on heroku-22"
+end
+
 # create cache dir if it doesn't exist
 FileUtils.mkdir_p(cache_dir)
 

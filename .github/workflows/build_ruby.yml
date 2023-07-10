@@ -1,0 +1,72 @@
+name: Build and upload Ruby runtime
+run-name: "Build and upload Ruby ${{ inputs.ruby_version }}${{ inputs.dry_run && ' (dry run)' || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ruby_version:
+          description: "The Ruby version to build, specified as X.Y.Z"
+          type: string
+          required: true
+      dry_run:
+          description: "Skip deploying to S3 (e.g. for testing)"
+          type: boolean
+          default: false
+          required: false
+
+permissions:
+  contents: read
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: "us-west-2"
+  S3_BUCKET: "heroku-buildpack-ruby"
+
+jobs:
+  build-and-upload-heroku-20:
+    runs-on: pub-hk-ubuntu-22.04-xlarge
+    env:
+      STACK: "heroku-20"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
+        with:
+          ruby-version: '3.1'
+      - name: Install dependencies
+        run: bundle install
+      - name: Build Docker image
+        run: bundle exec rake "generate_image[$STACK]"
+      - name: Generate Ruby Dockerfile
+        run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
+      - name: Build and package Ruby runtime
+        run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
+      - name: Upload Ruby runtime archive to S3
+        if: (!inputs.dry_run)
+        run: bundle exec rake "upload[${{inputs.ruby_version}},$STACK]"
+
+  build-and-upload-heroku-22:
+    if: (!startsWith(inputs.ruby_version, '3.0')) # https://bugs.ruby-lang.org/issues/18658
+    runs-on: pub-hk-ubuntu-22.04-xlarge
+    env:
+      STACK: "heroku-22"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
+        with:
+          ruby-version: '3.1'
+      - name: Install dependencies
+        run: bundle install
+      - name: Build Docker image
+        run: bundle exec rake "generate_image[$STACK]"
+      - name: Generate Ruby Dockerfile
+        run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
+      - name: Build and package Ruby runtime
+        run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
+      - name: Upload Ruby runtime archive to S3
+        if: (!inputs.dry_run)
+        run: bundle exec rake "upload[${{inputs.ruby_version}},$STACK]"
