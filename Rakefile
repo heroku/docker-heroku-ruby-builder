@@ -29,6 +29,40 @@ FILE
   write_file.call(args[:version], args[:stack], args[:patch])
 end
 
+desc "Output the Rubygems version for a given binary"
+task :rubygems_version, [:version, :stack] do |t, args|
+  stack = args[:stack]
+  ruby_version = args[:version]
+
+  # Extract the binary in a docker image and run `bin/gem -v` to output it's Rubygems version
+  command = "docker run -v $(PWD)/builds/#{stack}:/tmp/output hone/ruby-builder:#{stack} bash -c \"cd /tmp/output && tar xzf ruby-#{ruby_version}.tgz && echo 'Rubygems version is: ' && bin/gem -v\""
+  puts "Running: #{command}"
+  pipe(command)
+end
+
+desc "Emits a changelog message"
+task :changelog, [:version] do |_, args|
+  ruby_version = args[:version]
+
+  puts "Add a changelog item: https://devcenter.heroku.com/admin/changelog_items/new"
+
+  puts <<~EOM
+
+    ## Ruby version #{ruby_version} is now available
+
+    [Ruby v#{ruby_version}](/articles/ruby-support#ruby-versions) is now available on Heroku. To run
+    your app using this version of Ruby, add the following `ruby` directive to your Gemfile:
+
+    ```ruby
+    ruby "#{ruby_version}"
+    ```
+
+    For more information on [Ruby #{ruby_version}, you can view the release announcement](https://www.ruby-lang.org/en/news/).
+
+  EOM
+
+end
+
 desc "Upload a ruby to S3"
 task :upload, [:version, :stack, :staging] do |t, args|
   require 'aws-sdk-s3'
@@ -150,4 +184,19 @@ task :test, [:version, :stack, :staging] do |t, args|
       puts "Stack: #{stack}, #{out}, s3_bucket: #{staging ? "staging" : "production"}"
     end
   end
+end
+
+def pipe(command)
+  output = ""
+  IO.popen(command) do |io|
+    until io.eof?
+      buffer = io.gets
+      output << buffer
+      puts buffer
+    end
+  end
+
+  raise "Command failed #{command}" unless $?.success?
+
+  output
 end
