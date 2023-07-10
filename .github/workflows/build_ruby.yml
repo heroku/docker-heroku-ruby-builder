@@ -48,6 +48,9 @@ jobs:
         run: bundle exec rake "upload[${{inputs.ruby_version}},$STACK]"
       - name: Output Rubygems version
         run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
+      - name: Output CHANGELOG
+        if: (!inputs.dry_run)
+        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
 
   build-and-upload-heroku-22:
     if: (!startsWith(inputs.ruby_version, '3.0')) # https://bugs.ruby-lang.org/issues/18658
@@ -74,3 +77,6 @@ jobs:
         run: bundle exec rake "upload[${{inputs.ruby_version}},$STACK]"
       - name: Output Rubygems version
         run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
+      - name: Output CHANGELOG
+        if: (!inputs.dry_run)
+        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
