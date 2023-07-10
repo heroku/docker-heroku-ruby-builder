@@ -29,6 +29,17 @@ FILE
   write_file.call(args[:version], args[:stack], args[:patch])
 end
 
+desc "Output the Rubygems version for a given binary"
+task :rubygems_version, [:version, :stack] do |t, args|
+  ruby_version = args[:version]
+  stack = args[:stack]
+
+  # Extract the binary in a docker image and run `bin/gem -v` to output it's Rubygems version
+  command = "docker run -v $(PWD)/builds/#{stack}:/tmp/output hone/ruby-builder:#{stack} bash -c \"cd /tmp/output && tar xzf ruby-#{ruby_version}.tgz && echo 'Rubygems version is: ' && bin/gem -v\""
+  puts "Running: #{command}"
+  pipe(command)
+end
+
 desc "Upload a ruby to S3"
 task :upload, [:version, :stack, :staging] do |t, args|
   require 'aws-sdk-s3'
@@ -150,4 +161,19 @@ task :test, [:version, :stack, :staging] do |t, args|
       puts "Stack: #{stack}, #{out}, s3_bucket: #{staging ? "staging" : "production"}"
     end
   end
+end
+
+def pipe(command)
+  output = ""
+  IO.popen(command) do |io|
+    until io.eof?
+      buffer = io.gets
+      output << buffer
+      puts buffer
+    end
+  end
+
+  raise "Command failed #{command}" unless $?.success?
+
+  output
 end
