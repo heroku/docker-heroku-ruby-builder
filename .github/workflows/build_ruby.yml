@@ -45,7 +45,7 @@ jobs:
         run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
       - name: Upload Ruby runtime archive to S3
         if: (!inputs.dry_run)
-        run: bundle exec rake "upload[${{inputs.ruby_version}},$STACK]"
+        run: aws s3 sync ./builds "s3://${S3_BUCKET}"
       - name: Output Rubygems version
         run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
       - name: Output CHANGELOG
@@ -74,7 +74,7 @@ jobs:
         run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
       - name: Upload Ruby runtime archive to S3
         if: (!inputs.dry_run)
-        run: bundle exec rake "upload[${{inputs.ruby_version}},$STACK]"
+        run: aws s3 sync ./builds "s3://${S3_BUCKET}"
       - name: Output Rubygems version
         run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
       - name: Output CHANGELOG
