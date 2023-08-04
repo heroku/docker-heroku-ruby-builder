@@ -72,7 +72,7 @@ else
 end
 
 # https://bugs.ruby-lang.org/issues/18658
-if stack == "heroku-22" && version.starts_with?("3.0")
+if stack == "heroku-22" && version.start_with?("3.0")
   raise "Cannot build Ruby 3.0 on heroku-22"
 end
 
