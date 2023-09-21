@@ -110,3 +110,19 @@ To configure the build, we use environment variables. All of them are listed bel
 * `GIT_URL` - If this option is used, it will override fetching a source tarball from <http://ftp.ruby-lang.org/pub/ruby> with a git repo. This allows building ruby forks or trunk. This option also supports passing a treeish git object in the URL with the `#` character. For instance, `git://github.com/hone/ruby.git#ruby_1_8_7`.
 * `S3_BUCKET_NAME` - This option is the S3 bucket name containing of dependencies for building ruby. If this option is not specified, hammer-ruby defaults to "heroku-buildpack-ruby". The dependencies needed are `libyaml-0.1.4.tgz` and `libffi-3.0.10.tgz`.
 * `JOBS` - the number of jobs to run in parallel when running make: `make -j<jobs>`. By default this is 2.
+
+## Development
+
+Run unit tests
+
+```
+$ bundle exec rspec
+```
+
+Build a binary using current code and run it
+
+```
+$ bundle exec rake "generate_image[heroku-22]" && bash rubies/heroku-22/ruby-3.1.2.sh
+$ docker run -v $(PWD)/builds/heroku-22:/tmp/output hone/ruby-builder:heroku-22 bash -c "mkdir /tmp/unzipped && tar xzf /tmp/output/ruby-3.1.2.tgz -C /tmp/unzipped && echo 'Rubygems version is: ' &&  /tmp/unzipped/bin/gem -v"
+```
+
