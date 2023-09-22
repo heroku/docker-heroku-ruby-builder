@@ -37,6 +37,8 @@ jobs:
           ruby-version: '3.1'
       - name: Install dependencies
         run: bundle install
+      - name: Output CHANGELOG
+        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
       - name: Build Docker image
         run: bundle exec rake "generate_image[$STACK]"
       - name: Generate Ruby Dockerfile
@@ -48,9 +50,6 @@ jobs:
         run: aws s3 sync ./builds "s3://${S3_BUCKET}"
       - name: Output Rubygems version
         run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
-      - name: Output CHANGELOG
-        if: (!inputs.dry_run)
-        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
 
   build-and-upload-heroku-22:
     if: (!startsWith(inputs.ruby_version, '3.0')) # https://bugs.ruby-lang.org/issues/18658
@@ -66,6 +65,8 @@ jobs:
           ruby-version: '3.1'
       - name: Install dependencies
         run: bundle install
+      - name: Output CHANGELOG
+        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
       - name: Build Docker image
         run: bundle exec rake "generate_image[$STACK]"
       - name: Generate Ruby Dockerfile
@@ -77,6 +78,3 @@ jobs:
         run: aws s3 sync ./builds "s3://${S3_BUCKET}"
       - name: Output Rubygems version
         run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
-      - name: Output CHANGELOG
-        if: (!inputs.dry_run)
-        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
