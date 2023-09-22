@@ -48,7 +48,7 @@ describe RubyVersion do
 
       Note: This version of Ruby is not suitable for production applications.
             However, it can be used to test that your application is ready for
-            the December release of Ruby 3.3.0 and
+            the official release of Ruby 3.3.0 and
             to provide feedback to the Ruby core team.
     EOF
   end

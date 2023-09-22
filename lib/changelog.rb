@@ -28,7 +28,7 @@ class Changelog
 
         Note: This version of Ruby is not suitable for production applications.
               However, it can be used to test that your application is ready for
-              the December release of Ruby #{ruby_version.major_minor_patch} and
+              the official release of Ruby #{ruby_version.major_minor_patch} and
               to provide feedback to the Ruby core team.
       EOF
     end
