@@ -36,10 +36,9 @@ end
 
 desc "Output the Rubygems version for a given binary"
 task :rubygems_version, [:version, :stack] do |t, args|
-
   command = DockerCommand.gem_version_from_tar(
     stack: args[:stack],
-    ruby_version: RubyVersion.new(args[:version]),
+    ruby_version: RubyVersion.new(args[:version])
   )
   puts "Running: #{command}"
   pipe(command)
