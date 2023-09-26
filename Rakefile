@@ -1,6 +1,7 @@
 $LOAD_PATH.unshift File.expand_path("../lib", __FILE__)
 require "ruby_version"
 require "changelog"
+require "docker_command"
 
 require "fileutils"
 
@@ -35,11 +36,11 @@ end
 
 desc "Output the Rubygems version for a given binary"
 task :rubygems_version, [:version, :stack] do |t, args|
-  stack = args[:stack]
-  ruby_version = args[:version]
 
-  # Extract the binary in a docker image and run `bin/gem -v` to output it's Rubygems version
-  command = "docker run -v $(pwd)/builds/#{stack}:/tmp/output hone/ruby-builder:#{stack} bash -c \"mkdir /tmp/unzipped && tar xzf /tmp/output/ruby-#{ruby_version}.tgz -C /tmp/unzipped && echo 'Rubygems version is: ' && /tmp/unzipped/bin/gem -v\""
+  command = DockerCommand.gem_version_from_tar(
+    stack: args[:stack],
+    ruby_version: RubyVersion.new(args[:version]),
+  )
   puts "Running: #{command}"
   pipe(command)
 end
