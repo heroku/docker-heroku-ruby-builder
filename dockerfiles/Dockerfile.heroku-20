@@ -10,4 +10,5 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # output dir is mounted
 
 ADD build.rb /tmp/build.rb
+COPY lib/ /tmp/lib/
 CMD ["ruby", "/tmp/build.rb", "/tmp/workspace", "/tmp/output", "/tmp/cache"]

@@ -1,7 +1,7 @@
 require "spec_helper"
 require "changelog"
 
-describe RubyVersion do
+describe "Changelog output" do
   it "prints changelog info for regular releases" do
     io = StringIO.new
     Changelog.new(
