@@ -33,11 +33,11 @@ def run_build_script(
   ruby_version: ENV.fetch("STACK")
 )
 
+  parts = VersionParts.new(ruby_version)
   ruby_version = RubyVersion.new(ruby_version)
 
-  # The destination location of the built ruby version is the `prefix`
-  prefix = Pathname("/app/vendor/#{ruby_version.plain_file_name}")
-  io.puts "Using prefix: #{prefix}"
+  # The directory where ruby source will be downloaded
+  ruby_source_dir = Pathname(".")
 
   # create cache dir if it doesn't exist
   FileUtils.mkdir_p(cache_dir)
@@ -47,32 +47,45 @@ def run_build_script(
     ruby_version: ruby_version
   )
 
-  download_to_cache(
+  tar_file = download_to_cache(
     io: io,
     cache_dir: cache_dir,
-    ruby_version: ruby_version
+    download_url: DownloadRuby.new(parts: parts).url
   )
 
-  build(
-    io: io,
-    stack: stack,
-    prefix: prefix,
-    cache_dir: cache_dir,
-    ruby_version: ruby_version
+  untar_to_dir(
+    tar_file: tar_file,
+    dest_directory: ruby_source_dir
   )
 
-  fix_binstubs_in_dir(
-    io: io,
-    dir: prefix.join("bin")
-  )
+  Dir.mktmpdir do |tmp_dir|
+    # The directory where Ruby will be built into
+    ruby_binary_dir = Pathname(tmp_dir).join("prefix")
 
-  move_to_output(
-    io: io,
-    stack: stack,
-    prefix: prefix,
-    output_dir: output_dir,
-    ruby_version: ruby_version
-  )
+    build(
+      io: io,
+      ruby_version: ruby_version,
+      destination_dir: ruby_binary_dir,
+      ruby_source_dir: ruby_source_dir
+    )
+
+    fix_binstubs_in_dir(
+      io: io,
+      dir: ruby_binary_dir.join("bin")
+    )
+
+    destination = Pathname(output_dir)
+      .join(stack)
+      .tap(&:mkpath)
+      .join(ruby_version.tar_file_name_output)
+
+    io.puts "Writing #{destination}"
+    tar_dir(
+      io: io,
+      dir_to_tar: ruby_binary_dir,
+      destination_file: destination
+    )
+  end
 end
 
 # Runs a command on the command line and streams the results
@@ -100,57 +113,34 @@ def check_version_on_stack(ruby_version:, stack:)
 end
 
 # Downloads the given ruby version into the cache direcory
-def download_to_cache(cache_dir:, ruby_version:, io: $stdout)
-  Dir.chdir(cache_dir) do
-    url = ruby_version.download_url
-    uri = URI.parse(url)
-    filename = uri.to_s.split("/").last
+#
+# Returns a path to the file just downloaded
+def download_to_cache(cache_dir:, download_url:, io: $stdout)
+  file = Pathname(cache_dir).join(download_url.split("/").last)
 
-    io.puts "Downloading #{url}"
-
-    if File.exist?(filename)
-      io.puts "Using #{filename}"
-    else
-      io.puts "Fetching #{filename}"
-      run!("curl #{uri} -s -O")
-    end
+  if file.exist?
+    io.puts "Using cached #{file} (instead of downloading #{download_url})"
+  else
+    io.puts "Fetching #{file} (from #{download_url})"
+    run!("curl #{download_url} -s -o #{file}")
   end
+
+  file
 end
 
 # Compiles the ruby program and puts it into `prefix`
-def build(stack:, prefix:, cache_dir:, ruby_version:, jobs: DEFAULT_JOBS, io: $stdout)
-  build_dir = Pathname(".")
-  untar_to_dir(
-    tar_file: Pathname(cache_dir).join("#{ruby_version.plain_file_name}.tar.gz"),
-    dest_directory: build_dir
-  )
-
+# input a tar file
+def build(ruby_source_dir:, destination_dir:, ruby_version:, jobs: DEFAULT_JOBS, io: $stdout)
   # Move into the directory we just unziped and run `make`
   # We tell make where to put the result with the `prefix` argument
-  Dir.chdir(build_dir.join(ruby_version.plain_file_name)) do
+  Dir.chdir(ruby_source_dir.join(ruby_version.ruby_source_dir_name)) do
     command = make_commands(
       jobs: jobs,
-      prefix: prefix,
+      prefix: destination_dir,
       ruby_version: ruby_version
     )
     pipe(command)
   end
-end
-
-# After a ruby is compiled, this function will move it to the directory
-# that docker was given so it's available when the container exits
-def move_to_output(output_dir:, stack:, ruby_version:, prefix:, io: $stdout)
-  destination = Pathname(output_dir)
-    .join(stack)
-    .tap { |path| path.mkpath }
-    .join(ruby_version.tar_file_name_output)
-
-  io.puts "Writing #{destination}"
-  tar_dir(
-    io: io,
-    dir_to_tar: prefix,
-    destination_file: destination
-  )
 end
 
 # Generates the `make` commands that will build ruby

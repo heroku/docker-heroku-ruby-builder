@@ -1,9 +1,9 @@
 class Changelog
-  private attr_reader :io, :ruby_version
+  private attr_reader :io, :parts
 
-  def initialize(ruby_version:, io: $stdout)
+  def initialize(parts:, io: $stdout)
     @io = io
-    @ruby_version = ruby_version
+    @parts = parts
   end
 
   def call
@@ -11,24 +11,24 @@ class Changelog
 
     io.puts <<~EOM
 
-      ## Ruby version #{ruby_version.raw_version} is now available
+      ## Ruby version #{parts.download_format} is now available
 
-      [Ruby v#{ruby_version.raw_version}](/articles/ruby-support#ruby-versions) is now available on Heroku. To run
+      [Ruby v#{parts.download_format}](/articles/ruby-support#ruby-versions) is now available on Heroku. To run
       your app using this version of Ruby, add the following `ruby` directive to your Gemfile:
 
       ```ruby
-      ruby "#{ruby_version.major_minor_patch}"
+      ruby "#{parts.bundler_format}"
       ```
 
-      For more information on [Ruby #{ruby_version.raw_version}, you can view the release announcement](https://www.ruby-lang.org/en/news/).
+      For more information on [Ruby #{parts.download_format}, you can view the release announcement](https://www.ruby-lang.org/en/news/).
     EOM
 
-    if ruby_version.preview?
+    if parts.pre.length > 0
       io.puts <<~EOF
 
         Note: This version of Ruby is not suitable for production applications.
               However, it can be used to test that your application is ready for
-              the official release of Ruby #{ruby_version.major_minor_patch} and
+              the official release of Ruby #{parts.major}.#{parts.minor}.#{parts.patch} and
               to provide feedback to the Ruby core team.
       EOF
     end
