@@ -8,12 +8,6 @@ describe RubyVersion do
     expect(RubyVersion.new("3.1.0")).to be < Gem::Version.new("3.2")
   end
 
-  it "knows the filename of a specific version" do
-    expect(RubyVersion.new("3.0.2").download_file_name).to eq("ruby-3.0.2")
-    expect(RubyVersion.new("2.5.7").download_file_name).to eq("ruby-2.5.7")
-    expect(RubyVersion.new("3.3.0-preview2").download_file_name).to eq("ruby-3.3.0-preview2")
-  end
-
   it "knows the tarball name of a specific version" do
     expect(RubyVersion.new("3.0.2").tar_file_name_output).to eq("ruby-3.0.2.tgz")
     expect(RubyVersion.new("2.5.7").tar_file_name_output).to eq("ruby-2.5.7.tgz")

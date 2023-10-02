@@ -19,11 +19,6 @@ class RubyVersion
     "ruby-#{parts.bundler_format}.tgz"
   end
 
-  # Returns a file name without the extension (no directory)
-  def download_file_name
-    "ruby-#{parts.download_format}"
-  end
-
   # Ruby packages their source with a top level directory matching the name of the download file
   # see the docs in `tar_and_untar.rb` for more details on expected tar formats
   def ruby_source_dir_name
