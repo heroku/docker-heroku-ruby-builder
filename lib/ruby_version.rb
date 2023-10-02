@@ -1,46 +1,41 @@
+require_relative "version_parts"
+
 class RubyVersion
   # Uses def <=> to implement >=, <=, etc.
   include Comparable
 
-  # Returns a file name without the extension (no direcory)
-  attr_reader :plain_file_name
-
-  # Full URL of the ruby binary on ruby-lang (if it exists)
-  attr_reader :download_url
-
-  # Returns file name with tar extension (no directory)
-  # This is the file name that will be uploaded to Heroku
-  #
-  # Preview and release candidates are output as their
-  # major.minor.patch (without the `-preview` suffix)
-  attr_reader :tar_file_name_output
-
-  # Version without an extra bits at the end
-  attr_reader :major_minor_patch
-
-  attr_reader :raw_version
+  attr_reader :parts
+  private :parts
 
   def initialize(version = ENV.fetch("VERSION"))
-    @raw_version = version
-
-    parts = version.split(".")
-    major = parts.shift
-    minor = parts.shift
-    patch = parts.shift.match(/\d+/)[0]
-
-    @major_minor_patch = "#{major}.#{minor}.#{patch}"
-    @plain_file_name = "ruby-#{@raw_version}"
-    @download_url = "https://ftp.ruby-lang.org/pub/ruby/#{major}.#{minor}/#{@plain_file_name}.tar.gz"
-
-    @tar_file_name_output = "ruby-#{major}.#{minor}.#{patch}.tgz"
-    @compare_version = Gem::Version.new(raw_version)
+    @parts = VersionParts.new(version)
   end
 
-  def preview?
-    @raw_version != @major_minor_patch
+  # Returns file name with tar extension (but no directory)
+  # This is the file name that will be uploaded to Heroku
+  #
+  # e.g. "ruby-3.1.4.tgz"
+  def tar_file_name_output
+    "ruby-#{parts.bundler_format}.tgz"
+  end
+
+  # Ruby packages their source with a top level directory matching the name of the download file
+  # see the docs in `tar_and_untar.rb` for more details on expected tar formats
+  def ruby_source_dir_name
+    "ruby-#{parts.download_format}"
   end
 
   def <=>(other)
-    @compare_version <=> Gem::Version.new(other)
+    Gem::Version.new(parts.bundler_format) <=> Gem::Version.new(other)
+  end
+end
+
+class DownloadRuby
+  def initialize(parts:)
+    @parts = parts
+  end
+
+  def url
+    "https://ftp.ruby-lang.org/pub/ruby/#{@parts.major}.#{@parts.minor}/ruby-#{@parts.download_format}.tar.gz"
   end
 end

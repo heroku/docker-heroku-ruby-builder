@@ -6,7 +6,7 @@ describe "Changelog output" do
     io = StringIO.new
     Changelog.new(
       io: io,
-      ruby_version: RubyVersion.new("3.1.2")
+      parts: VersionParts.new("3.1.2")
     ).call
 
     expect(io.string).to eq(<<~'EOF')
@@ -29,7 +29,7 @@ describe "Changelog output" do
     io = StringIO.new
     Changelog.new(
       io: io,
-      ruby_version: RubyVersion.new("3.3.0-preview2")
+      parts: VersionParts.new("3.3.0-preview2")
     ).call
 
     expect(io.string).to eq(<<~'EOF')
@@ -41,7 +41,7 @@ describe "Changelog output" do
       your app using this version of Ruby, add the following `ruby` directive to your Gemfile:
 
       ```ruby
-      ruby "3.3.0"
+      ruby "3.3.0.preview2"
       ```
 
       For more information on [Ruby 3.3.0-preview2, you can view the release announcement](https://www.ruby-lang.org/en/news/).

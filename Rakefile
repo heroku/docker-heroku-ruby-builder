@@ -47,7 +47,7 @@ end
 desc "Emits a changelog message"
 task :changelog, [:version] do |_, args|
   Changelog.new(
-    ruby_version: RubyVersion.new(args[:version])
+    parts: VersionParts.new(args[:version])
   ).call
 end
 
