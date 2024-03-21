@@ -25,14 +25,13 @@ DEFAULT_JOBS = ENV.fetch("JOBS", nproc)
 
 # Build logic in a method
 def run_build_script(
-  io: $stdout,
+  architecture:, io: $stdout,
   workspace_dir: ARGV[0],
   output_dir: ARGV[1],
   cache_dir: ARGV[2],
   stack: ENV.fetch("STACK"),
   ruby_version: ENV.fetch("STACK")
 )
-
   parts = VersionParts.new(ruby_version)
   ruby_version = RubyVersion.new(ruby_version)
 
@@ -74,10 +73,12 @@ def run_build_script(
       dir: ruby_binary_dir.join("bin")
     )
 
-    destination = Pathname(output_dir)
-      .join(stack)
-      .tap(&:mkpath)
-      .join(ruby_version.tar_file_name_output)
+    destination = stack_architecture_tar_file_name(
+      stack: stack,
+      output_dir: output_dir,
+      architecture: architecture,
+      tar_file_name_output: ruby_version.tar_file_name_output
+    )
 
     io.puts "Writing #{destination}"
     tar_dir(
@@ -86,6 +87,20 @@ def run_build_script(
       destination_file: destination
     )
   end
+end
+
+# Returns a Pathname to the destination tar file
+#
+# The directory structure corresponds to the S3 directory structure directly
+def stack_architecture_tar_file_name(stack:, output_dir:, tar_file_name_output:, architecture:)
+  output_stack_dir = Pathname(output_dir).join(stack)
+
+  case stack
+  when "heroku-24"
+    output_stack_dir.join(architecture)
+  else
+    output_stack_dir
+  end.tap(&:mkpath).join(tar_file_name_output)
 end
 
 # Runs a command on the command line and streams the results
@@ -197,5 +212,18 @@ def fix_binstubs_in_dir(dir:, io: $stdout)
       lines.unshift("#!/usr/bin/env ruby\n")
       entry.write(lines.join(""))
     end
+  end
+end
+
+def get_architecture(system_output: `arch`, success: $?.success?)
+  raise "Error running `arch`: #{system_output}" unless success
+
+  case system_output.strip
+  when "x86_64"
+    "amd64"
+  when "aarch64"
+    "arm64"
+  else
+    raise "Unknown architecture: #{system_output}"
   end
 end

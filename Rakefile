@@ -79,8 +79,24 @@ end
 desc "Build docker image for stack"
 task :generate_image, [:stack] do |t, args|
   require "fileutils"
-  FileUtils.cp("dockerfiles/Dockerfile.#{args[:stack]}", "Dockerfile")
-  system("docker build -t hone/ruby-builder:#{args[:stack]} .")
+  stack = args[:stack]
+  FileUtils.cp("dockerfiles/Dockerfile.#{stack}", "Dockerfile")
+  image = "hone/ruby-builder:#{stack}"
+  arguments = ["-t #{image}"]
+
+  # rubocop:disable Lint/EmptyWhen
+  case stack
+  when "heroku-24"
+    arguments.push("--platform='linux/amd64,linux/arm64'")
+  when "heroku-20", "heroku-22"
+  else
+    raise "Unknown stack: #{stack}"
+  end
+  # rubocop:enable Lint/EmptyWhen
+
+  command = "docker build #{arguments.join(" ")} ."
+  puts "Running: `#{command}`"
+  system(command)
   FileUtils.rm("Dockerfile")
 end
 

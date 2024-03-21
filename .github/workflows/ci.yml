@@ -35,7 +35,7 @@ jobs:
     runs-on: pub-hk-ubuntu-22.04-xlarge
     strategy:
       matrix:
-        stack: ["heroku-20", "heroku-22"]
+        stack: ["heroku-20", "heroku-22", "heroku-24"]
         version: ["3.1.4"]
     steps:
       - name: Checkout

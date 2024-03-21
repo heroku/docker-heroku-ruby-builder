@@ -78,3 +78,43 @@ jobs:
         run: aws s3 sync ./builds "s3://${S3_BUCKET}"
       - name: Output Rubygems version
         run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
+
+  build-and-upload-heroku-24:
+    if: (!startsWith(inputs.ruby_version, '3.0')) # https://bugs.ruby-lang.org/issues/18658
+    runs-on: pub-hk-ubuntu-22.04-xlarge
+    env:
+      STACK: "heroku-24"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
+        with:
+          ruby-version: '3.2'
+      - name: Install dependencies
+        run: bundle install
+      - name: Output CHANGELOG
+        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
+      - name: Build Docker image
+        run: bundle exec rake "generate_image[$STACK]"
+      - name: Generate Ruby Dockerfile
+        run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
+      - name: Build and package Ruby runtime
+        run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
+      - name: Build and package Ruby runtime amd64
+        run: |
+          export DOCKER_DEFAULT_PLATFORM=linux/amd64
+          bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
+      - name: Build and package Ruby runtime arm64
+        run: |
+          export DOCKER_DEFAULT_PLATFORM=linux/arm64
+          bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
+      - name: Upload Ruby runtime archive to S3 dry run
+        if: (inputs.dry_run)
+        run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
+      - name: Upload Ruby runtime archive to S3 production
+        if: (!inputs.dry_run)
+        run: aws s3 sync ./builds "s3://${S3_BUCKET}"
+      - name: Output Rubygems version
+        run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
+
