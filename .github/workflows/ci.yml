@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -39,7 +39,7 @@ jobs:
         version: ["3.1.4"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Ruby
         uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
         with:
@@ -56,3 +56,30 @@ jobs:
         run: bash "rubies/${{matrix.stack}}/ruby-${{matrix.version}}.sh"
       - name: Verify ruby executable and output rubygems version
         run: bundle exec rake "rubygems_version[${{matrix.version}},${{matrix.stack}}]"
+
+  integration_test-arm:
+    runs-on: pub-hk-ubuntu-22.04-arm-large
+    strategy:
+      matrix:
+        stack: ["heroku-24"]
+        version: ["3.2.3"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
+        with:
+          ruby-version: '3.2'
+      - name: Install dependencies
+        run: bundle install
+      - name: Output CHANGELOG
+        run: bundle exec rake "changelog[${{matrix.version}}]"
+      - name: Build Docker image
+        run: bundle exec rake "generate_image[${{matrix.stack}}]"
+      - name: Generate Ruby Dockerfile
+        run: bundle exec rake "new[${{matrix.version}},${{matrix.stack}}]"
+      - name: Build and package Ruby runtime
+        run: bash "rubies/${{matrix.stack}}/ruby-${{matrix.version}}.sh"
+      - name: Verify ruby executable and output rubygems version
+        run: bundle exec rake "rubygems_version[${{matrix.version}},${{matrix.stack}}]"
+
