@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+BASE_IMAGE=$1
+if [ -z "$BASE_IMAGE" ]
+then
+  echo "Base image argument is requied i.e. 'heroku-24'"
+  exit 1
+fi
+
+cp "dockerfiles/Dockerfile.$BASE_IMAGE" Dockerfile
+
+docker build -t hone/ruby-builder:$BASE_IMAGE .

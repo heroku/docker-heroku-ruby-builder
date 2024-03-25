@@ -40,7 +40,7 @@ jobs:
       - name: Output CHANGELOG
         run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
       - name: Build Docker image
-        run: bundle exec rake "generate_image[$STACK]"
+        run: bin/activate_docker "$STACK"
       - name: Generate Ruby Dockerfile
         run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
       - name: Build and package Ruby runtime
@@ -68,7 +68,7 @@ jobs:
       - name: Output CHANGELOG
         run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
       - name: Build Docker image
-        run: bundle exec rake "generate_image[$STACK]"
+        run: bin/activate_docker "$STACK"
       - name: Generate Ruby Dockerfile
         run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
       - name: Build and package Ruby runtime
@@ -97,7 +97,7 @@ jobs:
       - name: Output CHANGELOG
         run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
       - name: Build Docker image
-        run: bundle exec rake "generate_image[$STACK]"
+        run: bin/activate_docker "$STACK"
       - name: Generate Ruby Dockerfile
         run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
       - name: Build and package Ruby runtime
@@ -122,16 +122,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-      - name: Install dependencies
-        run: bundle install
-      - name: Output CHANGELOG
-        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
+      # - name: Set up Ruby
+      #   uses: ruby/setup-ruby@v1
+      #   with:
+      #     ruby-version: '3.2'
+      # - name: Bootstrap ruby
+      #   run: sudo apt-get update -y; sudo apt-get install --no-install-recommends ruby -y
+      # - name: Install dependencies
+      #   run: bundle install
+      # - name: Output CHANGELOG
+      #   run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
       - name: Build Docker image
-        run: bundle exec rake "generate_image[$STACK]"
+        run: bin/activate_docker "$STACK"
       - name: Generate Ruby Dockerfile
         run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
       - name: Build and package Ruby runtime

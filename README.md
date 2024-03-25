@@ -53,30 +53,9 @@ This build tool supports heroku's multiple stacks. The built rubies will go in t
 
 ### Building
 
-First we'll need to generate the docker images needed for building the appropriate stack.
-
-```sh
-$ bundle exec rake "generate_image[heroku-22]"
 ```
-
-Generate a ruby build script:
-
-```sh
-$ bundle exec rake "new[3.1.3,heroku-22]"
-```
-
-From here, we can now execute a ruby build:
-
-```
-$ bash rubies/heroku-22/ruby-3.1.3.sh
-```
-
-When it's complete you should now see `builds/heroku-22/ruby-3.1.3.tgz`.
-
-If you set the env vars `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, you can upload them to s3. By default, we upload to the `heroku-buildpack-ruby` s3 bucket.
-
-```sh
-$ bundle exec rake upload[3.1.3,heroku-22]
+$ bin/activate_docker heroku-24
+$ bin/build_ruby heroku-24 3.2.3
 ```
 
 ### Building a GIT_URL release
