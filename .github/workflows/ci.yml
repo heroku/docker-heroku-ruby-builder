@@ -76,6 +76,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install docker
+        run: |
+          bin/setup_docker_ci
+
+          sudo usermod -aG docker $USER
+          sudo apt-get install acl
+          sudo setfacl --modify user:$USER:rw /var/run/docker.sock
       - name: Output CHANGELOG
         run: bin/print_changelog "${{matrix.version}}"
       - name: Build Docker image
