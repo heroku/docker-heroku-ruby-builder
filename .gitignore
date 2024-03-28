@@ -5,3 +5,4 @@ vendor/
 .DS_Store
 
 test/fixtures/repos/*
+Dockerfile
