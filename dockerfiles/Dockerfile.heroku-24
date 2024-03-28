@@ -1,0 +1,17 @@
+FROM heroku/heroku:24-build
+
+USER root
+
+# setup workspace
+RUN rm -rf /tmp/workspace
+RUN mkdir -p /tmp/workspace
+
+RUN apt-get update -y; apt-get install ruby -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# output dir is mounted
+
+ADD build.rb /tmp/build.rb
+COPY lib/ /tmp/lib/
+CMD ["ruby", "/tmp/build.rb", "/tmp/workspace", "/tmp/output", "/tmp/cache"]
