@@ -30,26 +30,21 @@ jobs:
       STACK: "heroku-20"
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.1'
-      - name: Install dependencies
-        run: bundle install
+        uses: actions/checkout@v4
       - name: Output CHANGELOG
-        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
+        run: bin/print_changelog "${{inputs.ruby_version}}"
       - name: Build Docker image
         run: bin/activate_docker "$STACK"
-      - name: Generate Ruby Dockerfile
-        run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
       - name: Build and package Ruby runtime
-        run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
-      - name: Upload Ruby runtime archive to S3
+        run: bin/build_ruby "$STACK" "${{inputs.ruby_version}}"
+      - name: Verify ruby executable and output rubygems version
+        run: bin/print_gem_version "$STACK" "${{inputs.ruby_version}}"
+      - name: Upload Ruby runtime archive to S3 dry run
+        if: (inputs.dry_run)
+        run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
+      - name: Upload Ruby runtime archive to S3 production
         if: (!inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}"
-      - name: Output Rubygems version
-        run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
 
   build-and-upload-heroku-22:
     if: (!startsWith(inputs.ruby_version, '3.0')) # https://bugs.ruby-lang.org/issues/18658
@@ -58,94 +53,73 @@ jobs:
       STACK: "heroku-22"
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.1'
-      - name: Install dependencies
-        run: bundle install
+        uses: actions/checkout@v4
       - name: Output CHANGELOG
-        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
+        run: bin/print_changelog "${{inputs.ruby_version}}"
       - name: Build Docker image
         run: bin/activate_docker "$STACK"
-      - name: Generate Ruby Dockerfile
-        run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
       - name: Build and package Ruby runtime
-        run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
-      - name: Upload Ruby runtime archive to S3
+        run: bin/build_ruby "$STACK" "${{inputs.ruby_version}}"
+      - name: Verify ruby executable and output rubygems version
+        run: bin/print_gem_version "$STACK" "${{inputs.ruby_version}}"
+      - name: Upload Ruby runtime archive to S3 dry run
+        if: (inputs.dry_run)
+        run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
+      - name: Upload Ruby runtime archive to S3 production
         if: (!inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}"
-      - name: Output Rubygems version
-        run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
 
   build-and-upload-heroku-24-amd:
     if: (!startsWith(inputs.ruby_version, '3.0')) # https://bugs.ruby-lang.org/issues/18658
     runs-on: pub-hk-ubuntu-22.04-xlarge
     env:
       STACK: "heroku-24"
-      DOCKER_DEFAULT_PLATFORM: "linux/amd64"
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-      - name: Install dependencies
-        run: bundle install
+        uses: actions/checkout@v4
       - name: Output CHANGELOG
-        run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
+        run: bin/print_changelog "${{inputs.ruby_version}}"
       - name: Build Docker image
         run: bin/activate_docker "$STACK"
-      - name: Generate Ruby Dockerfile
-        run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
       - name: Build and package Ruby runtime
-        run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
-      - name: Build and package Ruby runtime
-        run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
+        run: bin/build_ruby "$STACK" "${{inputs.ruby_version}}"
+      - name: Verify ruby executable and output rubygems version
+        run: bin/print_gem_version "$STACK" "${{inputs.ruby_version}}" amd64
       - name: Upload Ruby runtime archive to S3 dry run
         if: (inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
       - name: Upload Ruby runtime archive to S3 production
         if: (!inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}"
-      - name: Output Rubygems version
-        run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
 
   build-and-upload-heroku-24-arm:
     if: (!startsWith(inputs.ruby_version, '3.0')) # https://bugs.ruby-lang.org/issues/18658
     runs-on: pub-hk-ubuntu-22.04-arm-large
     env:
       STACK: "heroku-24"
-      DOCKER_DEFAULT_PLATFORM: "linux/arm64"
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      # - name: Set up Ruby
-      #   uses: ruby/setup-ruby@v1
-      #   with:
-      #     ruby-version: '3.2'
-      # - name: Bootstrap ruby
-      #   run: sudo apt-get update -y; sudo apt-get install --no-install-recommends ruby -y
-      # - name: Install dependencies
-      #   run: bundle install
-      # - name: Output CHANGELOG
-      #   run: bundle exec rake "changelog[${{inputs.ruby_version}}]"
+        uses: actions/checkout@v4
+      # Docker (and other tools) are not present on the early-access runners.
+      # We must install them manually: https://github.com/github-early-access/arm-runners-beta
+      - name: Install docker
+        run: |
+          bin/setup_docker_ci
+
+          sudo usermod -aG docker $USER
+          sudo apt-get install acl
+          sudo setfacl --modify user:$USER:rw /var/run/docker.sock
+      - name: Output CHANGELOG
+        run: bin/print_changelog "${{inputs.ruby_version}}"
       - name: Build Docker image
         run: bin/activate_docker "$STACK"
-      - name: Generate Ruby Dockerfile
-        run: bundle exec rake "new[${{inputs.ruby_version}},$STACK]"
       - name: Build and package Ruby runtime
-        run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
-      - name: Build and package Ruby runtime
-        run: bash "rubies/$STACK/ruby-${{inputs.ruby_version}}.sh"
+        run: bin/build_ruby "$STACK" "${{inputs.ruby_version}}"
+      - name: Verify ruby executable and output rubygems version
+        run: bin/print_gem_version "$STACK" "${{inputs.ruby_version}}" arm64
       - name: Upload Ruby runtime archive to S3 dry run
         if: (inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
       - name: Upload Ruby runtime archive to S3 production
         if: (!inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}"
-      - name: Output Rubygems version
-        run: bundle exec rake "rubygems_version[${{inputs.ruby_version}},$STACK]"
-

@@ -13,7 +13,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.1
+          ruby-version: 3.2
           bundler-cache: true
       - name: Linting
         run: bundle exec standardrb
@@ -26,7 +26,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.1'
+          ruby-version: '3.2'
           bundler-cache: true
       - name: test
         run: bundle exec rspec spec
@@ -76,6 +76,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      # Docker (and other tools) are not present on the early-access runners.
+      # We must install them manually: https://github.com/github-early-access/arm-runners-beta
       - name: Install docker
         run: |
           bin/setup_docker_ci
