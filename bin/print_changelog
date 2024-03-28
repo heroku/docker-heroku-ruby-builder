@@ -22,5 +22,5 @@ your app using this version of Ruby, add the following \`ruby\` directive to you
 ruby "$VERSION"
 \`\`\`
 
-For more information on [Ruby #{parts.download_format}, you can view the release announcement](https://www.ruby-lang.org/en/news/).
+For more information on [Ruby $VERSION, you can view the release announcement](https://www.ruby-lang.org/en/news/).
 EOM
