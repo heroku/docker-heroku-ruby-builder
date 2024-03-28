@@ -17,7 +17,7 @@ describe "Build logic" do
     Dir.mktmpdir do |tmp|
       dir = Pathname(tmp)
       file = dir.join("bad")
-      file.write(<<~'EOF')
+      file.write(<<~EOF)
         #!/app/vendor/ruby-3.1.2/bin/ruby
 
         Rest of the file stays
@@ -25,7 +25,7 @@ describe "Build logic" do
       EOF
       fix_binstubs_in_dir(dir: tmp, io: StringIO.new)
 
-      expect(file.read).to eq(<<~'EOF')
+      expect(file.read).to eq(<<~EOF)
         #!/usr/bin/env ruby
 
         Rest of the file stays
