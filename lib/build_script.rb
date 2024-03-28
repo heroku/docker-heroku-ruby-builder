@@ -25,7 +25,8 @@ DEFAULT_JOBS = ENV.fetch("JOBS", nproc)
 
 # Build logic in a method
 def run_build_script(
-  architecture:, io: $stdout,
+  architecture:, 
+  io: $stdout,
   workspace_dir: ARGV[0],
   output_dir: ARGV[1],
   cache_dir: ARGV[2],

@@ -10,7 +10,7 @@ Employees of Heroku see: [The Ruby language guides](https://github.com/heroku/la
 
 ## How it works
 
-Logic lives in the `build.rb` script at the root of this project. It will call `./configure` and `make` with the corresponding inputs. This file is coppied into a docker image when `$ bin/build_ruby` is called. See `dockerfiles/Dockerfile.heroku-24` for an example.
+Logic lives in the `build.rb` script at the root of this project. It will call `./configure` and `make` with the corresponding inputs. This file is copied into a docker image when `$ bin/build_ruby` is called. See `dockerfiles/Dockerfile.heroku-24` for an example.
 
 Once built it can be invoked with different inputs like:
 
