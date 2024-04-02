@@ -38,7 +38,7 @@ jobs:
       - name: Build and package Ruby runtime
         run: bin/build_ruby "$STACK" "${{inputs.ruby_version}}"
       - name: Verify ruby executable and output rubygems version
-        run: bin/print_gem_version "$STACK" "${{inputs.ruby_version}}"
+        run: bin/print_summary "$STACK" "${{inputs.ruby_version}}" >> $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3 dry run
         if: (inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
@@ -61,7 +61,7 @@ jobs:
       - name: Build and package Ruby runtime
         run: bin/build_ruby "$STACK" "${{inputs.ruby_version}}"
       - name: Verify ruby executable and output rubygems version
-        run: bin/print_gem_version "$STACK" "${{inputs.ruby_version}}"
+        run: bin/print_summary "$STACK" "${{inputs.ruby_version}}" >> $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3 dry run
         if: (inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
@@ -84,7 +84,7 @@ jobs:
       - name: Build and package Ruby runtime
         run: bin/build_ruby "$STACK" "${{inputs.ruby_version}}"
       - name: Verify ruby executable and output rubygems version
-        run: bin/print_gem_version "$STACK" "${{inputs.ruby_version}}" amd64
+        run: bin/print_summary "$STACK" "${{inputs.ruby_version}}" amd64 >> $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3 dry run
         if: (inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
@@ -116,7 +116,7 @@ jobs:
       - name: Build and package Ruby runtime
         run: bin/build_ruby "$STACK" "${{inputs.ruby_version}}"
       - name: Verify ruby executable and output rubygems version
-        run: bin/print_gem_version "$STACK" "${{inputs.ruby_version}}" arm64
+        run: bin/print_summary "$STACK" "${{inputs.ruby_version}}" arm64 >> $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3 dry run
         if: (inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
