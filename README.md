@@ -10,19 +10,7 @@ Employees of Heroku see: [The Ruby language guides](https://github.com/heroku/la
 
 ## How it works
 
-Logic lives in the `build.rb` script at the root of this project. It will call `./configure` and `make` with the corresponding inputs. This file is coppied into a docker image when `$ bundle exec rake "generate_image[heroku-22]"` is called. See `dockerfiles/Dockerfile.heroku-22` for an example.
-
-You can see the rake code:
-
-```ruby
-desc "Build docker image for stack"
-task :generate_image, [:stack] do |t, args|
-  require 'fileutils'
-  FileUtils.cp("dockerfiles/Dockerfile.#{args[:stack]}", "Dockerfile")
-  system("docker build -t hone/ruby-builder:#{args[:stack]} .")
-  FileUtils.rm("Dockerfile")
-end
-```
+Logic lives in the `build.rb` script at the root of this project. It will call `./configure` and `make` with the corresponding inputs. This file is copied into a docker image when `$ bin/build_ruby` is called. See `dockerfiles/Dockerfile.heroku-24` for an example.
 
 Once built it can be invoked with different inputs like:
 
@@ -49,55 +37,20 @@ The directory layout used by this script inside the docker container is as follo
 
 ### Stacks
 
-This build tool supports heroku's multiple stacks. The built rubies will go in the `builds/` directory. We also have a `rubies/` directory for ensuring consistent builds. In each of these directories, they're split into a stack folder. All of the heroku-22 builds will be in `builds/heroku-22/` for instance.
+This build tool supports heroku's multiple stacks and two architectures: AMD (x86) and ARM (M1/Gravitron/etc.). The built rubies will go in the `builds/` directory. We also have a `rubies/` directory for ensuring consistent builds. In each of these directories, they're split into a stack folder. All of the heroku-22 builds will be in `builds/heroku-22/` for instance.
 
 ### Building
 
-First we'll need to generate the docker images needed for building the appropriate stack.
-
-```sh
-$ bundle exec rake "generate_image[heroku-22]"
-```
-
-Generate a ruby build script:
-
-```sh
-$ bundle exec rake "new[3.1.3,heroku-22]"
-```
-
-From here, we can now execute a ruby build:
+For an example of the building flow see `.github/workflows`.  Example:
 
 ```
-$ bash rubies/heroku-22/ruby-3.1.3.sh
-```
-
-When it's complete you should now see `builds/heroku-22/ruby-3.1.3.tgz`.
-
-If you set the env vars `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, you can upload them to s3. By default, we upload to the `heroku-buildpack-ruby` s3 bucket.
-
-```sh
-$ bundle exec rake upload[3.1.3,heroku-22]
+$ bin/activate_docker heroku-24
+$ bin/build_ruby heroku-24 3.2.3
 ```
 
 ### Building a GIT_URL release
 
-Sometimes a version might need to be tested, for example a commit on Ruby trunk.
-
-If you're building from a specific commit, then fork `ruby/ruby` to your own repo.
-
-To build it first generate a new file:
-
-```
-bundle exec rake new[2.6.0,heroku-18]
-```
-
-Then add in the destination to the GIT_URL:
-
-```
-docker run -v $OUTPUT_DIR:/tmp/output -v $CACHE_DIR:/tmp/cache -e VERSION=2.6.0 -e GIT_URL=https://github.com/schneems/ruby#schneems/bundler -e STACK=heroku-18 hone/ruby-builder:heroku-18
-```
-
-If you need to use a branch you can put it in the url after the `#`.
+Prior versions of this codebase supported building a ruby binary from git url. This functionality has been removed. You can view git history for inspiration for how you might want to add it in the future.
 
 ### Docker Enviroment Variables
 
