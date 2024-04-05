@@ -47,7 +47,7 @@ jobs:
       - name: Build and package Ruby runtime
         run: bin/build_ruby "${{matrix.stack}}" "${{matrix.version}}"
       - name: Verify ruby executable and output rubygems version
-        run: bin/print_gem_version "${{matrix.stack}}" "${{matrix.version}}"
+        run: bin/print_summary "${{matrix.stack}}" "${{matrix.version}}" | tee $GITHUB_STEP_SUMMARY
 
   integration_test-heroku-24-amd:
     runs-on: pub-hk-ubuntu-22.04-xlarge
@@ -65,7 +65,7 @@ jobs:
       - name: Build and package Ruby runtime
         run: bin/build_ruby "${{matrix.stack}}" "${{matrix.version}}"
       - name: Verify ruby executable and output rubygems version
-        run: bin/print_gem_version "${{matrix.stack}}" "${{matrix.version}}" amd64
+        run: bin/print_summary "${{matrix.stack}}" "${{matrix.version}}" amd64 | tee $GITHUB_STEP_SUMMARY
 
   integration_test-heroku-24-arm:
     runs-on: pub-hk-ubuntu-22.04-arm-large
@@ -102,4 +102,4 @@ jobs:
       - name: Build and package Ruby runtime
         run: bin/build_ruby "${{matrix.stack}}" "${{matrix.version}}"
       - name: Verify ruby executable and output rubygems version
-        run: bin/print_gem_version "${{matrix.stack}}" "${{matrix.version}}" arm64
+        run: bin/print_summary "${{matrix.stack}}" "${{matrix.version}}" arm64 | tee $GITHUB_STEP_SUMMARY
