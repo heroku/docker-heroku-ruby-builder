@@ -6,7 +6,7 @@ USER root
 RUN rm -rf /tmp/workspace
 RUN mkdir -p /tmp/workspace
 
-RUN apt-get update -y; apt-get install ruby -y
+RUN apt-get update -y && apt-get install -y libreadline-dev ruby
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
