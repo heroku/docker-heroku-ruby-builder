@@ -1,8 +1,14 @@
 .bundle/
 builds/
+output/
 cache/
 vendor/
 .DS_Store
 
 test/fixtures/repos/*
 Dockerfile
+
+# Added by cargo
+target/
+cli/target
+inside_docker/target

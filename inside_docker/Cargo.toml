@@ -1,0 +1,34 @@
+[package]
+name = "inside_docker"
+version = "0.1.0"
+edition = "2021"
+description = """
+Contains scripts and libraries for building ruby intended to be executed inside
+of a docker container.
+
+Other scripts and module can depend on code in this module, but everything in
+this folder must be self contained.
+"""
+
+# Cannot use workspace, this project is installed inside the docker container by itself
+[dependencies]
+bullet_stream = "0.2.0"
+clap = { version = "4.5.4", features = ["derive"] }
+flate2 = "1.0.30"
+fs-err = "2.11.0"
+fun_run = "0.1.2"
+nom = "7.1.3"
+num_cpus = "1.16.0"
+regex = "1.10.4"
+reqwest = { version = "0.12.4", features = ["blocking"] }
+tar = "0.4.40"
+tempfile = "3.10.1"
+thiserror = "1.0.61"
+
+[dev-dependencies]
+tiny_http = "0.12.0"
+indoc = "2.0.5"
+
+[[bin]]
+name = "make_ruby"
+path = "src/bin/make_ruby.rs"
