@@ -158,7 +158,7 @@ fn make_ruby(args: Args) -> Result<(), Error> {
         ))
         .done();
 
-    tar_dir_to_file(&compiled_dir, output_tar_file)?;
+    tar_dir_to_file(&compiled_dir, &output_tar_file)?;
     log.done();
 
     Ok(())

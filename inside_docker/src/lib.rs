@@ -109,7 +109,7 @@ pub fn output_tar_path(
         .join(format!("ruby-{}.tgz", version.bundler_format()))
 }
 
-pub fn tar_dir_to_file(compiled_dir: &Path, tar_file: File) -> Result<(), Error> {
+pub fn tar_dir_to_file(compiled_dir: &Path, tar_file: &File) -> Result<(), Error> {
     let enc = flate2::write::GzEncoder::new(tar_file, flate2::Compression::best());
 
     let mut tar = tar::Builder::new(enc);

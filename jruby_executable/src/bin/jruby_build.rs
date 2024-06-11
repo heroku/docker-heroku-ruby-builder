@@ -128,27 +128,23 @@ fn jruby_build(args: &Args) -> Result<(), Error> {
 
     log = {
         let mut bullet = log.bullet("Creating tgz archives");
-        let tar_dir = volume_output_dir
-            .join(base_image.to_string())
-            .join(&tgz_name);
+        let tar_dir = volume_output_dir.join(base_image.to_string());
 
-        let timer = bullet.start_timer(format!("Write {}", tar_dir.display()));
-        tar_dir_to_file(
-            &jruby_dir,
-            fs_err::File::create(&tar_dir).map_err(Error::IoError)?,
-        )?;
+        fs_err::create_dir_all(&tar_dir).map_err(Error::IoError)?;
+
+        let tar_file = fs_err::File::create(tar_dir.join(&tgz_name)).map_err(Error::IoError)?;
+
+        let timer = bullet.start_timer(format!("Write {}", tar_file.path().display()));
+        tar_dir_to_file(&jruby_dir, &tar_file)?;
         bullet = timer.done();
 
         for arch in &["amd64", "arm64"] {
-            let path = volume_output_dir
-                .join(base_image.to_string())
-                .join(arch)
-                .join(&tgz_name);
+            let dir = volume_output_dir.join(base_image.to_string()).join(arch);
+            fs_err::create_dir_all(&dir).map_err(Error::IoError)?;
 
-            fs_err::create_dir_all(path.parent().expect("Parent dir")).map_err(Error::IoError)?;
-
+            let path = dir.join(&tgz_name);
             bullet = bullet.sub_bullet(format!("Write {}", path.display()));
-            fs_err::copy(&tar_dir, &path).map_err(Error::IoError)?;
+            fs_err::copy(tar_file.path(), &path).map_err(Error::IoError)?;
         }
 
         bullet.done()
