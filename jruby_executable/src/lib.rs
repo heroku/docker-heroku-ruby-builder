@@ -51,7 +51,7 @@
 /// ```
 #[derive(Debug)]
 pub struct BuildProperties {
-    body: String,
+    body: Vec<u8>,
     url: String,
 }
 
@@ -62,17 +62,25 @@ pub enum Error {
 
     #[error("Failed to fetch {0}")]
     FailedRequest(#[from] reqwest::Error),
+
+    #[error("Failed to parse Java properties {0}")]
+    InvalidProperties(#[from] java_properties::PropertiesError),
 }
 
 impl BuildProperties {
     pub fn ruby_stdlib_version(&self) -> Result<String, Error> {
-        self.body
-            .lines()
-            .find(|line| line.starts_with("version.ruby="))
-            .map(|line| line.replace("version.ruby=", ""))
+        java_properties::read(&self.body[..])
+            .map_err(Error::InvalidProperties)
+            .map(|properties| {
+                properties
+                    .get("version.ruby")
+                    .map(|version| version.to_owned())
+            })?
             .ok_or_else(|| Error::CannotParseJrubyStdlibVersion {
                 url: self.url.clone(),
-                body: self.body.clone(),
+                body: std::str::from_utf8(&self.body)
+                    .expect("UTF8 encoded java properties file from")
+                    .to_owned(),
             })
     }
 }
@@ -85,12 +93,16 @@ pub fn jruby_build_properties(jruby_version: &str) -> Result<BuildProperties, Er
     let client = reqwest::blocking::Client::new();
     let response = client.get(&url).send().map_err(Error::FailedRequest)?;
 
-    response
+    let body = response
         .error_for_status()
         .map_err(Error::FailedRequest)?
         .text()
-        .map_err(Error::FailedRequest)
-        .map(|body| BuildProperties { body, url })
+        .map_err(Error::FailedRequest)?;
+
+    Ok(BuildProperties {
+        body: body.as_bytes().to_vec(),
+        url: url.clone(),
+    })
 }
 
 #[cfg(test)]
@@ -108,7 +120,7 @@ mod test {
         "}
         .to_string();
         let properties = BuildProperties {
-            body,
+            body: body.as_bytes().to_vec(),
             url: "https://example.com".to_string(),
         };
 
@@ -125,7 +137,7 @@ mod test {
         "}
         .to_string();
         let properties = BuildProperties {
-            body,
+            body: body.as_bytes().to_vec(),
             url: "https://example.com".to_string(),
         };
 

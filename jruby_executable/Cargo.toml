@@ -16,6 +16,7 @@ name = "jruby_changelog"
 path = "src/bin/jruby_changelog.rs"
 
 [dependencies]
+java-properties = { workspace = true }
 glob = { workspace = true}
 clap = { workspace = true}
 inside_docker = { workspace = true}

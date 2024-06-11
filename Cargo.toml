@@ -6,6 +6,7 @@ members = [
 ]
 
 [workspace.dependencies]
+java-properties = "2.0.0"
 glob = "0.3.1"
 clap = { version = "4.5.4", features = ["derive"] }
 inside_docker = { path = "inside_docker" }
