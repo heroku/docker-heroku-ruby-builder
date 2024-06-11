@@ -118,7 +118,8 @@ fn jruby_build(args: &Args) -> Result<(), Error> {
 
     log = {
         let bullet = log.bullet("Create ruby symlink to jruby");
-        fs_err::os::unix::fs::symlink("jruby", jruby_dir.join("bin/ruby")).unwrap();
+        fs_err::os::unix::fs::symlink("jruby", jruby_dir.join("bin/ruby"))
+            .map_err(Error::IoError)?;
 
         bullet.done()
     };

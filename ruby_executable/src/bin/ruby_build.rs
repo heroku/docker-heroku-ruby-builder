@@ -89,7 +89,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Error> {
         let mut stream = log
             .bullet("Dockerfile")
             .start_stream("Writing contents to tmpdir");
-        write!(stream, "{dockerfile}").unwrap();
+        write!(stream, "{dockerfile}").expect("Stream write");
         fs_err::write(&dockerfile_path, dockerfile).map_err(Error::CannotWriteDockerfile)?;
         stream.done().done()
     };

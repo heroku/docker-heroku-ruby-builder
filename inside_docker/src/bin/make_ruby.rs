@@ -171,7 +171,7 @@ fn configure_args<'a>(compiled_dir: &'a Path, version: &'a RubyDownloadVersion) 
         "--enable-shared",
         // Tell make where to put the compiled files with the --prefix option
         "--prefix",
-        compiled_dir.to_str().unwrap(),
+        compiled_dir.to_str().expect("path to string"),
     ];
 
     if version.major > 3 || (version.major == 3 && version.minor >= 2) {
