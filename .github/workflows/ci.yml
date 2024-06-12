@@ -91,11 +91,6 @@ jobs:
       - name: Output CHANGELOG
         run: cargo run --bin jruby_changelog -- --version "${{matrix.version}}"
       - name: Build JRuby
-        run: cargo run --bin jruby_build -- \
-          --version ${{matrix.version}}
-          --base-image ${{matrix.base_image}}
+        run: cargo run --bin jruby_build -- --version ${{matrix.version}} --base-image ${{matrix.base_image}}
       - name: Check JRuby
-        run: cargo run --bin jruby_check -- \
-          --version ${{matrix.version}} \
-          --base-image ${{matrix.base_image}} \
-          --arch ${{matrix.arch}}
+        run: cargo run --bin jruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
