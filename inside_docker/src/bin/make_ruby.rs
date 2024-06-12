@@ -99,20 +99,23 @@ fn make_ruby(args: Args) -> Result<(), Error> {
     log = {
         let mut bullet = log.bullet("Configure");
 
+        let mut envs = HashMap::new();
+        envs.insert("debugflags".to_string(), "-g".to_string());
+
         let mut cmd = Command::new("./configure");
         cmd.args(configure_args(&compiled_dir, &version));
-        cmd.env("debugflags", "-g");
-
-        let envs = cmd
-            .get_envs()
-            .filter_map(|(k, v)| v.map(|v| (k.to_os_string(), v.to_os_string())))
-            .collect::<HashMap<_, _>>();
-        let cmd_name_with_envs =
-            fun_run::display_with_env_keys(cmd.mut_cmd(), envs, ["debugflags"]);
+        cmd.envs(&envs);
 
         bullet
             .stream_with(
-                format!("Running {}", style::command(cmd_name_with_envs)),
+                format!(
+                    "Running {}",
+                    style::command(fun_run::display_with_env_keys(
+                        cmd.mut_cmd(),
+                        &envs,
+                        envs.keys()
+                    ))
+                ),
                 |stdout, stderr| cmd.stream_output(stdout, stderr),
             )
             .map_err(Error::CmdError)?;
