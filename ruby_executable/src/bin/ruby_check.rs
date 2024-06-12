@@ -1,6 +1,7 @@
 use bullet_stream::{style, Print};
 use clap::Parser;
 use fun_run::{CmdError, CommandWithName};
+use indoc::formatdoc;
 use inside_docker::{output_tar_path, BaseImage, CpuArch, RubyDownloadVersion};
 use std::{path::PathBuf, process::Command};
 
@@ -94,7 +95,13 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Error> {
 fn main() {
     let args = RubyArgs::parse();
     if let Err(error) = ruby_check(&args) {
-        eprintln!("❌ {error}");
+        Print::new(std::io::stderr())
+            .without_header()
+            .error(formatdoc! {"
+                ❌ Command failed ❌
+
+                {error}
+            "});
         std::process::exit(1);
     }
 }

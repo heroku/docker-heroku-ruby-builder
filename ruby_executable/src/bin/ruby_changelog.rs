@@ -1,5 +1,6 @@
 use std::io::Write;
 
+use bullet_stream::Print;
 use clap::Parser;
 use indoc::formatdoc;
 use inside_docker::RubyDownloadVersion;
@@ -67,7 +68,13 @@ where
 fn main() {
     let args = Args::parse();
     if let Err(error) = ruby_changelog(&args, std::io::stdout()) {
-        eprintln!("❌ {error}");
+        Print::new(std::io::stderr())
+            .without_header()
+            .error(formatdoc! {"
+                ❌ Command failed ❌
+
+                {error}
+            "});
         std::process::exit(1);
     }
 }

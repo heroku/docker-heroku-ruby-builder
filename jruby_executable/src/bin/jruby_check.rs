@@ -158,7 +158,13 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Error> {
 fn main() {
     let args = RubyArgs::parse();
     if let Err(error) = jruby_check(&args) {
-        eprintln!("❌ {error}");
+        Print::new(std::io::stderr())
+            .without_header()
+            .error(formatdoc! {"
+                ❌ Command failed ❌
+
+                {error}
+            "});
         std::process::exit(1);
     }
 }

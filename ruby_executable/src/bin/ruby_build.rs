@@ -1,7 +1,7 @@
 use bullet_stream::{style, Print};
 use clap::Parser;
 use fun_run::{CmdError, CommandWithName};
-use indoc::indoc;
+use indoc::{formatdoc, indoc};
 use inside_docker::{BaseImage, CpuArch, RubyDownloadVersion};
 use std::{io::Write, path::PathBuf, process::Command};
 
@@ -127,7 +127,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Error> {
         docker_run.arg(&image_name);
         docker_run.args(["bash", "-c"]);
         docker_run.arg(&format!(
-            "cargo run --bin make_ruby -- --version {version} --base-image {base_image} --output {INNER_OUTPUT} --cache {INNER_CACHE}",
+            "cargo run --release --bin make_ruby -- --version {version} --base-image {base_image} --output {INNER_OUTPUT} --cache {INNER_CACHE}",
         ));
 
         bullet
@@ -148,7 +148,13 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Error> {
 fn main() {
     let args = RubyArgs::parse();
     if let Err(error) = ruby_build(&args) {
-        eprintln!("❌ {error}");
+        Print::new(std::io::stderr())
+            .without_header()
+            .error(formatdoc! {"
+                ❌ Command failed ❌
+
+                {error}
+            "});
         std::process::exit(1);
     }
 }

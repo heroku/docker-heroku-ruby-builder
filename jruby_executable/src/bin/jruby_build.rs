@@ -1,9 +1,9 @@
 use bullet_stream::{style, Print};
 use clap::Parser;
 use fs_err::PathExt;
+use indoc::formatdoc;
 use inside_docker::{download_tar, tar_dir_to_file, untar_to_dir, BaseImage, TarDownloadPath};
 use jruby_executable::jruby_build_properties;
-
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -157,7 +157,13 @@ fn jruby_build(args: &Args) -> Result<(), Error> {
 fn main() {
     let args = Args::parse();
     if let Err(error) = jruby_build(&args) {
-        eprintln!("❌ {error}");
+        Print::new(std::io::stderr())
+            .without_header()
+            .error(formatdoc! {"
+                ❌ Command failed ❌
+
+                {error}
+            "});
         std::process::exit(1);
     }
 }
