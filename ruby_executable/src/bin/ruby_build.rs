@@ -1,9 +1,17 @@
 use bullet_stream::{style, Print};
 use clap::Parser;
+use fs_err::PathExt;
 use fun_run::{CmdError, CommandWithName};
 use indoc::{formatdoc, indoc};
-use inside_docker::{BaseImage, CpuArch, RubyDownloadVersion};
-use std::{io::Write, path::PathBuf, process::Command};
+use inside_docker::{
+    download_tar, output_tar_path, validate_version_for_stack, BaseImage, CpuArch,
+    RubyDownloadVersion, TarDownloadPath,
+};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 static INNER_OUTPUT: &str = "/tmp/output";
 static INNER_CACHE: &str = "/tmp/cache";
@@ -46,17 +54,8 @@ fn ruby_dockerfile_contents(base_image: &BaseImage) -> String {
         # https://bugs.ruby-lang.org/issues/20506
         RUN rustup install 1.77 && rustup default 1.77
 
-        COPY ./inside_docker/Cargo.toml /tmp/workdir/Cargo.toml
-        COPY ./inside_docker/Cargo.lock /tmp/workdir/Cargo.lock
         WORKDIR /tmp/workdir/
-
-        # Docker cache for dependencies
-        RUN mkdir -p src/bin && echo "fn main() {}" > src/bin/make_ruby.rs
-        RUN cargo fetch
-        RUN cargo build
-
-        COPY ./inside_docker/ /tmp/workdir/
-        RUN cargo build --release
+        COPY make_ruby.sh /tmp/workdir/make_ruby.sh
     "#});
 
     dockerfile
@@ -79,6 +78,9 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Error> {
     let mut log = Print::new(std::io::stderr()).h1("Building Ruby");
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
+
+    fs_err::create_dir_all(&volume_cache_dir).expect("Create dir");
+    fs_err::create_dir_all(&volume_output_dir).expect("Create dir");
 
     let temp_dir = tempfile::tempdir().map_err(Error::CreateTmpDir)?;
     let image_name = format!("heroku/ruby-builder:{base_image}");
@@ -113,21 +115,52 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Error> {
         bullet.done()
     };
 
+    let download_tar_path =
+        TarDownloadPath(volume_cache_dir.join(format!("ruby-source-{version}.tgz")));
+
+    validate_version_for_stack(version, base_image).expect("validate version");
+
+    log = if Path::fs_err_try_exists(download_tar_path.as_ref()).expect("fs exists") {
+        log.bullet(format!(
+            "Using cached tarball {}",
+            download_tar_path.as_ref().display()
+        ))
+        .done()
+    } else {
+        let bullet = log.bullet(format!(
+            "Downloading {version} to {}",
+            download_tar_path.as_ref().display()
+        ));
+        download_tar(&version.download_url(), &download_tar_path).expect("download tar");
+        bullet.done()
+    };
+
     log = {
-        let mut bullet = log.bullet("Ruby binaries");
-        let outside_cache = volume_cache_dir.display();
-        let outside_output = volume_output_dir.display();
+        let mut bullet = log.bullet("Make Ruby");
+
+        let input_tar = PathBuf::from(INNER_CACHE).join(format!("ruby-source-{version}.tgz"));
+        let output_tar = output_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch);
+
+        let volume_output = volume_output_dir.display();
+        let volume_cache = volume_cache_dir.display();
 
         let mut docker_run = Command::new("docker");
         docker_run.arg("run");
         docker_run.arg("--rm");
         docker_run.args(["--platform", &format!("linux/{arch}")]);
-        docker_run.args(["--volume", &format!("{outside_output}:{INNER_OUTPUT}")]);
-        docker_run.args(["--volume", &format!("{outside_cache}:{INNER_CACHE}")]);
+        docker_run.args(["--volume", &format!("{volume_output}:{INNER_OUTPUT}")]);
+        docker_run.args(["--volume", &format!("{volume_cache}:{INNER_CACHE}")]);
+
+        if version.major > 3 || (version.major == 3 && version.minor >= 2) {
+            docker_run.args(["-e", "ENABLE_YJIT=1"]);
+        }
+
         docker_run.arg(&image_name);
         docker_run.args(["bash", "-c"]);
         docker_run.arg(&format!(
-            "cargo run --release --bin make_ruby -- --version {version} --base-image {base_image} --output {INNER_OUTPUT} --cache {INNER_CACHE}",
+            "./make_ruby.sh {} {}",
+            input_tar.display(),
+            output_tar.display()
         ));
 
         bullet

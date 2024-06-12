@@ -25,13 +25,12 @@ Available binaries:
     jruby_build
     jruby_changelog
     jruby_check
-    make_ruby
     ruby_build
     ruby_changelog
     ruby_check
 ```
 
-Binaries are prefixed with either `ruby` or `jruby`. Except for `make_ruby`, which is a rust script intended to be run **inside** of docker. It is packaged and invoked by the `build_ruby` script.
+Binaries are prefixed with either `ruby` or `jruby`.
 
 To see the arguments required to a binary, call it without args:
 

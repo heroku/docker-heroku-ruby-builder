@@ -28,7 +28,3 @@ thiserror = "1.0.61"
 [dev-dependencies]
 tiny_http = "0.12.0"
 indoc = "2.0.5"
-
-[[bin]]
-name = "make_ruby"
-path = "src/bin/make_ruby.rs"
