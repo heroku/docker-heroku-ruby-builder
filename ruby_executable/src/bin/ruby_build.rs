@@ -29,15 +29,19 @@ struct RubyArgs {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::enum_variant_names)]
 enum Error {
-    #[error("Cannot create temp dir {0}")]
-    CreateTmpDir(std::io::Error),
+    #[error("{0}")]
+    IoError(std::io::Error),
 
     #[error("Cannot write dockerfile contents")]
     CannotWriteDockerfile(std::io::Error),
 
     #[error("Command failed {0}")]
     CannotRunCmd(CmdError),
+
+    #[error("{0}")]
+    SharedError(#[from] shared::Error),
 }
 
 fn ruby_dockerfile_contents(base_image: &BaseImage) -> String {
@@ -79,21 +83,21 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Error> {
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
 
-    fs_err::create_dir_all(&volume_cache_dir).expect("Create dir");
-    fs_err::create_dir_all(&volume_output_dir).expect("Create dir");
+    fs_err::create_dir_all(&volume_cache_dir).map_err(Error::IoError)?;
+    fs_err::create_dir_all(&volume_output_dir).map_err(Error::IoError)?;
 
-    let temp_dir = tempfile::tempdir().map_err(Error::CreateTmpDir)?;
+    let temp_dir = tempfile::tempdir().map_err(Error::IoError)?;
     let image_name = format!("heroku/ruby-builder:{base_image}");
     let dockerfile = ruby_dockerfile_contents(base_image);
     let dockerfile_path = temp_dir.path().join("Dockerfile");
 
     log = {
-        let mut stream = log
-            .bullet("Dockerfile")
-            .start_stream("Writing contents to tmpdir");
-        write!(stream, "{dockerfile}").expect("Stream write");
-        fs_err::write(&dockerfile_path, dockerfile).map_err(Error::CannotWriteDockerfile)?;
-        stream.done().done()
+        let mut bullet = log.bullet("Dockerfile");
+        bullet.stream_with("Writing contents to tmpdir", |mut stream, _| {
+            write!(stream, "{dockerfile}").expect("Stream write");
+            fs_err::write(&dockerfile_path, &dockerfile).map_err(Error::CannotWriteDockerfile)
+        })?;
+        bullet.done()
     };
 
     log = {
@@ -104,7 +108,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Error> {
         docker_build.args(["--progress", "plain"]);
         docker_build.args(["--tag", &image_name]);
         docker_build.args(["--file", &dockerfile_path.display().to_string()]);
-        docker_build.arg(source_dir().to_str().expect("Path to str"));
+        docker_build.arg(source_dir());
         let _ = bullet
             .stream_with(
                 format!("Building via {}", style::command(docker_build.name())),
@@ -118,9 +122,9 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Error> {
     let download_tar_path =
         TarDownloadPath(volume_cache_dir.join(format!("ruby-source-{version}.tgz")));
 
-    validate_version_for_stack(version, base_image).expect("validate version");
+    validate_version_for_stack(version, base_image).map_err(Error::SharedError)?;
 
-    log = if Path::fs_err_try_exists(download_tar_path.as_ref()).expect("fs exists") {
+    log = if Path::fs_err_try_exists(download_tar_path.as_ref()).map_err(Error::IoError)? {
         log.bullet(format!(
             "Using cached tarball {}",
             download_tar_path.as_ref().display()
@@ -131,7 +135,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Error> {
             "Downloading {version} to {}",
             download_tar_path.as_ref().display()
         ));
-        download_tar(&version.download_url(), &download_tar_path).expect("download tar");
+        download_tar(&version.download_url(), &download_tar_path).map_err(Error::SharedError)?;
         bullet.done()
     };
 
