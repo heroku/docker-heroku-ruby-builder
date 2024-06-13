@@ -2,8 +2,8 @@ use bullet_stream::{style, Print};
 use clap::Parser;
 use fun_run::{CmdError, CommandWithName};
 use indoc::formatdoc;
-use inside_docker::{BaseImage, CpuArch};
 use jruby_executable::jruby_build_properties;
+use shared::{BaseImage, CpuArch};
 use std::io::Write;
 use std::{path::PathBuf, process::Command};
 

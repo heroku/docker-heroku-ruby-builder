@@ -2,8 +2,8 @@ use bullet_stream::{style, Print};
 use clap::Parser;
 use fs_err::PathExt;
 use indoc::formatdoc;
-use inside_docker::{download_tar, tar_dir_to_file, untar_to_dir, BaseImage, TarDownloadPath};
 use jruby_executable::jruby_build_properties;
+use shared::{download_tar, tar_dir_to_file, untar_to_dir, BaseImage, TarDownloadPath};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -22,7 +22,7 @@ enum Error {
     CreateTmpDir(std::io::Error),
 
     #[error("{0}")]
-    HerokuError(#[from] inside_docker::Error),
+    HerokuError(#[from] shared::Error),
 
     #[error("{0}")]
     LibError(#[from] jruby_executable::Error),

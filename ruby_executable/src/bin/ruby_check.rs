@@ -2,7 +2,7 @@ use bullet_stream::{style, Print};
 use clap::Parser;
 use fun_run::{CmdError, CommandWithName};
 use indoc::formatdoc;
-use inside_docker::{output_tar_path, BaseImage, CpuArch, RubyDownloadVersion};
+use shared::{output_tar_path, BaseImage, CpuArch, RubyDownloadVersion};
 use std::{path::PathBuf, process::Command};
 
 static INNER_OUTPUT: &str = "/tmp/output";

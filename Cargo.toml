@@ -2,14 +2,14 @@
 members = [
     "jruby_executable",
     "ruby_executable",
-    "inside_docker",
+    "shared",
 ]
 
 [workspace.dependencies]
 java-properties = "2.0.0"
 glob = "0.3.1"
 clap = { version = "4.5.4", features = ["derive"] }
-inside_docker = { path = "inside_docker" }
+shared = { path = "shared" }
 indoc = "2.0.5"
 lazy_static = "1.4.0"
 flate2 = "1.0.30"

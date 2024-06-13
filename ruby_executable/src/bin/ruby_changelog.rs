@@ -3,7 +3,7 @@ use std::io::Write;
 use bullet_stream::Print;
 use clap::Parser;
 use indoc::formatdoc;
-use inside_docker::RubyDownloadVersion;
+use shared::RubyDownloadVersion;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -14,7 +14,7 @@ struct Args {
 #[derive(Debug, thiserror::Error)]
 enum Error {
     #[error("{0}")]
-    HerokuError(#[from] inside_docker::Error),
+    HerokuError(#[from] shared::Error),
 
     #[error("Write to IO failed {0}")]
     IoWriteFailed(#[from] std::io::Error),

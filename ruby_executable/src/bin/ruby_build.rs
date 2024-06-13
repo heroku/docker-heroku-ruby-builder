@@ -3,7 +3,7 @@ use clap::Parser;
 use fs_err::PathExt;
 use fun_run::{CmdError, CommandWithName};
 use indoc::{formatdoc, indoc};
-use inside_docker::{
+use shared::{
     download_tar, output_tar_path, validate_version_for_stack, BaseImage, CpuArch,
     RubyDownloadVersion, TarDownloadPath,
 };

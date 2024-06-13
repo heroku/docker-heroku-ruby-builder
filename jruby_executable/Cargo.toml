@@ -19,7 +19,7 @@ path = "src/bin/jruby_changelog.rs"
 java-properties = { workspace = true }
 glob = { workspace = true}
 clap = { workspace = true}
-inside_docker = { workspace = true}
+shared = { workspace = true}
 indoc = { workspace = true}
 lazy_static = { workspace = true}
 flate2 = { workspace = true}
