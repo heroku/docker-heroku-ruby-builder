@@ -16,7 +16,7 @@ Employees of Heroku see: [The Ruby language guides](https://github.com/heroku/la
 
 ## Run it locally
 
-All of the logic of this repo lives in rust scripts. List available rust scripts:
+List available rust scripts:
 
 ```
 $ cargo run --bin
@@ -32,19 +32,27 @@ Available binaries:
 
 Binaries are prefixed with either `ruby` or `jruby`.
 
-To see the arguments required to a binary, call it without args:
+To see the arguments required to a binary, call it without args or with `-- --help`:
 
 ```
-$ cargo run --release --bin ruby_build
-  --arch <ARCH>
-  --version <VERSION>
-  --base-image <BASE_IMAGE>
+$ cargo run --bin ruby_build
+$ cargo run --bin ruby_build -- --help
+  # ...
+Usage: ruby_build --arch <ARCH> --version <VERSION> --base-image <BASE_IMAGE>
+
+Options:
+      --arch <ARCH>
+      --version <VERSION>
+      --base-image <BASE_IMAGE>
+  -h, --help                     Print help
 ```
 
-To pass arguments into a binary you have to use a `--` separator (to let cargo know you're not trying to give it an argument). For example:
+To pass arguments into a binary you have to use a double dash (`--`) separator (to let cargo know you're not trying to give it an argument).
+
+For example:
 
 ```
-$ cargo run --release --bin ruby_check -- --version 3.1.6 --arch arm64 --base-image heroku-24
+$ cargo run --bin ruby_check -- --version 3.1.6 --arch arm64 --base-image heroku-24
 # ...
 - Done (finished in 4.9s)
 
@@ -65,9 +73,3 @@ Run unit tests:
 ```
 $ cargo test
 ```
-
-## Why Rust?
-
-I bet you're thinking "Why not something simpler like bash or Ruby?" This library was originally written in Ruby and shelled out. That caused bootstrapping problems, for example when rolling out ARM support, the github action for installing Ruby did not yet support ARM so we had to re-write the logic in Bash (or bootstrap our own version of Ruby with bash). We chose to re-write the library in bash. So why not keep it in bash? Even though bash doesn't need "bootstrapping" authors rely on system tools and packages which may or may not already be installed, and may or may not vary between operating systems. For example GNU grep uses different arguments than BSD (mac) grep. So while there's not a "bash bootstrapping problem" installing dependencies and ensuring scripts work across multiple platforms is tricky. It's easy to write quick scripts, but hard to maintain and do well.
-
-Don't you have a Rust bootstrapping problem now? As of Ruby 3.2 YJIT requires a Rust toolchain to support the `--enable-yjit` config flag, so Rust is already a requirement of a full Ruby install. That means that even if we didn't write our scripts in Rust, we still need to have it available on the system when we build Ruby anyway. It's also historically been an easy to install language.

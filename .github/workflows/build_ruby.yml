@@ -42,7 +42,7 @@ jobs:
         run: rustup update
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2.7.3
-      - name: Cargo build (to make test logs shorter)
+      - name: Cargo build
         run: cargo build
       - name: Output CHANGELOG
         run: cargo run --bin ruby_changelog -- --version "${{inputs.ruby_version}}"
