@@ -1,9 +1,9 @@
 use bullet_stream::{style, Print};
 use clap::Parser;
-use fun_run::{CmdError, CommandWithName};
+use fun_run::CommandWithName;
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
-use shared::{BaseImage, CpuArch};
+use shared::{source_dir, BaseImage, CpuArch};
 use std::error::Error;
 use std::io::Write;
 use std::{path::PathBuf, process::Command};
@@ -20,12 +20,6 @@ struct RubyArgs {
 
     #[arg(long = "base-image")]
     base_image: BaseImage,
-}
-
-fn source_dir() -> PathBuf {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-
-    fs_err::canonicalize(path).expect("Canonicalize source dir")
 }
 
 fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {

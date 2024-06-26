@@ -1,7 +1,7 @@
 use bullet_stream::state::SubBullet;
 use bullet_stream::Print;
 use flate2::read::GzDecoder;
-use fs_err::File;
+use fs_err::{File, PathExt};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use tar::Archive;
@@ -60,6 +60,13 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+}
+
+pub fn source_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .fs_err_canonicalize()
+        .expect("Canonicalize source dir")
 }
 
 pub fn validate_version_for_stack(

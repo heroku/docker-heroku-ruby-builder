@@ -2,7 +2,7 @@ use bullet_stream::{style, Print};
 use clap::Parser;
 use fun_run::{CmdError, CommandWithName};
 use indoc::formatdoc;
-use shared::{output_tar_path, BaseImage, CpuArch, RubyDownloadVersion};
+use shared::{output_tar_path, source_dir, BaseImage, CpuArch, RubyDownloadVersion};
 use std::{error::Error, path::PathBuf, process::Command};
 
 static INNER_OUTPUT: &str = "/tmp/output";
@@ -17,12 +17,6 @@ struct RubyArgs {
 
     #[arg(long = "base-image")]
     base_image: BaseImage,
-}
-
-fn source_dir() -> PathBuf {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-
-    fs_err::canonicalize(path).expect("Canonicalize source dir")
 }
 
 fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {

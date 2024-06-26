@@ -4,7 +4,7 @@ use fs_err::PathExt;
 use fun_run::{CmdError, CommandWithName};
 use indoc::{formatdoc, indoc};
 use shared::{
-    download_tar, output_tar_path, validate_version_for_stack, BaseImage, CpuArch,
+    download_tar, output_tar_path, source_dir, validate_version_for_stack, BaseImage, CpuArch,
     RubyDownloadVersion, TarDownloadPath,
 };
 use std::{
@@ -47,12 +47,6 @@ fn ruby_dockerfile_contents(base_image: &BaseImage) -> String {
     "#});
 
     dockerfile
-}
-
-fn source_dir() -> PathBuf {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-    fs_err::canonicalize(path).expect("Canonicalize source dir")
 }
 
 fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {

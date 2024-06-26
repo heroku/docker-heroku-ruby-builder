@@ -3,8 +3,8 @@ use clap::Parser;
 use fs_err::PathExt;
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
-use shared::{download_tar, tar_dir_to_file, untar_to_dir, BaseImage, TarDownloadPath};
-use std::{error::Error, path::PathBuf};
+use shared::{download_tar, source_dir, tar_dir_to_file, untar_to_dir, BaseImage, TarDownloadPath};
+use std::error::Error;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -13,12 +13,6 @@ struct Args {
 
     #[arg(long)]
     base_image: BaseImage,
-}
-
-fn source_dir() -> PathBuf {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-
-    fs_err::canonicalize(path).expect("Canonicalize source dir")
 }
 
 fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
