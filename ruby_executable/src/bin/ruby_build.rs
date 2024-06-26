@@ -1,7 +1,7 @@
 use bullet_stream::{style, Print};
 use clap::Parser;
 use fs_err::PathExt;
-use fun_run::{CmdError, CommandWithName};
+use fun_run::CommandWithName;
 use indoc::{formatdoc, indoc};
 use shared::{
     download_tar, output_tar_path, source_dir, validate_version_for_stack, BaseImage, CpuArch,

@@ -1,6 +1,6 @@
 use bullet_stream::{style, Print};
 use clap::Parser;
-use fun_run::{CmdError, CommandWithName};
+use fun_run::CommandWithName;
 use indoc::formatdoc;
 use shared::{output_tar_path, source_dir, BaseImage, CpuArch, RubyDownloadVersion};
 use std::{error::Error, path::PathBuf, process::Command};
