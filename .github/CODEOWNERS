@@ -3,4 +3,4 @@
 
 # However, request review from the language owner instead for files that are
 # updated by Dependabot, to reduce team review request noise.
-Gemfile.lock @schneems
+Cargo.lock @schneems

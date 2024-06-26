@@ -1,11 +1,11 @@
-name: Build and upload Ruby runtime
-run-name: "Build and upload Ruby ${{ inputs.ruby_version }}${{ inputs.dry_run && ' (dry run)' || '' }}"
+name: Build and upload JRuby runtime
+run-name: "Build and upload JRuby ${{ inputs.jruby_version }}${{ inputs.dry_run && ' (dry run)' || '' }}"
 
 on:
   workflow_dispatch:
     inputs:
-      ruby_version:
-          description: "The Ruby version to build, specified as X.Y.Z"
+      jruby_version:
+          description: "The JRuby version to build, specified as X.Y.Z (i.e. 9.4.7.0)"
           type: string
           required: true
       dry_run:
@@ -24,17 +24,12 @@ env:
   S3_BUCKET: "heroku-buildpack-ruby"
 
 jobs:
-  build_ruby:
-    runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-22.04-arm-xlarge' || 'pub-hk-ubuntu-22.04-xlarge' }}
+  build-and-upload:
+    runs-on: pub-hk-ubuntu-22.04-xlarge
     strategy:
+      fail-fast: false
       matrix:
-        arch: ["amd64", "arm64"]
         base_image: ["heroku-20", "heroku-22", "heroku-24"]
-        exclude:
-          - base_image: "heroku-20"
-            arch: "arm64"
-          - base_image: "heroku-22"
-            arch: "arm64"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,11 +40,11 @@ jobs:
       - name: Cargo build
         run: cargo build
       - name: Output CHANGELOG
-        run: cargo run --bin ruby_changelog -- --version "${{inputs.ruby_version}}"
+        run: cargo run --bin jruby_changelog -- --version "${{inputs.jruby_version}}"
       - name: Build Ruby
-        run: cargo run --bin ruby_build -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+        run: cargo run --bin jruby_build -- --version ${{inputs.jruby_version}} --base-image ${{matrix.base_image}} \
       - name: Check Ruby
-        run: cargo run --bin ruby_check -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch  ${{matrix.arch}} | tee $GITHUB_STEP_SUMMARY
+        run: cargo run --bin jruby_check -- --version ${{inputs.jruby_version}} --base-image ${{matrix.base_image}} --arch amd64 | tee $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3 dry run
         if: (inputs.dry_run)
         run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun

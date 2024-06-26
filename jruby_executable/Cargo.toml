@@ -1,0 +1,34 @@
+[package]
+name = "jruby_executable"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "jruby_build"
+path = "src/bin/jruby_build.rs"
+
+[[bin]]
+name = "jruby_check"
+path = "src/bin/jruby_check.rs"
+
+[[bin]]
+name = "jruby_changelog"
+path = "src/bin/jruby_changelog.rs"
+
+[dependencies]
+java-properties = { workspace = true }
+glob = { workspace = true}
+clap = { workspace = true}
+shared = { workspace = true}
+indoc = { workspace = true}
+lazy_static = { workspace = true}
+flate2 = { workspace = true}
+fs-err = { workspace = true}
+fun_run = { workspace = true}
+nom = { workspace = true}
+regex = { workspace = true}
+reqwest = { workspace = true}
+tar = { workspace = true}
+tempfile = { workspace = true}
+thiserror = { workspace = true}
+bullet_stream = { workspace = true }
