@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use bullet_stream::Print;
 use clap::Parser;
 use indoc::formatdoc;
@@ -9,19 +11,10 @@ struct Args {
     version: String,
 }
 
-#[derive(Debug, thiserror::Error)]
-enum Error {
-    #[error("{0}")]
-    LibError(#[from] jruby_executable::Error),
-}
-
-fn jruby_changelog(args: &Args) -> Result<(), Error> {
+fn jruby_changelog(args: &Args) -> Result<(), Box<dyn Error>> {
     let Args { version } = args;
 
-    let stdlib_version = jruby_build_properties(version)
-        .map_err(Error::LibError)?
-        .ruby_stdlib_version()
-        .map_err(Error::LibError)?;
+    let stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
 
     println!("Add a changelog item: https://devcenter.heroku.com/admin/changelog_items/new");
     println!();

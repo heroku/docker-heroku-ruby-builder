@@ -4,6 +4,7 @@ use fun_run::{CmdError, CommandWithName};
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
 use shared::{BaseImage, CpuArch};
+use std::error::Error;
 use std::io::Write;
 use std::{path::PathBuf, process::Command};
 
@@ -21,37 +22,20 @@ struct RubyArgs {
     base_image: BaseImage,
 }
 
-#[derive(Debug, thiserror::Error)]
-#[allow(clippy::enum_variant_names)]
-enum Error {
-    #[error("Command failed {0}")]
-    CannotRunCmdError(CmdError),
-
-    #[error("{0}")]
-    LibError(#[from] jruby_executable::Error),
-
-    #[error("{0}")]
-    IoError(#[from] std::io::Error),
-}
-
 fn source_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .canonicalize()
-        .expect("Canonicalize source dir")
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+
+    fs_err::canonicalize(path).expect("Canonicalize source dir")
 }
 
-fn jruby_check(args: &RubyArgs) -> Result<(), Error> {
+fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     let RubyArgs {
         arch,
         version,
         base_image,
     } = args;
 
-    let jruby_stdlib_version = jruby_build_properties(version)
-        .map_err(Error::LibError)?
-        .ruby_stdlib_version()
-        .map_err(Error::LibError)?;
+    let jruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
 
     // Log progress to STDERR, print results to STDOUT directly
     let mut log = Print::new(std::io::stderr()).h1(format!(
@@ -59,7 +43,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Error> {
     ));
     let distro_number = base_image.distro_number();
 
-    let tempdir = tempfile::tempdir().map_err(Error::IoError)?;
+    let tempdir = tempfile::tempdir()?;
     let dockerfile_path = tempdir.path().join("Dockerfile");
 
     let image_name = format!("heroku/jruby-builder:{base_image}");
@@ -75,9 +59,9 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Error> {
         RUN apt-get update -y; apt-get install default-jre default-jdk -y
     "};
 
-    write!(stream, "{}", dockerfile).map_err(Error::IoError)?;
+    write!(stream, "{}", dockerfile)?;
 
-    fs_err::write(&dockerfile_path, dockerfile).map_err(Error::IoError)?;
+    fs_err::write(&dockerfile_path, dockerfile)?;
 
     log = stream.done().done();
 
@@ -92,12 +76,10 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Error> {
         docker_build.args(["--tag", &image_name]);
         docker_build.args(["--file", &dockerfile_path.display().to_string()]);
         docker_build.arg(source_dir().to_str().expect("Path to str"));
-        let _ = bullet
-            .stream_with(
-                format!("Building via {}", style::command(docker_build.name())),
-                |stdout, stderr| docker_build.stream_output(stdout, stderr),
-            )
-            .map_err(Error::CannotRunCmdError)?;
+        let _ = bullet.stream_with(
+            format!("Building via {}", style::command(docker_build.name())),
+            |stdout, stderr| docker_build.stream_output(stdout, stderr),
+        )?;
 
         bullet.done()
     };
@@ -135,12 +117,10 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Error> {
 
         let mut cmd_stream = log.bullet("Versions");
 
-        let result = cmd_stream
-            .stream_with(
-                format!("Running {}", style::command(cmd.name())),
-                |stdout, stderr| cmd.stream_output(stdout, stderr),
-            )
-            .map_err(Error::CannotRunCmdError)?;
+        let result = cmd_stream.stream_with(
+            format!("Running {}", style::command(cmd.name())),
+            |stdout, stderr| cmd.stream_output(stdout, stderr),
+        )?;
 
         (cmd_stream.done(), result)
     };

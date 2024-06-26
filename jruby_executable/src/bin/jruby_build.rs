@@ -4,7 +4,7 @@ use fs_err::PathExt;
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
 use shared::{download_tar, tar_dir_to_file, untar_to_dir, BaseImage, TarDownloadPath};
-use std::path::PathBuf;
+use std::{error::Error, path::PathBuf};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -15,36 +15,13 @@ struct Args {
     base_image: BaseImage,
 }
 
-#[derive(Debug, thiserror::Error)]
-#[allow(clippy::enum_variant_names)]
-enum Error {
-    #[error("Cannot create temp dir {0}")]
-    CreateTmpDir(std::io::Error),
-
-    #[error("{0}")]
-    HerokuError(#[from] shared::Error),
-
-    #[error("{0}")]
-    LibError(#[from] jruby_executable::Error),
-
-    #[error("{0}")]
-    IoError(#[from] std::io::Error),
-
-    #[error("{0}")]
-    BadPattern(#[from] glob::PatternError),
-
-    #[error("{0}")]
-    GlobPathError(#[from] glob::GlobError),
-}
-
 fn source_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .canonicalize()
-        .expect("Canonicalize path")
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+
+    fs_err::canonicalize(path).expect("Canonicalize source dir")
 }
 
-fn jruby_build(args: &Args) -> Result<(), Error> {
+fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
     let Args {
         version,
         base_image,
@@ -54,24 +31,17 @@ fn jruby_build(args: &Args) -> Result<(), Error> {
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
 
-    fs_err::create_dir_all(&volume_cache_dir).map_err(Error::IoError)?;
+    fs_err::create_dir_all(&volume_cache_dir)?;
 
-    let temp_dir = tempfile::tempdir().map_err(Error::CreateTmpDir)?;
+    let temp_dir = tempfile::tempdir()?;
     let extracted_path = temp_dir.path().join("extracted");
 
-    let ruby_stdlib_version = jruby_build_properties(version)
-        .map_err(Error::LibError)?
-        .ruby_stdlib_version()
-        .map_err(Error::LibError)?;
+    let ruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
 
     let download_path =
         TarDownloadPath(volume_cache_dir.join(format!("jruby-dist-{version}-bin.tar.gz")));
 
-    if download_path
-        .as_ref()
-        .fs_err_try_exists()
-        .map_err(Error::IoError)?
-    {
+    if download_path.as_ref().fs_err_try_exists()? {
         log = log
             .bullet(format!(
                 "Using cached JRuby archive {}",
@@ -97,20 +67,18 @@ fn jruby_build(args: &Args) -> Result<(), Error> {
     log = {
         let mut bullet = log.bullet("Removing unnecessary files");
         for pattern in &["*.bat", "*.dll", "*.exe"] {
-            for path in glob::glob(&jruby_dir.join("bin").join(pattern).to_string_lossy())
-                .map_err(Error::BadPattern)?
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(Error::GlobPathError)?
+            for path in glob::glob(&jruby_dir.join("bin").join(pattern).to_string_lossy())?
+                .collect::<Result<Vec<_>, _>>()?
             {
                 bullet = bullet.sub_bullet(format!("Remove {}", path.display()));
-                fs_err::remove_file(path).map_err(Error::IoError)?;
+                fs_err::remove_file(path)?;
             }
         }
 
         let path = jruby_dir.join("lib").join("target");
-        if path.fs_err_try_exists().map_err(Error::IoError)? {
+        if path.fs_err_try_exists()? {
             bullet = bullet.sub_bullet(format!("Remove recursive {}", path.display()));
-            fs_err::remove_dir_all(&path).map_err(Error::IoError)?;
+            fs_err::remove_dir_all(&path)?;
         }
 
         bullet.done()
@@ -118,8 +86,7 @@ fn jruby_build(args: &Args) -> Result<(), Error> {
 
     log = {
         let bullet = log.bullet("Create ruby symlink to jruby");
-        fs_err::os::unix::fs::symlink("jruby", jruby_dir.join("bin/ruby"))
-            .map_err(Error::IoError)?;
+        fs_err::os::unix::fs::symlink("jruby", jruby_dir.join("bin/ruby"))?;
 
         bullet.done()
     };
@@ -130,9 +97,9 @@ fn jruby_build(args: &Args) -> Result<(), Error> {
         let mut bullet = log.bullet("Creating tgz archives");
         let tar_dir = volume_output_dir.join(base_image.to_string());
 
-        fs_err::create_dir_all(&tar_dir).map_err(Error::IoError)?;
+        fs_err::create_dir_all(&tar_dir)?;
 
-        let tar_file = fs_err::File::create(tar_dir.join(&tgz_name)).map_err(Error::IoError)?;
+        let tar_file = fs_err::File::create(tar_dir.join(&tgz_name))?;
 
         let timer = bullet.start_timer(format!("Write {}", tar_file.path().display()));
         tar_dir_to_file(&jruby_dir, &tar_file)?;
@@ -140,11 +107,11 @@ fn jruby_build(args: &Args) -> Result<(), Error> {
 
         for arch in &["amd64", "arm64"] {
             let dir = volume_output_dir.join(base_image.to_string()).join(arch);
-            fs_err::create_dir_all(&dir).map_err(Error::IoError)?;
+            fs_err::create_dir_all(&dir)?;
 
             let path = dir.join(&tgz_name);
             bullet = bullet.sub_bullet(format!("Write {}", path.display()));
-            fs_err::copy(tar_file.path(), &path).map_err(Error::IoError)?;
+            fs_err::copy(tar_file.path(), &path)?;
         }
 
         bullet.done()

@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{error::Error, io::Write};
 
 use bullet_stream::Print;
 use clap::Parser;
@@ -11,16 +11,7 @@ struct Args {
     version: RubyDownloadVersion,
 }
 
-#[derive(Debug, thiserror::Error)]
-enum Error {
-    #[error("{0}")]
-    HerokuError(#[from] shared::Error),
-
-    #[error("Write to IO failed {0}")]
-    IoWriteFailed(#[from] std::io::Error),
-}
-
-fn ruby_changelog<W>(args: &Args, mut io: W) -> Result<W, Error>
+fn ruby_changelog<W>(args: &Args, mut io: W) -> Result<W, Box<dyn Error>>
 where
     W: Write,
 {
@@ -29,10 +20,9 @@ where
     writeln!(
         io,
         "Add a changelog item: https://devcenter.heroku.com/admin/changelog_items/new"
-    )
-    .map_err(Error::IoWriteFailed)?;
+    )?;
 
-    writeln!(io).map_err(Error::IoWriteFailed)?;
+    writeln!(io)?;
 
     let gemfile_format = version.bundler_format();
 
@@ -49,7 +39,7 @@ where
         For more information on [Ruby {version}, you can view the release announcement](https://www.ruby-lang.org/en/news/).
     "};
 
-    writeln!(io, "{changelog}").map_err(Error::IoWriteFailed)?;
+    writeln!(io, "{changelog}")?;
 
     if let Some(full_version) = version.is_prerelease() {
         let warning = formatdoc! {"
@@ -59,7 +49,7 @@ where
             > the official release of Ruby {full_version} and
             > to provide feedback to the Ruby core team.
         "};
-        writeln!(io, "{warning}").map_err(Error::IoWriteFailed)?;
+        writeln!(io, "{warning}")?;
     }
 
     Ok(io)

@@ -3,7 +3,7 @@ use clap::Parser;
 use fun_run::{CmdError, CommandWithName};
 use indoc::formatdoc;
 use shared::{output_tar_path, BaseImage, CpuArch, RubyDownloadVersion};
-use std::{path::PathBuf, process::Command};
+use std::{error::Error, path::PathBuf, process::Command};
 
 static INNER_OUTPUT: &str = "/tmp/output";
 
@@ -19,20 +19,13 @@ struct RubyArgs {
     base_image: BaseImage,
 }
 
-#[derive(Debug, thiserror::Error)]
-enum Error {
-    #[error("Command failed {0}")]
-    CannotRunCmdError(CmdError),
-}
-
 fn source_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .canonicalize()
-        .expect("Canonicalize source dir")
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+
+    fs_err::canonicalize(path).expect("Canonicalize source dir")
 }
 
-fn ruby_check(args: &RubyArgs) -> Result<(), Error> {
+fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     let RubyArgs {
         arch,
         version,
@@ -74,12 +67,10 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Error> {
 
     let mut cmd_stream = log.bullet("Versions");
 
-    let result = cmd_stream
-        .stream_with(
-            format!("Running {}", style::command(cmd.name())),
-            |stdout, stderr| cmd.stream_output(stdout, stderr),
-        )
-        .map_err(Error::CannotRunCmdError)?;
+    let result = cmd_stream.stream_with(
+        format!("Running {}", style::command(cmd.name())),
+        |stdout, stderr| cmd.stream_output(stdout, stderr),
+    )?;
 
     cmd_stream.done().done();
     eprintln!();
