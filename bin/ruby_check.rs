@@ -9,7 +9,6 @@ glob = "0.3.1"
 clap = { version = "4.5.4", features = ["derive"] }
 shared = { path = "../shared" }
 indoc = "2.0.5"
-lazy_static = "1.4.0"
 flate2 = "1.0.30"
 fs-err = "2.11.0"
 fun_run = "0.2.0"
