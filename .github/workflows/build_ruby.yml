@@ -52,7 +52,7 @@ jobs:
         run: cargo run --bin ruby_check -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch  ${{matrix.arch}} | tee $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3 dry run
         if: (inputs.dry_run)
-        run: aws s3 sync ./builds "s3://${S3_BUCKET}" --dryrun
+        run: aws s3 sync ./output "s3://${S3_BUCKET}" --dryrun
       - name: Upload Ruby runtime archive to S3 production
         if: (!inputs.dry_run)
-        run: aws s3 sync ./builds "s3://${S3_BUCKET}"
+        run: aws s3 sync ./output "s3://${S3_BUCKET}"
