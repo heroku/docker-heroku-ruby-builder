@@ -1,4 +1,6 @@
-/// Short: This script parses a file based on the input jruby version to determine
+// See `bin/*.rs` for scripts
+
+/// Short: This struct parses a file based on the input jruby version to determine
 /// what Ruby version it targets.
 ///
 /// If you run this script with `9.4.3.0` it will return 3.1.4
