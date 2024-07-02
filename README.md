@@ -4,7 +4,12 @@ This repo contains scripts to build binaries locally and on GitHub Actions.
 
 ## Building with GitHub actions
 
-Navigate to GithHub actions. Select the workflow "Build and upload (j?)Ruby runtime" then click the drop down "Run workflow" and enter the desired Ruby version. This will trigger a build for all supported stacks. If a version is not supported on a specific stack, add that logic to the `inside_docker/*.rs` file and to the GitHub action yaml logic.
+Navigate to GithHub actions. Select the workflow:
+
+- [Build Ruby](https://github.com/heroku/docker-heroku-ruby-builder/actions/workflows/build_ruby.yml)
+- [Build JRuby](https://github.com/heroku/docker-heroku-ruby-builder/actions/workflows/build_jruby.yml)
+
+Then click the drop down "Run workflow" and enter the desired Ruby version. This will trigger a build for all supported stacks. If a version is not supported on a specific stack, add that logic to the `inside_docker/*.rs` file and to the GitHub action yaml logic.
 
 Employees of Heroku see: [The Ruby language guides](https://github.com/heroku/languages-team/tree/main/languages/ruby) (not public) for additional details on building and deploying Ruby versions.
 
