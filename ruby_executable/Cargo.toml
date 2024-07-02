@@ -7,7 +7,6 @@ edition = "2021"
 clap = { workspace = true}
 shared = { workspace = true}
 indoc = { workspace = true}
-lazy_static = { workspace = true}
 flate2 = { workspace = true}
 fs-err = { workspace = true}
 fun_run = { workspace = true}
