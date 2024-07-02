@@ -5,101 +5,100 @@ on:
   - pull_request
 
 jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run ShellCheck
+        run: shellcheck *.sh -x
+
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 3.2
-          bundler-cache: true
-      - name: Linting
-        run: bundle exec standardrb --no-fix
+      - name: Update Rust toolchain
+        # Most of the time this will be a no-op, since GitHub releases new images every week
+        # which include the latest stable release of Rust, Rustup, Clippy and rustfmt.
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.7.1
+      - name: Clippy
+        # Using --all-targets so tests are checked and --deny to fail on warnings.
+        # Not using --locked here and below since Cargo.lock is in .gitignore.
+        run: cargo clippy --all-targets --all-features -- --deny warnings
+      - name: rustfmt
+        run: cargo fmt -- --check
+      - name: Check docs
+        # Using RUSTDOCFLAGS until `cargo doc --check` is stabilised:
+        # https://github.com/rust-lang/cargo/issues/10025
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --all-features --document-private-items --no-deps
 
-  test:
+  unit-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-          bundler-cache: true
-      - name: test
-        run: bundle exec rspec spec
-
-  integration_test:
-    runs-on: pub-hk-ubuntu-22.04-xlarge
-    strategy:
-      matrix:
-        stack: ["heroku-20", "heroku-22"]
-        version: ["3.1.4"]
-    steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Output CHANGELOG
-        run: bin/print_changelog "${{matrix.version}}"
-      - name: Build Docker image
-        run: bin/activate_docker "${{matrix.stack}}"
-      - name: Build and package Ruby runtime
-        run: bin/build_ruby "${{matrix.stack}}" "${{matrix.version}}"
-      - name: Verify ruby executable and output rubygems version
-        run: bin/print_summary "${{matrix.stack}}" "${{matrix.version}}" | tee $GITHUB_STEP_SUMMARY
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.7.1
+      - name: Run unit tests
+        run: cargo test --all-features
 
-  integration_test-heroku-24-amd:
-    runs-on: pub-hk-ubuntu-22.04-xlarge
+  ruby_integration_test:
+    runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-22.04-arm-medium' || 'ubuntu-latest' }}
     strategy:
       matrix:
-        stack: ["heroku-24"]
+        base_image: ["heroku-20", "heroku-22", "heroku-24"]
         version: ["3.2.3"]
+        arch: ["arm64", "amd64"]
+        exclude:
+          - base_image: "heroku-20"
+            arch: "arm64"
+          - base_image: "heroku-22"
+            arch: "arm64"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.7.3
+      - name: Cargo build (to make test logs shorter)
+        run: cargo build
       - name: Output CHANGELOG
-        run: bin/print_changelog "${{matrix.version}}"
-      - name: Build Docker image
-        run: bin/activate_docker "${{matrix.stack}}"
-      - name: Build and package Ruby runtime
-        run: bin/build_ruby "${{matrix.stack}}" "${{matrix.version}}"
-      - name: Verify ruby executable and output rubygems version
-        run: bin/print_summary "${{matrix.stack}}" "${{matrix.version}}" amd64 | tee $GITHUB_STEP_SUMMARY
+        run: cargo run --bin ruby_changelog -- --version "${{matrix.version}}"
+      - name: Build Ruby
+        run: cargo run --bin ruby_build -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+      - name: Check Ruby
+        run: cargo run --bin ruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
 
-  integration_test-heroku-24-arm:
-    runs-on: pub-hk-ubuntu-22.04-arm-large
+  jruby_integration_test:
+    runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-22.04-arm-medium' || 'ubuntu-latest' }}
     strategy:
       matrix:
-        stack: ["heroku-24"]
-        version: ["3.2.3"]
+        base_image: ["heroku-20", "heroku-22", "heroku-24"]
+        version: ["9.4.7.0"]
+        arch: ["arm64", "amd64"]
+        exclude:
+          - base_image: "heroku-20"
+            arch: "arm64"
+          - base_image: "heroku-22"
+            arch: "arm64"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      # Docker (and other tools) are not present on the early-access runners.
-      # We must install them manually: https://github.com/github-early-access/arm-runners-beta
-      - name: Install docker
-        run: |
-          bin/setup_docker_ci
-
-          sudo usermod -aG docker $USER
-          sudo apt-get install acl
-          sudo setfacl --modify user:$USER:rw /var/run/docker.sock
-      # AWS CLI (and other tools) are not present on the early-access runners.
-      # We must install them manually: https://github.com/github-early-access/arm-runners-beta
-      - name: Install AWS CLI
-        run: | # https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
-          sudo apt-get install -y unzip
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install
-      - name: Verify AWS installed correctly
-        run: aws --version
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.7.3
+      - name: Cargo build (to make test logs shorter)
+        run: cargo build
       - name: Output CHANGELOG
-        run: bin/print_changelog "${{matrix.version}}"
-      - name: Build Docker image
-        run: bin/activate_docker "${{matrix.stack}}"
-      - name: Build and package Ruby runtime
-        run: bin/build_ruby "${{matrix.stack}}" "${{matrix.version}}"
-      - name: Verify ruby executable and output rubygems version
-        run: bin/print_summary "${{matrix.stack}}" "${{matrix.version}}" arm64 | tee $GITHUB_STEP_SUMMARY
+        run: cargo run --bin jruby_changelog -- --version "${{matrix.version}}"
+      - name: Build JRuby
+        run: cargo run --bin jruby_build -- --version ${{matrix.version}} --base-image ${{matrix.base_image}}
+      - name: Check JRuby
+        run: cargo run --bin jruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}

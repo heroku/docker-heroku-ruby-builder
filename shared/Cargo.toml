@@ -1,0 +1,24 @@
+[package]
+name = "shared"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+glob = { workspace = true}
+clap = { workspace = true}
+indoc = { workspace = true}
+lazy_static = { workspace = true}
+flate2 = { workspace = true}
+fs-err = { workspace = true}
+fun_run = { workspace = true}
+nom = { workspace = true}
+regex = { workspace = true}
+reqwest = { workspace = true}
+tar = { workspace = true}
+tempfile = { workspace = true}
+thiserror = { workspace = true}
+bullet_stream = { workspace = true }
+
+[dev-dependencies]
+tiny_http = "0.12.0"
+indoc = "2.0.5"
