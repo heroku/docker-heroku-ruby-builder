@@ -1,10 +1,10 @@
 use bullet_stream::state::SubBullet;
 use bullet_stream::Print;
-use flate2::read::GzDecoder;
 use fs_err::{File, PathExt};
+use fun_run::CommandWithName;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use tar::Archive;
+use std::process::Command;
 
 mod base_image;
 mod download_ruby_version;
@@ -22,10 +22,17 @@ impl AsRef<Path> for TarDownloadPath {
 }
 
 pub fn untar_to_dir(tar_path: &TarDownloadPath, workspace: &Path) -> Result<(), Error> {
-    let file = fs_err::File::open(tar_path.as_ref()).map_err(Error::FsError)?;
-    let tar = GzDecoder::new(file);
-    let mut archive = Archive::new(tar);
-    archive.unpack(workspace).map_err(Error::FsError)?;
+    fs_err::create_dir_all(workspace).map_err(Error::FsError)?;
+
+    // Shelling out due to https://github.com/alexcrichton/tar-rs/issues/369
+    let mut cmd = Command::new("bash");
+    cmd.arg("-c");
+    cmd.arg(format!(
+        "tar xzf {tar_file} -C {out_dir}",
+        tar_file = tar_path.as_ref().display(),
+        out_dir = workspace.display()
+    ));
+    cmd.named_output().map_err(Error::CmdError)?;
 
     Ok(())
 }
