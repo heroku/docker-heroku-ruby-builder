@@ -27,13 +27,11 @@ pub fn untar_to_dir(tar_path: &TarDownloadPath, workspace: &Path) -> Result<(), 
     // Shelling out due to https://github.com/alexcrichton/tar-rs/issues/369
     let mut cmd = Command::new("bash");
     cmd.arg("-c");
-    cmd.arg(
-        [
-            format!("cd {}", workspace.display()),
-            format!("tar xzf {}", tar_path.as_ref().display()),
-        ]
-        .join(" && "),
-    );
+    cmd.arg(format!(
+        "tar xzf {tar_file} -C {out_dir}",
+        tar_file = tar_path.as_ref().display(),
+        out_dir = workspace.display()
+    ));
     cmd.named_output().map_err(Error::CmdError)?;
 
     Ok(())
