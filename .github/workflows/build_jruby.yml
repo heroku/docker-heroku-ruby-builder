@@ -25,7 +25,7 @@ env:
 
 jobs:
   build-and-upload:
-    runs-on: pub-hk-ubuntu-22.04-xlarge
+    runs-on: pub-hk-ubuntu-24.04-xlarge
     strategy:
       fail-fast: false
       matrix:

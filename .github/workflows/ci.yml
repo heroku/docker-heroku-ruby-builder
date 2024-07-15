@@ -6,7 +6,7 @@ on:
 
 jobs:
   shellcheck:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -14,7 +14,7 @@ jobs:
         run: shellcheck *.sh -x
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
         run: RUSTDOCFLAGS="-D warnings" cargo doc --all-features --document-private-items --no-deps
 
   unit-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
         run: cargo test --all-features
 
   ruby_integration_test:
-    runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-22.04-arm-medium' || 'ubuntu-latest' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-24.04-arm-medium' || 'ubuntu-24.04' }}
     strategy:
       matrix:
         base_image: ["heroku-20", "heroku-22", "heroku-24"]
@@ -76,7 +76,7 @@ jobs:
         run: cargo run --bin ruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
 
   jruby_integration_test:
-    runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-22.04-arm-medium' || 'ubuntu-latest' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-24.04-arm-medium' || 'ubuntu-24.04' }}
     strategy:
       matrix:
         base_image: ["heroku-20", "heroku-22", "heroku-24"]
