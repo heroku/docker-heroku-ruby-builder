@@ -2,9 +2,17 @@ use bullet_stream::{style, Print};
 use clap::Parser;
 use fs_err::PathExt;
 use indoc::formatdoc;
+use inventory::artifact::Artifact;
 use jruby_executable::jruby_build_properties;
-use shared::{download_tar, source_dir, tar_dir_to_file, untar_to_dir, BaseImage, TarDownloadPath};
+use shared::{
+    append_filename_with, append_manifest, download_tar, sha256_from_path, source_dir,
+    tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage, CpuArch, ManifestVersion,
+    TarDownloadPath,
+};
+use std::convert::From;
 use std::error::Error;
+
+static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws.com";
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -24,6 +32,8 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
     let mut log = Print::new(std::io::stderr()).h1("Building JRuby");
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
+
+    let inventory = source_dir().join("jruby_inventory.toml");
 
     fs_err::create_dir_all(&volume_cache_dir)?;
 
@@ -89,6 +99,10 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
 
     log = {
         let mut bullet = log.bullet("Creating tgz archives");
+        bullet = bullet.sub_bullet(format!(
+            "Inventory file {}",
+            style::value(inventory.to_string_lossy())
+        ));
         let tar_dir = volume_output_dir.join(base_image.to_string());
 
         fs_err::create_dir_all(&tar_dir)?;
@@ -99,17 +113,45 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         tar_dir_to_file(&jruby_dir, &tar_file)?;
         bullet = timer.done();
 
-        for arch in &["amd64", "arm64"] {
-            let dir = volume_output_dir.join(base_image.to_string()).join(arch);
+        for cpu_arch in &[CpuArch::new("amd64")?, CpuArch::new("arm64")?] {
+            let dir = volume_output_dir
+                .join(base_image.to_string())
+                .join(cpu_arch.to_string());
             fs_err::create_dir_all(&dir)?;
 
             let path = dir.join(&tgz_name);
             bullet = bullet.sub_bullet(format!("Write {}", path.display()));
             fs_err::copy(tar_file.path(), &path)?;
+
+            let sha = sha256_from_path(&path)?;
+            let sha_seven = sha.chars().take(7).collect::<String>();
+            let sha_seven_path = append_filename_with(&path, &format!("-{sha_seven}"), ".tgz")?;
+
+            bullet = bullet.sub_bullet(format!("Write {}", sha_seven_path.display(),));
+            fs_err::copy(tar_file.path(), &sha_seven_path)?;
+
+            append_manifest(
+                &inventory,
+                Artifact {
+                    version: ManifestVersion::new(version),
+                    os: inventory::artifact::Os::Linux,
+                    arch: cpu_arch.into(),
+                    url: format!(
+                        "{S3_BASE_URL}/{}",
+                        sha_seven_path.strip_prefix(&volume_output_dir)?.display()
+                    ),
+                    checksum: format!("sha256:{sha}").parse()?,
+                    metadata: ArtifactMetadata {
+                        distro_version: base_image.distro_version(),
+                        timestamp: chrono::Utc::now(),
+                    },
+                },
+            )?;
         }
 
         bullet.done()
     };
+
     log.done();
 
     Ok(())

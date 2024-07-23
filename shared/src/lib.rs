@@ -1,7 +1,14 @@
+use base_image::DistroVersion;
 use bullet_stream::state::SubBullet;
 use bullet_stream::Print;
+use chrono::{DateTime, Utc};
+use fs2::FileExt;
 use fs_err::{File, PathExt};
 use fun_run::CommandWithName;
+use inventory::artifact::Artifact;
+use inventory::inventory::Inventory;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -11,6 +18,120 @@ mod download_ruby_version;
 
 pub use base_image::{BaseImage, CpuArch, CpuArchError};
 pub use download_ruby_version::RubyDownloadVersion;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ArtifactMetadata {
+    pub timestamp: DateTime<Utc>,
+    pub distro_version: DistroVersion,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ManifestVersion(pub String);
+
+impl ManifestVersion {
+    pub fn new(version: &str) -> Self {
+        Self(version.to_string())
+    }
+}
+
+/// Appends the given artifact to the inventory file at the given path
+///
+/// If the file doesn't exist, it will be created.
+/// Uses file locking to ensure atomic updating.
+pub fn append_manifest(
+    path: &Path,
+    artifact: Artifact<ManifestVersion, Sha256, ArtifactMetadata>,
+) -> Result<(), Error> {
+    fs_err::create_dir_all(
+        path.parent().ok_or_else(|| {
+            Error::Other(format!("Cannot determine parent from {}", path.display()))
+        })?,
+    )
+    .map_err(Error::FsError)?;
+
+    let mut file: std::fs::File = fs_err::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)
+        .map_err(Error::FsError)?
+        .into();
+
+    file.lock_exclusive().map_err(|e| {
+        Error::Other(format!(
+            "Error {e} obtaining file lock on {}",
+            path.display()
+        ))
+    })?;
+
+    let inventory_string = fs_err::read_to_string(path).map_err(Error::FsError)?;
+
+    let mut inventory = if inventory_string.trim().is_empty() {
+        Inventory {
+            artifacts: Vec::new(),
+        }
+    } else {
+        inventory_string
+            .parse::<Inventory<ManifestVersion, Sha256, ArtifactMetadata>>()
+            .map_err(|e| Error::Other(format!("Error {e} parsing inventory: {}", path.display())))?
+    };
+
+    inventory.push(artifact);
+    writeln!(file, "{inventory}").expect("Writeable file");
+
+    file.unlock().map_err(|e| {
+        Error::Other(format!(
+            "Error {e} releasing file lock on {}",
+            path.display()
+        ))
+    })?;
+
+    Ok(())
+}
+
+/// Appends the given string after the filename and before the `ends_with`
+///
+/// ```
+/// use std::path::Path;
+/// use shared::append_filename_with;
+///
+/// let path = Path::new("/tmp/file.txt");
+/// let out = append_filename_with(path, "-lol", ".txt").unwrap();
+/// assert_eq!(Path::new("/tmp/file-lol.txt"), out);
+/// ```
+///
+/// Raises an error if the files doesn't exist or if the file name doesn't end with `ends_with`
+pub fn append_filename_with(path: &Path, append: &str, ends_with: &str) -> Result<PathBuf, Error> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| Error::Other(format!("Cannot determine parent from {}", path.display())))?;
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| {
+            Error::Other(format!(
+                "Cannot determine file name from {}",
+                path.display()
+            ))
+        })?
+        .to_string_lossy();
+
+    if !file_name.ends_with(ends_with) {
+        Err(Error::Other(format!(
+            "File name {} does not end with {}",
+            file_name, ends_with
+        )))?;
+    }
+    let file_base = file_name.trim_end_matches(ends_with);
+
+    Ok(parent.join(format!("{file_base}{append}{ends_with}")))
+}
+
+/// Returns the sha256 hash of the file at the given path
+pub fn sha256_from_path(path: &Path) -> Result<String, Error> {
+    let mut hasher = Sha256::new();
+    hasher.update(fs_err::read(path).map_err(Error::FsError)?);
+
+    Ok(format!("{:x}", hasher.finalize()))
+}
 
 #[derive(Debug, Clone)]
 pub struct TarDownloadPath(pub PathBuf);
@@ -67,6 +188,9 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+
+    #[error("Error {0}")]
+    Other(String),
 }
 
 pub fn source_dir() -> PathBuf {

@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
+use serde::{Deserialize, Serialize};
+
 static KNOWN_ARCHITECTURES: [&str; 2] = ["amd64", "arm64"];
 static KNOWN_BASE_IMAGES: &[(&str, &str)] = &[
     ("heroku-20", "20"),
@@ -19,6 +21,9 @@ pub struct BaseImage {
     distro_number: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct DistroVersion(String);
+
 impl BaseImage {
     pub fn new(s: &str) -> Result<Self, BaseImageError> {
         KNOWN_BASE_IMAGES
@@ -29,6 +34,10 @@ impl BaseImage {
                 distro_number: version.to_owned(),
             })
             .ok_or_else(|| BaseImageError(s.to_owned()))
+    }
+
+    pub fn distro_version(&self) -> DistroVersion {
+        DistroVersion(format!("{}.04", self.distro_number))
     }
 
     pub fn is_arch_aware(&self) -> bool {
@@ -82,6 +91,18 @@ impl FromStr for CpuArch {
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid CPU architecture {0} must be one of {}", KNOWN_ARCHITECTURES.join(", "))]
 pub struct CpuArchError(String);
+
+impl From<&CpuArch> for inventory::artifact::Arch {
+    fn from(value: &CpuArch) -> Self {
+        if &value.name == "amd64" {
+            inventory::artifact::Arch::Amd64
+        } else if value.name == "arm64" {
+            inventory::artifact::Arch::Arm64
+        } else {
+            unreachable!();
+        }
+    }
+}
 
 impl CpuArch {
     pub fn new(s: &str) -> Result<Self, CpuArchError> {

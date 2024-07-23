@@ -17,6 +17,12 @@ tar = { workspace = true}
 tempfile = { workspace = true}
 thiserror = { workspace = true}
 bullet_stream = { workspace = true }
+sha2 = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+inventory = { workspace = true }
+fs2 = { workspace = true }
 
 [dev-dependencies]
 tiny_http = "0.12.0"
