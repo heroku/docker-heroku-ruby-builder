@@ -89,18 +89,19 @@ impl FromStr for CpuArch {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("Invalid CPU architecture {0} must be one of {}", KNOWN_ARCHITECTURES.join(", "))]
-pub struct CpuArchError(String);
+pub enum CpuArchError {
+    #[error("Invalid CPU architecture {0} must be one of {}", KNOWN_ARCHITECTURES.join(", "))]
+    Unknown(String),
 
-impl From<&CpuArch> for inventory::artifact::Arch {
-    fn from(value: &CpuArch) -> Self {
-        if &value.name == "amd64" {
-            inventory::artifact::Arch::Amd64
-        } else if value.name == "arm64" {
-            inventory::artifact::Arch::Arm64
-        } else {
-            unreachable!();
-        }
+    #[error("CPU architecture {0} cannot be converted {1}")]
+    CannotConvert(String, inventory::artifact::UnsupportedArchError),
+}
+
+impl TryFrom<&CpuArch> for inventory::artifact::Arch {
+    type Error = CpuArchError;
+
+    fn try_from(value: &CpuArch) -> Result<Self, Self::Error> {
+        Self::from_str(&value.name).map_err(|e| CpuArchError::CannotConvert(value.name.clone(), e))
     }
 }
 
@@ -110,7 +111,7 @@ impl CpuArch {
             .iter()
             .find(|&&name| name == s)
             .map(|_| Self { name: s.to_owned() })
-            .ok_or_else(|| CpuArchError(s.to_owned()))
+            .ok_or_else(|| CpuArchError::Unknown(s.to_owned()))
     }
 
     pub fn from_system() -> Result<Self, CpuArchError> {
