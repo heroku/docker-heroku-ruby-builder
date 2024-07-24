@@ -12,7 +12,9 @@ mod inventory_help;
 
 pub use base_image::{BaseImage, CpuArch, CpuArchError};
 pub use download_ruby_version::RubyDownloadVersion;
-pub use inventory_help::{append_inventory, inventory_check, sha256_from_path, ArtifactMetadata};
+pub use inventory_help::{
+    atomic_file_contents, inventory_check, parse_inventory, sha256_from_path, ArtifactMetadata,
+};
 
 /// Appends the given string after the filename and before the `ends_with`
 ///

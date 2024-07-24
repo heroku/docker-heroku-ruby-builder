@@ -93,29 +93,7 @@ pub fn inventory_check(contents: &str) -> Result<(), Error> {
     }
 }
 
-/// Appends the given artifact to the inventory file at the given path
-///
-/// If the file doesn't exist, it will be created.
-/// Uses file locking to ensure atomic updating.
-pub fn append_inventory(
-    path: &Path,
-    artifact: Artifact<GemVersion, Sha256, ArtifactMetadata>,
-) -> Result<(), Error> {
-    atomic_file_access(path, |file, contents| {
-        let mut inventory = parse_contents(contents)?;
-
-        inventory.push(artifact);
-
-        writeln!(file, "{inventory}").expect("Writeable file");
-
-        Ok(())
-    })
-    .map_err(|e| Error::Other(e.to_string()))?;
-
-    Ok(())
-}
-
-fn atomic_file_access<F, T>(path: &Path, f: F) -> Result<T, Box<dyn std::error::Error>>
+pub fn atomic_file_contents<F, T>(path: &Path, f: F) -> Result<T, Box<dyn std::error::Error>>
 where
     F: FnOnce(&mut std::fs::File, &str) -> Result<T, Box<dyn std::error::Error>>,
 {
@@ -143,7 +121,7 @@ where
     result
 }
 
-fn parse_contents(
+pub fn parse_inventory(
     contents: &str,
 ) -> Result<Inventory<GemVersion, Sha256, ArtifactMetadata>, Error> {
     if contents.trim().is_empty() {
@@ -214,13 +192,26 @@ mod test {
             },
             url: "https://example.com".to_string(),
         };
-        append_inventory(&path, artifact.clone()).unwrap();
 
-        let inventory = parse_contents(&fs_err::read_to_string(&path).unwrap()).unwrap();
+        atomic_file_contents(&path, |file, contents| {
+            let mut inventory = parse_inventory(contents)?;
+            inventory.push(artifact.clone());
+            write!(file, "{inventory}").expect("Writeable file");
+            Ok(())
+        })
+        .unwrap();
+
+        let inventory = parse_inventory(&fs_err::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(1, inventory.artifacts.len());
 
-        append_inventory(&path, artifact.clone()).unwrap();
-        let inventory = parse_contents(&fs_err::read_to_string(&path).unwrap()).unwrap();
+        atomic_file_contents(&path, |file, contents| {
+            let mut inventory = parse_inventory(contents)?;
+            inventory.push(artifact.clone());
+            write!(file, "{inventory}").expect("Writeable file");
+            Ok(())
+        })
+        .unwrap();
+        let inventory = parse_inventory(&fs_err::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(2, inventory.artifacts.len());
     }
 }

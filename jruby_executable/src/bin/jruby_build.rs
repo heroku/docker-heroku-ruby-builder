@@ -6,11 +6,13 @@ use indoc::formatdoc;
 use inventory::artifact::Artifact;
 use jruby_executable::jruby_build_properties;
 use shared::{
-    append_filename_with, append_inventory, download_tar, sha256_from_path, source_dir,
-    tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage, CpuArch, TarDownloadPath,
+    append_filename_with, atomic_file_contents, download_tar, parse_inventory, sha256_from_path,
+    source_dir, tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage, CpuArch,
+    TarDownloadPath,
 };
 use std::convert::From;
 use std::error::Error;
+use std::io::Write;
 use std::str::FromStr;
 
 static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws.com";
@@ -125,9 +127,10 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         let timestamp = chrono::Utc::now();
         for cpu_arch in &[CpuArch::new("amd64")?, CpuArch::new("arm64")?] {
             let distro_version = base_image.distro_version();
-            append_inventory(
-                &inventory,
-                Artifact {
+
+            atomic_file_contents(&inventory, |file, contents| {
+                let mut inventory = parse_inventory(contents)?;
+                inventory.push(Artifact {
                     version: GemVersion::from_str(version)?,
                     os: inventory::artifact::Os::Linux,
                     arch: cpu_arch.try_into()?,
@@ -140,8 +143,12 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
                         distro_version,
                         timestamp,
                     },
-                },
-            )?;
+                });
+
+                writeln!(file, "{inventory}").expect("Writeable file");
+
+                Ok(())
+            })?
         }
 
         // Can be removed once manifest file support is fully rolled out
