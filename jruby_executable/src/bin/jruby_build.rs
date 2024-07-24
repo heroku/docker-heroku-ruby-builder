@@ -127,23 +127,29 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         let timestamp = chrono::Utc::now();
         for cpu_arch in &[CpuArch::new("amd64")?, CpuArch::new("arm64")?] {
             let distro_version = base_image.distro_version();
-
+            let artifact = Artifact {
+                version: GemVersion::from_str(version)?,
+                os: inventory::artifact::Os::Linux,
+                arch: cpu_arch.try_into()?,
+                url: format!(
+                    "{S3_BASE_URL}/{}",
+                    sha_seven_path.strip_prefix(&volume_output_dir)?.display()
+                ),
+                checksum: format!("sha256:{sha}").parse()?,
+                metadata: ArtifactMetadata {
+                    distro_version,
+                    timestamp,
+                },
+            };
             atomic_file_contents(&inventory, |file, contents| {
                 let mut inventory = parse_inventory(contents)?;
-                inventory.push(Artifact {
-                    version: GemVersion::from_str(version)?,
-                    os: inventory::artifact::Os::Linux,
-                    arch: cpu_arch.try_into()?,
-                    url: format!(
-                        "{S3_BASE_URL}/{}",
-                        sha_seven_path.strip_prefix(&volume_output_dir)?.display()
-                    ),
-                    checksum: format!("sha256:{sha}").parse()?,
-                    metadata: ArtifactMetadata {
-                        distro_version,
-                        timestamp,
-                    },
+                inventory.artifacts.retain(|a| {
+                    a.version != artifact.version
+                        || a.arch != artifact.arch
+                        || a.metadata.distro_version != artifact.metadata.distro_version
                 });
+
+                inventory.push(artifact);
 
                 writeln!(file, "{inventory}").expect("Writeable file");
 

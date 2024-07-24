@@ -2,16 +2,14 @@ use crate::base_image::DistroVersion;
 use crate::{download_tar, Error, TarDownloadPath};
 use chrono::{DateTime, Utc};
 use fs2::FileExt;
-use fs_err::os::unix::fs;
 use gem_version::GemVersion;
-use inventory::artifact::Artifact;
 use inventory::checksum::Checksum;
 use inventory::inventory::Inventory;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::borrow::Borrow;
-use std::io::{Read, Seek, Write};
+use std::io::Read;
 use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -169,9 +167,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
     use crate::BaseImage;
+    use inventory::artifact::Artifact;
+    use std::io::Write;
+    use std::str::FromStr;
 
     use super::*;
 
