@@ -2,6 +2,7 @@ use crate::base_image::DistroVersion;
 use crate::{download_tar, Error, TarDownloadPath};
 use chrono::{DateTime, Utc};
 use fs2::FileExt;
+use fs_err::os::unix::fs;
 use gem_version::GemVersion;
 use inventory::artifact::Artifact;
 use inventory::checksum::Checksum;
@@ -10,7 +11,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::borrow::Borrow;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -100,6 +101,24 @@ pub fn append_inventory(
     path: &Path,
     artifact: Artifact<GemVersion, Sha256, ArtifactMetadata>,
 ) -> Result<(), Error> {
+    atomic_file_access(path, |file, contents| {
+        let mut inventory = parse_contents(contents)?;
+
+        inventory.push(artifact);
+
+        writeln!(file, "{inventory}").expect("Writeable file");
+
+        Ok(())
+    })
+    .map_err(|e| Error::Other(e.to_string()))?;
+
+    Ok(())
+}
+
+fn atomic_file_access<F, T>(path: &Path, f: F) -> Result<T, Box<dyn std::error::Error>>
+where
+    F: FnOnce(&mut std::fs::File, &str) -> Result<T, Box<dyn std::error::Error>>,
+{
     fs_err::create_dir_all(
         path.parent().ok_or_else(|| {
             Error::Other(format!("Cannot determine parent from {}", path.display()))
@@ -108,33 +127,20 @@ pub fn append_inventory(
     .map_err(Error::FsError)?;
 
     let mut file: std::fs::File = fs_err::OpenOptions::new()
+        .read(true)
         .write(true)
         .create(true)
-        .open(path)
-        .map_err(Error::FsError)?
+        .open(path)?
         .into();
+    file.lock_exclusive()?;
+    use std::io::Seek;
 
-    file.lock_exclusive().map_err(|e| {
-        Error::Other(format!(
-            "Error {e} obtaining file lock on {}",
-            path.display()
-        ))
-    })?;
-
-    let inventory_string = fs_err::read_to_string(path).map_err(Error::FsError)?;
-    let mut inventory = parse_contents(&inventory_string)?;
-    inventory.push(artifact);
-
-    writeln!(file, "{inventory}").expect("Writeable file");
-
-    file.unlock().map_err(|e| {
-        Error::Other(format!(
-            "Error {e} releasing file lock on {}",
-            path.display()
-        ))
-    })?;
-
-    Ok(())
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).map_err(Error::FsError)?;
+    file.rewind()?;
+    let result: Result<T, Box<dyn std::error::Error>> = f(&mut file, &contents);
+    file.unlock()?;
+    result
 }
 
 fn parse_contents(
