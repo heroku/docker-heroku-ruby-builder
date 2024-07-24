@@ -2,6 +2,7 @@ use crate::base_image::DistroVersion;
 use crate::{download_tar, Error, TarDownloadPath};
 use chrono::{DateTime, Utc};
 use fs2::FileExt;
+use gem_version::GemVersion;
 use inventory::artifact::Artifact;
 use inventory::checksum::Checksum;
 use inventory::inventory::Inventory;
@@ -16,15 +17,6 @@ use std::path::Path;
 pub struct ArtifactMetadata {
     pub timestamp: DateTime<Utc>,
     pub distro_version: DistroVersion,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ManifestVersion(pub String);
-
-impl ManifestVersion {
-    pub fn new(version: &str) -> Self {
-        Self(version.to_string())
-    }
 }
 
 /// ```
@@ -50,7 +42,7 @@ pub fn inventory_check(contents: &str) -> Result<(), Error> {
     }
 
     let inventory = contents
-        .parse::<Inventory<ManifestVersion, Sha256, ArtifactMetadata>>()
+        .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
         .map_err(|e| Error::Other(format!("Could not parse inventory. Error: {e}")))?;
 
     let results = inventory
@@ -106,7 +98,7 @@ pub fn inventory_check(contents: &str) -> Result<(), Error> {
 /// Uses file locking to ensure atomic updating.
 pub fn append_inventory(
     path: &Path,
-    artifact: Artifact<ManifestVersion, Sha256, ArtifactMetadata>,
+    artifact: Artifact<GemVersion, Sha256, ArtifactMetadata>,
 ) -> Result<(), Error> {
     fs_err::create_dir_all(
         path.parent().ok_or_else(|| {
@@ -147,14 +139,14 @@ pub fn append_inventory(
 
 fn parse_contents(
     contents: &str,
-) -> Result<Inventory<ManifestVersion, Sha256, ArtifactMetadata>, Error> {
+) -> Result<Inventory<GemVersion, Sha256, ArtifactMetadata>, Error> {
     if contents.trim().is_empty() {
         Ok(Inventory {
             artifacts: Vec::new(),
         })
     } else {
         contents
-            .parse::<Inventory<ManifestVersion, Sha256, ArtifactMetadata>>()
+            .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
             .map_err(|e| Error::Other(format!("Error {e} parsing inventory:\n{contents}")))
     }
 }
@@ -193,6 +185,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
     use crate::BaseImage;
 
     use super::*;
@@ -204,7 +198,7 @@ mod test {
         let artifact = Artifact {
             os: inventory::artifact::Os::Linux,
             arch: inventory::artifact::Arch::Amd64,
-            version: ManifestVersion("1.0.0".to_string()),
+            version: GemVersion::from_str("1.0.0").unwrap(),
             checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
                 .parse()
                 .unwrap(),

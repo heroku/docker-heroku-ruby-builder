@@ -1,16 +1,17 @@
 use bullet_stream::{style, Print};
 use clap::Parser;
 use fs_err::PathExt;
+use gem_version::GemVersion;
 use indoc::formatdoc;
 use inventory::artifact::Artifact;
 use jruby_executable::jruby_build_properties;
 use shared::{
     append_filename_with, append_inventory, download_tar, sha256_from_path, source_dir,
-    tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage, CpuArch, ManifestVersion,
-    TarDownloadPath,
+    tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage, CpuArch, TarDownloadPath,
 };
 use std::convert::From;
 use std::error::Error;
+use std::str::FromStr;
 
 static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws.com";
 
@@ -127,7 +128,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
             append_inventory(
                 &inventory,
                 Artifact {
-                    version: ManifestVersion::new(version),
+                    version: GemVersion::from_str(version)?,
                     os: inventory::artifact::Os::Linux,
                     arch: cpu_arch.try_into()?,
                     url: format!(

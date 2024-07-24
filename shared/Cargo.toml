@@ -29,6 +29,7 @@ inventory = { workspace = true }
 fs2 = { workspace = true }
 rayon = { workspace = true }
 hex = { workspace = true }
+gem_version = { workspace = true }
 
 
 [dev-dependencies]
