@@ -6,8 +6,9 @@ use indoc::formatdoc;
 use inventory::artifact::Artifact;
 use jruby_executable::jruby_build_properties;
 use shared::{
-    append_filename_with, atomic_inventory_update, download_tar, sha256_from_path, source_dir,
-    tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage, CpuArch, TarDownloadPath,
+    append_filename_with, artifact_is_different, atomic_inventory_update, download_tar,
+    sha256_from_path, source_dir, tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage,
+    CpuArch, TarDownloadPath,
 };
 use std::convert::From;
 use std::error::Error;
@@ -140,11 +141,9 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
                 },
             };
             atomic_inventory_update(&inventory, |inventory| {
-                inventory.artifacts.retain(|a| {
-                    a.version != artifact.version
-                        || a.arch != artifact.arch
-                        || a.metadata.distro_version != artifact.metadata.distro_version
-                });
+                inventory
+                    .artifacts
+                    .retain(|a| artifact_is_different(a, &artifact));
 
                 inventory.push(artifact);
                 Ok(())

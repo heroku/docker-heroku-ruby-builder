@@ -180,6 +180,15 @@ where
     Ok(digest.finalize_fixed())
 }
 
+pub fn artifact_is_different(
+    a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
+    b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
+) -> bool {
+    a.version != b.version
+        || a.arch != b.arch
+        || a.metadata.distro_version != b.metadata.distro_version
+}
+
 #[cfg(test)]
 mod test {
     use crate::BaseImage;
@@ -188,6 +197,38 @@ mod test {
     use std::str::FromStr;
 
     use super::*;
+
+    #[test]
+    fn test_is_not_version_match() {
+        let a = Artifact {
+            os: inventory::artifact::Os::Linux,
+            arch: inventory::artifact::Arch::Amd64,
+            version: GemVersion::from_str("1.0.0").unwrap(),
+            checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
+                .parse()
+                .unwrap(),
+            metadata: ArtifactMetadata {
+                timestamp: Utc::now(),
+                distro_version: BaseImage::new("heroku-24").unwrap().distro_version(),
+            },
+            url: "https://example.com".to_string(),
+        };
+
+        let b = a.clone();
+        assert!(!artifact_is_different(&a, &b));
+
+        let mut b = a.clone();
+        b.version = GemVersion::from_str("1.0.1").unwrap();
+        assert!(artifact_is_different(&a, &b));
+
+        let mut b = a.clone();
+        b.arch = inventory::artifact::Arch::Arm64;
+        assert!(artifact_is_different(&a, &b));
+
+        let mut b = a.clone();
+        b.metadata.distro_version = BaseImage::new("heroku-22").unwrap().distro_version();
+        assert!(artifact_is_different(&a, &b));
+    }
 
     #[test]
     fn test_append_inventory() {
