@@ -6,9 +6,9 @@ use indoc::formatdoc;
 use inventory::artifact::Artifact;
 use jruby_executable::jruby_build_properties;
 use shared::{
-    append_filename_with, artifact_is_different, atomic_inventory_update, download_tar,
-    sha256_from_path, source_dir, tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage,
-    CpuArch, TarDownloadPath,
+    append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
+    atomic_inventory_update, download_tar, sha256_from_path, source_dir, tar_dir_to_file,
+    untar_to_dir, ArtifactMetadata, BaseImage, CpuArch, TarDownloadPath,
 };
 use std::convert::From;
 use std::error::Error;
@@ -140,6 +140,21 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
                 },
             };
             atomic_inventory_update(&inventory, |inventory| {
+                for prior in &inventory.artifacts {
+                    if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
+                        // TODO: Investigate bullet stream ownership
+                        println!(
+                            "{}",
+                            style::important(format!(
+                                "!!!!!!!!!! Error updating inventory: {error}"
+                            ))
+                        );
+
+                        fs_err::remove_file(&sha_seven_path)?;
+                        return Err(error);
+                    };
+                }
+
                 inventory
                     .artifacts
                     .retain(|a| artifact_is_different(a, &artifact));

@@ -180,6 +180,28 @@ where
     Ok(digest.finalize_fixed())
 }
 
+/// Raises an error if the same URL has a different checksum
+///
+/// This protects against the (reasonably) unlikely event that the same version generates a checksum with the same first 7 characters but a net different checksum.
+/// While unlikely, it's still possible. If we didn't guard against this case, then it could break people's builds who are relying on the old checksum
+/// no not change.
+pub fn artifact_same_url_different_checksum(
+    a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
+    b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if a.url == b.url && a.checksum != b.checksum {
+        Err(format!(
+            "Duplicate url {url} has different checksums {a_checksum} != {b_checksum}",
+            url = a.url,
+            a_checksum = hex::encode(&a.checksum.value),
+            b_checksum = hex::encode(&b.checksum.value)
+        )
+        .into())
+    } else {
+        Ok(())
+    }
+}
+
 pub fn artifact_is_different(
     a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
     b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
@@ -197,6 +219,32 @@ mod test {
     use std::str::FromStr;
 
     use super::*;
+
+    #[test]
+    fn test_same_url_different_checksum_raises_error() {
+        let a = Artifact {
+            os: inventory::artifact::Os::Linux,
+            arch: inventory::artifact::Arch::Amd64,
+            version: GemVersion::from_str("1.0.0").unwrap(),
+            checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
+                .parse()
+                .unwrap(),
+            metadata: ArtifactMetadata {
+                timestamp: Utc::now(),
+                distro_version: BaseImage::new("heroku-24").unwrap().distro_version(),
+            },
+            url: "https://example.com".to_string(),
+        };
+
+        let b = a.clone();
+        artifact_same_url_different_checksum(&a, &b).unwrap();
+
+        let mut b = a.clone();
+        b.checksum = "sha256:7bebeee1b9128bdbb290331b813fa01cf43e30cd0098286f7de011796cb8eee5"
+            .parse()
+            .unwrap();
+        assert!(artifact_same_url_different_checksum(&a, &b).is_err());
+    }
 
     #[test]
     fn test_is_not_version_match() {

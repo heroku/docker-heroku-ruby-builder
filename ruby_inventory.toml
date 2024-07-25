@@ -1,1 +1,10 @@
+[[artifacts]]
+version = "3.3.4"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws.com/heroku-24/arm64/ruby-3.3.4-7bebeee.tgz"
+checksum = "sha256:7bebeee1b9128bdbb290331b813fa01cf43e30cd0098286f7de011796cb8eee5"
 
+[artifacts.metadata]
+timestamp = "2024-07-25T21:13:38.723081Z"
+distro_version = "24.04"

@@ -5,10 +5,12 @@ use fun_run::CommandWithName;
 use gem_version::GemVersion;
 use indoc::{formatdoc, indoc};
 use inventory::artifact::Artifact;
+use nom::Err;
 use shared::{
-    append_filename_with, artifact_is_different, atomic_inventory_update, download_tar,
-    output_tar_path, sha256_from_path, source_dir, validate_version_for_stack, ArtifactMetadata,
-    BaseImage, CpuArch, RubyDownloadVersion, TarDownloadPath,
+    append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
+    atomic_inventory_update, download_tar, output_tar_path, sha256_from_path, source_dir,
+    validate_version_for_stack, ArtifactMetadata, BaseImage, CpuArch, RubyDownloadVersion,
+    TarDownloadPath,
 };
 use std::{
     io::Write,
@@ -185,10 +187,25 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         };
 
         atomic_inventory_update(&inventory, |inventory| {
+            for prior in &inventory.artifacts {
+                if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
+                    // TODO: Investigate bullet stream ownership
+                    println!(
+                        "{}",
+                        style::important(format!("!!!!!!!!!! Error updating inventory: {error}"))
+                    );
+
+                    fs_err::remove_file(&sha_seven_path)?;
+                    return Err(error);
+                };
+            }
+
             inventory
                 .artifacts
                 .retain(|a| artifact_is_different(a, &artifact));
+
             inventory.push(artifact);
+
             Ok(())
         })?;
 
