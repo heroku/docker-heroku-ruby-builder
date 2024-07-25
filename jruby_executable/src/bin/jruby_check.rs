@@ -97,7 +97,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         cmd.arg(image_name);
         cmd.args(["bash", "-c"]);
         cmd.arg(
-            &[
+            [
                 "mkdir /tmp/unzipped",
                 &format!("tar xzf {} -C /tmp/unzipped", inner_jruby_path.display()),
                 "export PATH=\"tmp/unzipped/bin:$PATH\"",

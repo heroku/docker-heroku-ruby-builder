@@ -5,7 +5,6 @@ use fun_run::CommandWithName;
 use gem_version::GemVersion;
 use indoc::{formatdoc, indoc};
 use inventory::artifact::Artifact;
-use nom::Err;
 use shared::{
     append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
     atomic_inventory_update, download_tar, output_tar_path, sha256_from_path, source_dir,
