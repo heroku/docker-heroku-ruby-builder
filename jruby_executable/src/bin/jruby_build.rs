@@ -32,10 +32,9 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
     } = args;
 
     let mut log = Print::new(std::io::stderr()).h1("Building JRuby");
+    let inventory = source_dir().join("jruby_inventory.toml");
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
-
-    let inventory = source_dir().join("jruby_inventory.toml");
 
     fs_err::create_dir_all(&volume_cache_dir)?;
 

@@ -1158,14 +1158,18 @@ name = "ruby_executable"
 version = "0.1.0"
 dependencies = [
  "bullet_stream",
+ "chrono",
  "clap",
  "flate2",
  "fs-err",
  "fun_run",
+ "gem_version",
  "indoc",
+ "inventory",
  "nom",
  "regex",
  "reqwest",
+ "sha2",
  "shared",
  "tar",
  "tempfile",

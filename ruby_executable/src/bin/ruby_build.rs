@@ -2,19 +2,24 @@ use bullet_stream::{style, Print};
 use clap::Parser;
 use fs_err::PathExt;
 use fun_run::CommandWithName;
+use gem_version::GemVersion;
 use indoc::{formatdoc, indoc};
+use inventory::artifact::Artifact;
 use shared::{
-    download_tar, output_tar_path, source_dir, validate_version_for_stack, BaseImage, CpuArch,
-    RubyDownloadVersion, TarDownloadPath,
+    append_filename_with, artifact_is_different, atomic_inventory_update, download_tar,
+    output_tar_path, sha256_from_path, source_dir, validate_version_for_stack, ArtifactMetadata,
+    BaseImage, CpuArch, RubyDownloadVersion, TarDownloadPath,
 };
 use std::{
     io::Write,
     path::{Path, PathBuf},
     process::Command,
+    str::FromStr,
 };
 
 static INNER_OUTPUT: &str = "/tmp/output";
 static INNER_CACHE: &str = "/tmp/cache";
+static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws.com";
 
 #[derive(Parser, Debug)]
 struct RubyArgs {
@@ -57,6 +62,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
     } = args;
 
     let mut log = Print::new(std::io::stderr()).h1("Building Ruby");
+    let inventory = source_dir().join("ruby_inventory.toml");
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
 
@@ -116,12 +122,10 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     log = {
         let mut bullet = log.bullet("Make Ruby");
-
         let input_tar = PathBuf::from(INNER_CACHE).join(format!("ruby-source-{version}.tgz"));
         let output_tar = output_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch);
-
-        let volume_output = volume_output_dir.display();
         let volume_cache = volume_cache_dir.display();
+        let volume_output = volume_output_dir.display();
 
         let mut docker_run = Command::new("docker");
         docker_run.arg("run");
@@ -146,6 +150,47 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
             format!("Running {}", style::command(docker_run.name())),
             |stdout, stderr| docker_run.stream_output(stdout, stderr),
         )?;
+        bullet.done()
+    };
+
+    log = {
+        let mut bullet = log.bullet(format!(
+            "Updating manifest {}",
+            style::value(inventory.to_string_lossy())
+        ));
+
+        let output_tar = output_tar_path(&volume_output_dir, version, base_image, arch);
+
+        let sha = sha256_from_path(&output_tar)?;
+        let sha_seven = sha.chars().take(7).collect::<String>();
+        let sha_seven_path = append_filename_with(&output_tar, &format!("-{sha_seven}"), ".tgz")?;
+        let url = format!(
+            "{S3_BASE_URL}/{}",
+            sha_seven_path.strip_prefix(&volume_output_dir)?.display()
+        );
+
+        bullet = bullet.sub_bullet(format!("Copying SHA tgz {}", sha_seven_path.display(),));
+        fs_err::copy(output_tar, &sha_seven_path)?;
+
+        let artifact = Artifact {
+            version: GemVersion::from_str(&version.bundler_format())?,
+            os: inventory::artifact::Os::Linux,
+            arch: arch.try_into()?,
+            url,
+            checksum: format!("sha256:{sha}").parse()?,
+            metadata: ArtifactMetadata {
+                distro_version: base_image.distro_version(),
+                timestamp: chrono::Utc::now(),
+            },
+        };
+
+        atomic_inventory_update(&inventory, |inventory| {
+            inventory
+                .artifacts
+                .retain(|a| artifact_is_different(a, &artifact));
+            inventory.push(artifact);
+            Ok(())
+        })?;
 
         bullet.done()
     };
