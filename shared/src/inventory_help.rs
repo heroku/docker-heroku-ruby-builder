@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::borrow::Borrow;
 use std::io::Read;
+use std::io::Write;
 use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -91,7 +92,7 @@ pub fn inventory_check(contents: &str) -> Result<(), Error> {
     }
 }
 
-pub fn atomic_file_contents<F, T>(path: &Path, f: F) -> Result<T, Box<dyn std::error::Error>>
+fn atomic_file_contents<F, T>(path: &Path, f: F) -> Result<T, Box<dyn std::error::Error>>
 where
     F: FnOnce(&mut std::fs::File, &str) -> Result<T, Box<dyn std::error::Error>>,
 {
@@ -119,7 +120,21 @@ where
     result
 }
 
-pub fn parse_inventory(
+pub fn atomic_inventory_update<F>(path: &Path, f: F) -> Result<(), Box<dyn std::error::Error>>
+where
+    F: FnOnce(
+        &mut Inventory<GemVersion, Sha256, ArtifactMetadata>,
+    ) -> Result<(), Box<dyn std::error::Error>>,
+{
+    atomic_file_contents(path, |file, contents| {
+        let mut inventory = parse_inventory(contents)?;
+        f(&mut inventory)?;
+        write!(file, "{inventory}").map_err(Error::FsError)?;
+        Ok(())
+    })
+}
+
+fn parse_inventory(
     contents: &str,
 ) -> Result<Inventory<GemVersion, Sha256, ArtifactMetadata>, Error> {
     if contents.trim().is_empty() {

@@ -6,13 +6,11 @@ use indoc::formatdoc;
 use inventory::artifact::Artifact;
 use jruby_executable::jruby_build_properties;
 use shared::{
-    append_filename_with, atomic_file_contents, download_tar, parse_inventory, sha256_from_path,
-    source_dir, tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage, CpuArch,
-    TarDownloadPath,
+    append_filename_with, atomic_inventory_update, download_tar, sha256_from_path, source_dir,
+    tar_dir_to_file, untar_to_dir, ArtifactMetadata, BaseImage, CpuArch, TarDownloadPath,
 };
 use std::convert::From;
 use std::error::Error;
-use std::io::Write;
 use std::str::FromStr;
 
 static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws.com";
@@ -141,8 +139,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
                     timestamp,
                 },
             };
-            atomic_file_contents(&inventory, |file, contents| {
-                let mut inventory = parse_inventory(contents)?;
+            atomic_inventory_update(&inventory, |inventory| {
                 inventory.artifacts.retain(|a| {
                     a.version != artifact.version
                         || a.arch != artifact.arch
@@ -150,9 +147,6 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
                 });
 
                 inventory.push(artifact);
-
-                writeln!(file, "{inventory}").expect("Writeable file");
-
                 Ok(())
             })?
         }
