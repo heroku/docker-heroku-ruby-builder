@@ -17,3 +17,7 @@ tar = { workspace = true}
 tempfile = { workspace = true}
 thiserror = { workspace = true}
 bullet_stream = { workspace = true }
+inventory = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+gem_version = { workspace = true }

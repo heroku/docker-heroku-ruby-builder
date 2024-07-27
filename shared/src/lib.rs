@@ -8,9 +8,51 @@ use std::process::Command;
 
 mod base_image;
 mod download_ruby_version;
+mod inventory_help;
 
 pub use base_image::{BaseImage, CpuArch, CpuArchError};
 pub use download_ruby_version::RubyDownloadVersion;
+pub use inventory_help::{
+    artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
+    inventory_check, sha256_from_path, ArtifactMetadata,
+};
+
+/// Appends the given string after the filename and before the `ends_with`
+///
+/// ```
+/// use std::path::Path;
+/// use shared::append_filename_with;
+///
+/// let path = Path::new("/tmp/file.txt");
+/// let out = append_filename_with(path, "-lol", ".txt").unwrap();
+/// assert_eq!(Path::new("/tmp/file-lol.txt"), out);
+/// ```
+///
+/// Raises an error if the files doesn't exist or if the file name doesn't end with `ends_with`
+pub fn append_filename_with(path: &Path, append: &str, ends_with: &str) -> Result<PathBuf, Error> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| Error::Other(format!("Cannot determine parent from {}", path.display())))?;
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| {
+            Error::Other(format!(
+                "Cannot determine file name from {}",
+                path.display()
+            ))
+        })?
+        .to_string_lossy();
+
+    if !file_name.ends_with(ends_with) {
+        Err(Error::Other(format!(
+            "File name {} does not end with {}",
+            file_name, ends_with
+        )))?;
+    }
+    let file_base = file_name.trim_end_matches(ends_with);
+
+    Ok(parent.join(format!("{file_base}{append}{ends_with}")))
+}
 
 #[derive(Debug, Clone)]
 pub struct TarDownloadPath(pub PathBuf);
@@ -67,6 +109,9 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+
+    #[error("Error {0}")]
+    Other(String),
 }
 
 pub fn source_dir() -> PathBuf {

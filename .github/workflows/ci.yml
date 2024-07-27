@@ -102,3 +102,22 @@ jobs:
         run: cargo run --bin jruby_build -- --version ${{matrix.version}} --base-image ${{matrix.base_image}}
       - name: Check JRuby
         run: cargo run --bin jruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+
+  check_inventory_urls:
+    runs-on: ubuntu-24.04
+    if: (!contains(github.event.pull_request.labels.*.name, 'skip inventory check'))
+    strategy:
+      matrix:
+        inventory: ["jruby_inventory.toml", "ruby_inventory.toml"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Grab prior commits
+        run: |
+          set -eu
+          set pipefail
+
+          git fetch origin ${{ github.base_ref }} --depth 1 && \
+          git diff --unified=0 remotes/origin/${{ github.base_ref }} ${{matrix.inventory}} | grep '^+' | grep -v '^+++' | cut -c2- > check_inventory.toml
+      - name: Check manifest URLs
+        run: cargo run --bin inventory_check -- check_inventory.toml

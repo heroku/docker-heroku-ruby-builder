@@ -23,6 +23,9 @@ PS4='>\e[33m${BASH_SOURCE}:${LINENO} $\e[0m '
 set -o xtrace
 
 mkdir -p "$(dirname "$OUT_TAR")"
+
+# Docker issue with permissions
+chmod a+w "$(dirname "$OUT_TAR")"
 mkdir -p /tmp/source
 mkdir -p /tmp/compiled
 

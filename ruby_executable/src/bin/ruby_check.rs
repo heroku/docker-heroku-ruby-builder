@@ -48,7 +48,7 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     cmd.arg(image_name);
     cmd.args(["bash", "-c"]);
     cmd.arg(
-        &[
+        [
             "mkdir /tmp/unzipped",
             &format!("tar xzf {} -C /tmp/unzipped", path.display()),
             "echo -n '- Rubygems version: '",
