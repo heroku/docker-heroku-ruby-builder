@@ -2,6 +2,7 @@ use bullet_stream::state::SubBullet;
 use bullet_stream::Print;
 use fs_err::{File, PathExt};
 use fun_run::CommandWithName;
+use inventory::artifact::Arch;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -10,7 +11,7 @@ mod base_image;
 mod download_ruby_version;
 mod inventory_help;
 
-pub use base_image::{BaseImage, CpuArch, CpuArchError};
+pub use base_image::BaseImage;
 pub use download_ruby_version::RubyDownloadVersion;
 pub use inventory_help::{
     artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
@@ -81,9 +82,6 @@ pub fn untar_to_dir(tar_path: &TarDownloadPath, workspace: &Path) -> Result<(), 
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Error {0}")]
-    UnknownArchitecture(CpuArchError),
-
     #[error("Command failed {0}")]
     CmdError(fun_run::CmdError),
 
@@ -155,7 +153,7 @@ pub fn output_tar_path(
     output: &Path,
     version: &RubyDownloadVersion,
     base_image: &BaseImage,
-    cpu_architecture: &CpuArch,
+    cpu_architecture: &Arch,
 ) -> PathBuf {
     let directory = if base_image.is_arch_aware() {
         PathBuf::from(base_image.to_string()).join(cpu_architecture.to_string())
@@ -307,7 +305,7 @@ mod test {
         let output = PathBuf::from("/tmp");
         let version = RubyDownloadVersion::from_str("2.7.3").unwrap();
         let base_image = BaseImage::new("heroku-20").unwrap();
-        let cpu_architecture = CpuArch::from_test_str("amd64");
+        let cpu_architecture = Arch::Amd64;
 
         let tar_path = output_tar_path(&output, &version, &base_image, &cpu_architecture);
 
@@ -320,7 +318,7 @@ mod test {
         let output = PathBuf::from("/tmp");
         let version = RubyDownloadVersion::from_str("2.7.3").unwrap();
         let base_image = BaseImage::new("heroku-24").unwrap();
-        let cpu_architecture = CpuArch::from_test_str("amd64");
+        let cpu_architecture = Arch::Amd64;
 
         let tar_path = output_tar_path(&output, &version, &base_image, &cpu_architecture);
 

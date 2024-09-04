@@ -3,7 +3,6 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-static KNOWN_ARCHITECTURES: [&str; 2] = ["amd64", "arm64"];
 static KNOWN_BASE_IMAGES: &[(&str, &str)] = &[
     ("heroku-20", "20"),
     ("heroku-22", "22"),
@@ -66,70 +65,5 @@ impl FromStr for BaseImage {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         BaseImage::new(s)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct CpuArch {
-    name: String,
-}
-
-impl Display for CpuArch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name)
-    }
-}
-
-impl FromStr for CpuArch {
-    type Err = CpuArchError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        CpuArch::new(s)
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum CpuArchError {
-    #[error("Invalid CPU architecture {0} must be one of {}", KNOWN_ARCHITECTURES.join(", "))]
-    Unknown(String),
-
-    #[error("CPU architecture {0} cannot be converted {1}")]
-    CannotConvert(String, inventory::artifact::UnsupportedArchError),
-}
-
-impl TryFrom<&CpuArch> for inventory::artifact::Arch {
-    type Error = CpuArchError;
-
-    fn try_from(value: &CpuArch) -> Result<Self, Self::Error> {
-        Self::from_str(&value.name).map_err(|e| CpuArchError::CannotConvert(value.name.clone(), e))
-    }
-}
-
-impl CpuArch {
-    pub fn new(s: &str) -> Result<Self, CpuArchError> {
-        KNOWN_ARCHITECTURES
-            .iter()
-            .find(|&&name| name == s)
-            .map(|_| Self { name: s.to_owned() })
-            .ok_or_else(|| CpuArchError::Unknown(s.to_owned()))
-    }
-
-    pub fn from_system() -> Result<Self, CpuArchError> {
-        let arch = if cfg!(target_arch = "aarch64") {
-            "arm64"
-        } else if cfg!(target_arch = "x86_64") {
-            "amd64"
-        } else {
-            "Unknown architecture"
-        };
-
-        Self::new(arch)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn from_test_str(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-        }
     }
 }
