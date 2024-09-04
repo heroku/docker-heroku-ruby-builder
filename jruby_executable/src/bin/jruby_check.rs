@@ -2,8 +2,9 @@ use bullet_stream::{style, Print};
 use clap::Parser;
 use fun_run::CommandWithName;
 use indoc::formatdoc;
+use inventory::artifact::Arch;
 use jruby_executable::jruby_build_properties;
-use shared::{source_dir, BaseImage, CpuArch};
+use shared::{source_dir, BaseImage};
 use std::error::Error;
 use std::io::Write;
 use std::{path::PathBuf, process::Command};
@@ -13,7 +14,7 @@ static INNER_OUTPUT: &str = "/tmp/output";
 #[derive(Parser, Debug)]
 struct RubyArgs {
     #[arg(long)]
-    arch: CpuArch,
+    arch: Arch,
 
     #[arg(long)]
     version: String,

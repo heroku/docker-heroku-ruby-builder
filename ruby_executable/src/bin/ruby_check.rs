@@ -2,7 +2,8 @@ use bullet_stream::{style, Print};
 use clap::Parser;
 use fun_run::CommandWithName;
 use indoc::formatdoc;
-use shared::{output_tar_path, source_dir, BaseImage, CpuArch, RubyDownloadVersion};
+use inventory::artifact::Arch;
+use shared::{output_tar_path, source_dir, BaseImage, RubyDownloadVersion};
 use std::{error::Error, path::PathBuf, process::Command};
 
 static INNER_OUTPUT: &str = "/tmp/output";
@@ -10,7 +11,7 @@ static INNER_OUTPUT: &str = "/tmp/output";
 #[derive(Parser, Debug)]
 struct RubyArgs {
     #[arg(long)]
-    arch: CpuArch,
+    arch: Arch,
 
     #[arg(long)]
     version: RubyDownloadVersion,

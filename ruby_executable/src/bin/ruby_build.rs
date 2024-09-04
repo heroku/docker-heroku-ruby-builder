@@ -4,12 +4,11 @@ use fs_err::PathExt;
 use fun_run::CommandWithName;
 use gem_version::GemVersion;
 use indoc::{formatdoc, indoc};
-use inventory::artifact::Artifact;
+use inventory::artifact::{Arch, Artifact};
 use shared::{
     append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
     atomic_inventory_update, download_tar, output_tar_path, sha256_from_path, source_dir,
-    validate_version_for_stack, ArtifactMetadata, BaseImage, CpuArch, RubyDownloadVersion,
-    TarDownloadPath,
+    validate_version_for_stack, ArtifactMetadata, BaseImage, RubyDownloadVersion, TarDownloadPath,
 };
 use std::{
     io::Write,
@@ -25,7 +24,7 @@ static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws
 #[derive(Parser, Debug)]
 struct RubyArgs {
     #[arg(long)]
-    arch: CpuArch,
+    arch: Arch,
 
     #[arg(long)]
     version: RubyDownloadVersion,
@@ -176,7 +175,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         let artifact = Artifact {
             version: GemVersion::from_str(&version.bundler_format())?,
             os: inventory::artifact::Os::Linux,
-            arch: arch.try_into()?,
+            arch: *arch,
             url,
             checksum: format!("sha256:{sha}").parse()?,
             metadata: ArtifactMetadata {
