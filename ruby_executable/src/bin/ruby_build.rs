@@ -140,7 +140,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
 
         docker_run.arg(&image_name);
         docker_run.args(["bash", "-c"]);
-        docker_run.arg(&format!(
+        docker_run.arg(format!(
             "./make_ruby.sh {} {}",
             input_tar.display(),
             output_tar.display()

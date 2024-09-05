@@ -9,14 +9,14 @@
 /// implements Ruby 3.1.4 stdlib. When people use jruby they specify both the
 /// jruby version and the stdlib version, for example:
 ///
-/// ```ignore
+/// ```ruby
 /// # Gemfile
 /// ruby "3.1.4", engine: "jruby", engine_version: "9.4.3.0"
 /// ```
 ///
 /// Example file for <https://raw.githubusercontent.com/jruby/jruby/9.4.7.0/default.build.properties>
 ///
-/// ```ignore
+/// ```ini
 /// # Defaults. To override, create a file called build.properties in
 /// #  the same directory and put your changes in that.
 /// #src.dir=src
