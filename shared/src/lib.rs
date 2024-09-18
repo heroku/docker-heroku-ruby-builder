@@ -2,15 +2,58 @@ use bullet_stream::state::SubBullet;
 use bullet_stream::Print;
 use fs_err::{File, PathExt};
 use fun_run::CommandWithName;
+use inventory::artifact::Arch;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod base_image;
 mod download_ruby_version;
+mod inventory_help;
 
-pub use base_image::{BaseImage, CpuArch, CpuArchError};
+pub use base_image::BaseImage;
 pub use download_ruby_version::RubyDownloadVersion;
+pub use inventory_help::{
+    artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
+    inventory_check, sha256_from_path, ArtifactMetadata,
+};
+
+/// Appends the given string after the filename and before the `ends_with`
+///
+/// ```
+/// use std::path::Path;
+/// use shared::append_filename_with;
+///
+/// let path = Path::new("/tmp/file.txt");
+/// let out = append_filename_with(path, "-lol", ".txt").unwrap();
+/// assert_eq!(Path::new("/tmp/file-lol.txt"), out);
+/// ```
+///
+/// Raises an error if the files doesn't exist or if the file name doesn't end with `ends_with`
+pub fn append_filename_with(path: &Path, append: &str, ends_with: &str) -> Result<PathBuf, Error> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| Error::Other(format!("Cannot determine parent from {}", path.display())))?;
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| {
+            Error::Other(format!(
+                "Cannot determine file name from {}",
+                path.display()
+            ))
+        })?
+        .to_string_lossy();
+
+    if !file_name.ends_with(ends_with) {
+        Err(Error::Other(format!(
+            "File name {} does not end with {}",
+            file_name, ends_with
+        )))?;
+    }
+    let file_base = file_name.trim_end_matches(ends_with);
+
+    Ok(parent.join(format!("{file_base}{append}{ends_with}")))
+}
 
 #[derive(Debug, Clone)]
 pub struct TarDownloadPath(pub PathBuf);
@@ -39,9 +82,6 @@ pub fn untar_to_dir(tar_path: &TarDownloadPath, workspace: &Path) -> Result<(), 
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Error {0}")]
-    UnknownArchitecture(CpuArchError),
-
     #[error("Command failed {0}")]
     CmdError(fun_run::CmdError),
 
@@ -67,6 +107,9 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+
+    #[error("Error {0}")]
+    Other(String),
 }
 
 pub fn source_dir() -> PathBuf {
@@ -110,7 +153,7 @@ pub fn output_tar_path(
     output: &Path,
     version: &RubyDownloadVersion,
     base_image: &BaseImage,
-    cpu_architecture: &CpuArch,
+    cpu_architecture: &Arch,
 ) -> PathBuf {
     let directory = if base_image.is_arch_aware() {
         PathBuf::from(base_image.to_string()).join(cpu_architecture.to_string())
@@ -262,7 +305,7 @@ mod test {
         let output = PathBuf::from("/tmp");
         let version = RubyDownloadVersion::from_str("2.7.3").unwrap();
         let base_image = BaseImage::new("heroku-20").unwrap();
-        let cpu_architecture = CpuArch::from_test_str("amd64");
+        let cpu_architecture = Arch::Amd64;
 
         let tar_path = output_tar_path(&output, &version, &base_image, &cpu_architecture);
 
@@ -275,7 +318,7 @@ mod test {
         let output = PathBuf::from("/tmp");
         let version = RubyDownloadVersion::from_str("2.7.3").unwrap();
         let base_image = BaseImage::new("heroku-24").unwrap();
-        let cpu_architecture = CpuArch::from_test_str("amd64");
+        let cpu_architecture = Arch::Amd64;
 
         let tar_path = output_tar_path(&output, &version, &base_image, &cpu_architecture);
 

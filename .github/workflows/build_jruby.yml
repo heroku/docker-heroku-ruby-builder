@@ -51,3 +51,13 @@ jobs:
       - name: Upload Ruby runtime archive to S3 production
         if: (!inputs.dry_run)
         run: aws s3 sync ./output "s3://${S3_BUCKET}"
+
+  after-build-and-upload:
+    needs: build-and-upload
+    runs-on: pub-hk-ubuntu-24.04-xlarge
+    steps:
+      - name: Update Jruby inventory file locally
+        uses: peter-evans/create-pull-request@v6
+        with:
+          path: jruby_inventory.toml
+          title: "Add JRuby ${{inputs.jruby_version}} to inventory"

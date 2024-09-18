@@ -24,7 +24,7 @@ env:
   S3_BUCKET: "heroku-buildpack-ruby"
 
 jobs:
-  build_ruby:
+  build-and-upload:
     runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-24.04-arm-xlarge' || 'pub-hk-ubuntu-24.04-xlarge' }}
     strategy:
       matrix:
@@ -56,3 +56,13 @@ jobs:
       - name: Upload Ruby runtime archive to S3 production
         if: (!inputs.dry_run)
         run: aws s3 sync ./output "s3://${S3_BUCKET}"
+
+  after-build-and-upload:
+    needs: build-and-upload
+    runs-on: pub-hk-ubuntu-24.04-xlarge
+    steps:
+      - name: Update Ruby inventory file locally
+        uses: peter-evans/create-pull-request@v6
+        with:
+          path: ruby_inventory.toml
+          title: "Add Ruby ${{inputs.ruby_version}} to inventory"
