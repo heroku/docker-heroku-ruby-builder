@@ -3,8 +3,9 @@ use clap::Parser;
 use fs_err::PathExt;
 use gem_version::GemVersion;
 use indoc::formatdoc;
-use inventory::artifact::{Arch, Artifact};
 use jruby_executable::jruby_build_properties;
+use libherokubuildpack::inventory;
+use libherokubuildpack::inventory::artifact::{Arch, Artifact};
 use shared::{
     append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
     atomic_inventory_update, download_tar, sha256_from_path, source_dir, tar_dir_to_file,

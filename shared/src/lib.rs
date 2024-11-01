@@ -2,7 +2,7 @@ use bullet_stream::state::SubBullet;
 use bullet_stream::Print;
 use fs_err::{File, PathExt};
 use fun_run::CommandWithName;
-use inventory::artifact::Arch;
+use libherokubuildpack::inventory::artifact::Arch;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;

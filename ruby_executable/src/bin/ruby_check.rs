@@ -2,7 +2,7 @@ use bullet_stream::{style, Print};
 use clap::Parser;
 use fun_run::CommandWithName;
 use indoc::formatdoc;
-use inventory::artifact::Arch;
+use libherokubuildpack::inventory::artifact::Arch;
 use shared::{output_tar_path, source_dir, BaseImage, RubyDownloadVersion};
 use std::{error::Error, path::PathBuf, process::Command};
 
