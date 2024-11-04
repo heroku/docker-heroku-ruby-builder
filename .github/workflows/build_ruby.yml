@@ -47,7 +47,12 @@ jobs:
       - name: Output CHANGELOG
         run: cargo run --bin ruby_changelog -- --version "${{inputs.ruby_version}}"
       - name: Build Ruby
-        run: cargo run --bin ruby_build -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+        run: cargo run --bin ruby_build -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}} --inventory "${{ matrix.base_image }}{{ matrix.arch }}-inventory.toml"
+      - name: Store inventory
+        id: store_inventory
+        run: |
+          echo "${{ matrix.base_image }}{{ matrix.arch }}=" > $GITHUB_OUTPUT
+          cat "${{ matrix.base_image }}{{ matrix.arch }}-inventory.toml  | jq -r . >> $GITHUB_OUTPUT"
       - name: Check Ruby
         run: cargo run --bin ruby_check -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch  ${{matrix.arch}} | tee $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3 dry run

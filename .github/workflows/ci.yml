@@ -121,3 +121,31 @@ jobs:
           git diff --unified=0 remotes/origin/${{ github.base_ref }} ${{matrix.inventory}} | grep '^+' | grep -v '^+++' | cut -c2- > check_inventory.toml
       - name: Check manifest URLs
         run: cargo run --bin inventory_check -- check_inventory.toml
+
+  test-dependent-job:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        arch: ["amd64", "arm64"]
+        base_image: ["heroku-20", "heroku-22", "heroku-24"]
+    steps:
+      - name: Store inventory
+        id: store_inventory
+        run: |
+          echo "${{ matrix.base_image }}${{ matrix.arch }}=" > $GITHUB_OUTPUT
+          cat "${{ matrix.base_image }}${{ matrix.arch }}-inventory.toml  | jq -r . >> $GITHUB_OUTPUT"
+
+  after-test-dependent-job:
+    runs-on: ubuntu-24.04
+    needs: test-dependent-job
+    steps:
+      - name: Output GITHUB_OUTPUT
+        run: echo ${{needs.test-dependent-job.outputs}}
+      - name: Combine results
+        run: |
+          echo "Combining results..."
+          for key in $(jq -r 'keys[]' <<< "${{ toJson(needs.test-dependent-job.outputs) }}"); do
+            value=$(jq -r --arg key "$key" '.[$key]' <<< "${{ toJson(needs.test-dependent-job.outputs) }}")
+            echo "$value" >> combined.txt
+            echo "" >> combined.txt
+          done

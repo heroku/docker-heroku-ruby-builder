@@ -34,6 +34,9 @@ struct RubyArgs {
 
     #[arg(long = "base-image")]
     base_image: BaseImage,
+
+    #[arg(long = "inventory", default_value = "ruby_inventory.yml")]
+    inventory: PathBuf,
 }
 
 fn ruby_dockerfile_contents(base_image: &BaseImage) -> String {
@@ -62,10 +65,16 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         arch,
         version,
         base_image,
+        inventory,
     } = args;
 
     let mut log = Print::new(std::io::stderr()).h1("Building Ruby");
-    let inventory = source_dir().join("ruby_inventory.toml");
+
+    let inventory = if inventory.is_absolute() {
+        inventory.clone()
+    } else {
+        source_dir().join(inventory)
+    };
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
 
