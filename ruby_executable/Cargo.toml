@@ -21,3 +21,6 @@ libherokubuildpack = { workspace = true }
 chrono = { workspace = true }
 sha2 = { workspace = true }
 gem_version = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
