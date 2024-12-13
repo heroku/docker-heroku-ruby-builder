@@ -29,7 +29,7 @@ where
     let changelog = formatdoc! {"
         ## Ruby version {version} is now available
 
-        [Ruby v{version}](/articles/ruby-support#ruby-versions) is now available on Heroku. To run
+        [Ruby v{version}](/articles/ruby-support#ruby-versions) is now available on Heroku. To run \
         your app using this version of Ruby, add the following `ruby` directive to your Gemfile:
 
         ```ruby
@@ -72,6 +72,7 @@ fn main() {
 #[cfg(test)]
 mod test {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn regular_release() {
@@ -86,7 +87,7 @@ mod test {
 
                 ## Ruby version 3.3.2 is now available
 
-                [Ruby v3.3.2](/articles/ruby-support#ruby-versions) is now available on Heroku. To run
+                [Ruby v3.3.2](/articles/ruby-support#ruby-versions) is now available on Heroku. To run \
                 your app using this version of Ruby, add the following `ruby` directive to your Gemfile:
 
                 ```ruby
@@ -95,7 +96,7 @@ mod test {
 
                 For more information on [Ruby 3.3.2, you can view the release announcement](https://www.ruby-lang.org/en/news/).
             "};
-        assert_eq!(actual.trim(), expected.trim());
+        assert_eq!(expected.trim(), actual.trim());
     }
 
     #[test]
@@ -111,7 +112,7 @@ mod test {
 
                 ## Ruby version 3.1.0-rc1 is now available
 
-                [Ruby v3.1.0-rc1](/articles/ruby-support#ruby-versions) is now available on Heroku. To run
+                [Ruby v3.1.0-rc1](/articles/ruby-support#ruby-versions) is now available on Heroku. To run \
                 your app using this version of Ruby, add the following `ruby` directive to your Gemfile:
 
                 ```ruby

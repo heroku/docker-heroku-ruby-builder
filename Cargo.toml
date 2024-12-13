@@ -34,3 +34,4 @@ libherokubuildpack = { version = "0.24.0", default-features = false, features = 
 # File locking (FLOCK)
 fs2 = "0.4"
 
+pretty_assertions = "1.4.1"
