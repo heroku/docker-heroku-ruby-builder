@@ -96,7 +96,7 @@ mod test {
 
                 For more information on [Ruby 3.3.2, you can view the release announcement](https://www.ruby-lang.org/en/news/).
             "};
-        assert_eq!(actual.trim(), expected.trim());
+        assert_eq!(expected.trim(), actual.trim());
     }
 
     #[test]
