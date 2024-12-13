@@ -29,7 +29,7 @@ where
     let changelog = formatdoc! {"
         ## Ruby version {version} is now available
 
-        [Ruby v{version}](/articles/ruby-support-reference#ruby-versions) is now available on Heroku. To run
+        [Ruby v{version}](/articles/ruby-support#ruby-versions) is now available on Heroku. To run \
         your app using this version of Ruby, add the following `ruby` directive to your Gemfile:
 
         ```ruby
@@ -87,7 +87,7 @@ mod test {
 
                 ## Ruby version 3.3.2 is now available
 
-                [Ruby v3.3.2](/articles/ruby-support#ruby-versions) is now available on Heroku. To run
+                [Ruby v3.3.2](/articles/ruby-support#ruby-versions) is now available on Heroku. To run \
                 your app using this version of Ruby, add the following `ruby` directive to your Gemfile:
 
                 ```ruby
@@ -112,7 +112,7 @@ mod test {
 
                 ## Ruby version 3.1.0-rc1 is now available
 
-                [Ruby v3.1.0-rc1](/articles/ruby-support#ruby-versions) is now available on Heroku. To run
+                [Ruby v3.1.0-rc1](/articles/ruby-support#ruby-versions) is now available on Heroku. To run \
                 your app using this version of Ruby, add the following `ruby` directive to your Gemfile:
 
                 ```ruby
