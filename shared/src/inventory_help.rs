@@ -1,5 +1,5 @@
 use crate::base_image::DistroVersion;
-use crate::{download_tar, Error, TarDownloadPath};
+use crate::{Error, TarDownloadPath, download_tar};
 use chrono::{DateTime, Utc};
 use fs2::FileExt;
 use gem_version::GemVersion;
