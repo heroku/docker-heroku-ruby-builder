@@ -33,4 +33,4 @@ gem_version = { workspace = true }
 
 [dev-dependencies]
 tiny_http = "0.12.0"
-indoc = "2.0.5"
+indoc = "2.0.6"
