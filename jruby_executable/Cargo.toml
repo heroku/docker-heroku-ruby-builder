@@ -16,23 +16,23 @@ name = "jruby_changelog"
 path = "src/bin/jruby_changelog.rs"
 
 [dependencies]
-java-properties = { workspace = true }
-glob = { workspace = true }
+bullet_stream = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
-shared = { workspace = true }
-indoc = { workspace = true }
-lazy_static = { workspace = true }
 flate2 = { workspace = true }
 fs-err = { workspace = true }
 fun_run = { workspace = true }
+gem_version = { workspace = true }
+glob = { workspace = true }
+indoc = { workspace = true }
+java-properties = { workspace = true }
+lazy_static = { workspace = true }
+libherokubuildpack = { workspace = true }
 nom = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+sha2 = { workspace = true }
+shared = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
-bullet_stream = { workspace = true }
-libherokubuildpack = { workspace = true }
-chrono = { workspace = true }
-sha2 = { workspace = true }
-gem_version = { workspace = true }
