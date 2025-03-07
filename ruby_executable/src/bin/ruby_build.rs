@@ -1,4 +1,4 @@
-use bullet_stream::{style, Print};
+use bullet_stream::{Print, style};
 use clap::Parser;
 use fs_err::PathExt;
 use fun_run::CommandWithName;
@@ -9,9 +9,9 @@ use libherokubuildpack::inventory::{
     artifact::{Arch, Artifact},
 };
 use shared::{
-    append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
-    atomic_inventory_update, download_tar, output_tar_path, sha256_from_path, source_dir,
-    validate_version_for_stack, ArtifactMetadata, BaseImage, RubyDownloadVersion, TarDownloadPath,
+    ArtifactMetadata, BaseImage, RubyDownloadVersion, TarDownloadPath, append_filename_with,
+    artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
+    download_tar, output_tar_path, sha256_from_path, source_dir, validate_version_for_stack,
 };
 use std::{
     io::Write,

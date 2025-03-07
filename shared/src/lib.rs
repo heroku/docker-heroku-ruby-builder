@@ -1,5 +1,5 @@
-use bullet_stream::state::SubBullet;
 use bullet_stream::Print;
+use bullet_stream::state::SubBullet;
 use fs_err::{File, PathExt};
 use fun_run::CommandWithName;
 use libherokubuildpack::inventory::artifact::Arch;
@@ -14,8 +14,8 @@ mod inventory_help;
 pub use base_image::BaseImage;
 pub use download_ruby_version::RubyDownloadVersion;
 pub use inventory_help::{
-    artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
-    inventory_check, sha256_from_path, ArtifactMetadata,
+    ArtifactMetadata, artifact_is_different, artifact_same_url_different_checksum,
+    atomic_inventory_update, inventory_check, sha256_from_path,
 };
 
 /// Appends the given string after the filename and before the `ends_with`
@@ -287,17 +287,21 @@ mod test {
 
     #[test]
     fn test_validate_version_for_stack() {
-        assert!(validate_version_for_stack(
-            &RubyDownloadVersion::from_str("2.7.3").unwrap(),
-            &BaseImage::new("heroku-22").unwrap()
-        )
-        .is_ok());
+        assert!(
+            validate_version_for_stack(
+                &RubyDownloadVersion::from_str("2.7.3").unwrap(),
+                &BaseImage::new("heroku-22").unwrap()
+            )
+            .is_ok()
+        );
 
-        assert!(validate_version_for_stack(
-            &RubyDownloadVersion::from_str("3.0.0").unwrap(),
-            &BaseImage::new("heroku-22").unwrap()
-        )
-        .is_err());
+        assert!(
+            validate_version_for_stack(
+                &RubyDownloadVersion::from_str("3.0.0").unwrap(),
+                &BaseImage::new("heroku-22").unwrap()
+            )
+            .is_err()
+        );
     }
 
     #[test]

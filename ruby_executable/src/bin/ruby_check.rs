@@ -1,9 +1,9 @@
-use bullet_stream::{style, Print};
+use bullet_stream::{Print, style};
 use clap::Parser;
 use fun_run::CommandWithName;
 use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
-use shared::{output_tar_path, source_dir, BaseImage, RubyDownloadVersion};
+use shared::{BaseImage, RubyDownloadVersion, output_tar_path, source_dir};
 use std::{error::Error, path::PathBuf, process::Command};
 
 static INNER_OUTPUT: &str = "/tmp/output";

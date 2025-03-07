@@ -1,4 +1,4 @@
-use bullet_stream::{style, Print};
+use bullet_stream::{Print, style};
 use clap::Parser;
 use fs_err::PathExt;
 use gem_version::GemVersion;
@@ -7,9 +7,9 @@ use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory;
 use libherokubuildpack::inventory::artifact::{Arch, Artifact};
 use shared::{
-    append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
-    atomic_inventory_update, download_tar, sha256_from_path, source_dir, tar_dir_to_file,
-    untar_to_dir, ArtifactMetadata, BaseImage, TarDownloadPath,
+    ArtifactMetadata, BaseImage, TarDownloadPath, append_filename_with, artifact_is_different,
+    artifact_same_url_different_checksum, atomic_inventory_update, download_tar, sha256_from_path,
+    source_dir, tar_dir_to_file, untar_to_dir,
 };
 use std::convert::From;
 use std::error::Error;
@@ -55,7 +55,9 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
             ))
             .done();
     } else {
-        let url =  format!("https://repo1.maven.org/maven2/org/jruby/jruby-dist/{version}/jruby-dist-{version}-bin.tar.gz");
+        let url = format!(
+            "https://repo1.maven.org/maven2/org/jruby/jruby-dist/{version}/jruby-dist-{version}-bin.tar.gz"
+        );
         let timer = log
             .bullet("Download JRuby")
             .sub_bullet(format!("To {}", download_path.as_ref().to_string_lossy()))

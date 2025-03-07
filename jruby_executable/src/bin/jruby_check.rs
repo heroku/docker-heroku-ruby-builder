@@ -1,10 +1,10 @@
-use bullet_stream::{style, Print};
+use bullet_stream::{Print, style};
 use clap::Parser;
 use fun_run::CommandWithName;
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory::artifact::Arch;
-use shared::{source_dir, BaseImage};
+use shared::{BaseImage, source_dir};
 use std::error::Error;
 use std::io::Write;
 use std::{path::PathBuf, process::Command};
