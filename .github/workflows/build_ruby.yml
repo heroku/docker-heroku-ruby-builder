@@ -62,7 +62,7 @@ jobs:
     runs-on: pub-hk-ubuntu-24.04-xlarge
     steps:
       - name: Update Ruby inventory file locally
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           path: ruby_inventory.toml
           title: "Add Ruby ${{inputs.ruby_version}} to inventory"
