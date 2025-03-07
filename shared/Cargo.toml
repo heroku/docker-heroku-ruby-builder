@@ -1,25 +1,25 @@
 [package]
 name = "shared"
-version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+rust-version.workspace = true
 
 [[bin]]
 name = "inventory_check"
 path = "src/bin/inventory_check.rs"
 
 [dependencies]
-glob = { workspace = true}
-clap = { workspace = true}
-indoc = { workspace = true}
-flate2 = { workspace = true}
-fs-err = { workspace = true}
-fun_run = { workspace = true}
-nom = { workspace = true}
-regex = { workspace = true}
-reqwest = { workspace = true}
-tar = { workspace = true}
-tempfile = { workspace = true}
-thiserror = { workspace = true}
+glob = { workspace = true }
+clap = { workspace = true }
+indoc = { workspace = true }
+flate2 = { workspace = true }
+fs-err = { workspace = true }
+fun_run = { workspace = true }
+nom = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+tar = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
 bullet_stream = { workspace = true }
 sha2 = { workspace = true }
 chrono = { workspace = true }
@@ -30,7 +30,6 @@ fs2 = { workspace = true }
 rayon = { workspace = true }
 hex = { workspace = true }
 gem_version = { workspace = true }
-
 
 [dev-dependencies]
 tiny_http = "0.12.0"

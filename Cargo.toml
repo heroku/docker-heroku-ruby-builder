@@ -1,9 +1,14 @@
 [workspace]
+resolver = "3"
 members = [
     "jruby_executable",
     "ruby_executable",
     "shared",
 ]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
 
 [workspace.dependencies]
 java-properties = "2.0.0"

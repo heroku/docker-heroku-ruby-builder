@@ -116,7 +116,7 @@ where
     file.read_to_string(&mut contents).map_err(Error::FsError)?;
     file.rewind()?;
     let result: Result<T, Box<dyn std::error::Error>> = f(&mut file, &contents);
-    file.unlock()?;
+    fs2::FileExt::unlock(&file)?;
     result
 }
 
