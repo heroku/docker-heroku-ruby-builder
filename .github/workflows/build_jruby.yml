@@ -57,7 +57,7 @@ jobs:
     runs-on: pub-hk-ubuntu-24.04-xlarge
     steps:
       - name: Update Jruby inventory file locally
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           path: jruby_inventory.toml
           title: "Add JRuby ${{inputs.jruby_version}} to inventory"
