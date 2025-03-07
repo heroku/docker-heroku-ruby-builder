@@ -4,23 +4,23 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+bullet_stream = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
-shared = { workspace = true }
-indoc = { workspace = true }
 flate2 = { workspace = true }
 fs-err = { workspace = true }
 fun_run = { workspace = true }
+gem_version = { workspace = true }
+indoc = { workspace = true }
+libherokubuildpack = { workspace = true }
 nom = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+sha2 = { workspace = true }
+shared = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
-bullet_stream = { workspace = true }
-libherokubuildpack = { workspace = true }
-chrono = { workspace = true }
-sha2 = { workspace = true }
-gem_version = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
