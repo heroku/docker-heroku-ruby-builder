@@ -23,7 +23,7 @@ jobs:
         # which include the latest stable release of Rust, Rustup, Clippy and rustfmt.
         run: rustup update
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2.7.7
+        uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
       - name: Clippy
         # Using --all-targets so tests are checked and --deny to fail on warnings.
         # Not using --locked here and below since Cargo.lock is in .gitignore.
@@ -43,7 +43,7 @@ jobs:
       - name: Update Rust toolchain
         run: rustup update
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2.7.7
+        uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
       - name: Run unit tests
         run: cargo test --all-features
 
@@ -65,7 +65,7 @@ jobs:
       - name: Update Rust toolchain
         run: rustup update
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2.7.7
+        uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
       - name: Cargo build (to make test logs shorter)
         run: cargo build
       - name: Output CHANGELOG
@@ -93,7 +93,7 @@ jobs:
       - name: Update Rust toolchain
         run: rustup update
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2.7.7
+        uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
       - name: Cargo build (to make test logs shorter)
         run: cargo build
       - name: Output CHANGELOG
