@@ -43,13 +43,13 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
       - name: Cargo build
-        run: cargo build
+        run: cargo build --locked
       - name: Output CHANGELOG
-        run: cargo run --bin ruby_changelog -- --version "${{inputs.ruby_version}}"
+        run: cargo run --locked --bin ruby_changelog -- --version "${{inputs.ruby_version}}"
       - name: Build Ruby
-        run: cargo run --bin ruby_build -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+        run: cargo run --locked --bin ruby_build -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
       - name: Check Ruby
-        run: cargo run --bin ruby_check -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch  ${{matrix.arch}} | tee $GITHUB_STEP_SUMMARY
+        run: cargo run --locked --bin ruby_check -- --version ${{inputs.ruby_version}} --base-image ${{matrix.base_image}} --arch  ${{matrix.arch}} | tee $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3 dry run
         if: (inputs.dry_run)
         run: aws s3 sync ./output "s3://${S3_BUCKET}" --dryrun
