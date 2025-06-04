@@ -48,7 +48,7 @@ fn ruby_dockerfile_contents(base_image: &BaseImage) -> String {
         ENV PATH="/root/.cargo/bin:${PATH}"
 
         # https://bugs.ruby-lang.org/issues/20506
-        RUN rustup install 1.77 && rustup default 1.77
+        RUN rustup update
 
         WORKDIR /tmp/workdir/
         COPY make_ruby.sh /tmp/workdir/make_ruby.sh
