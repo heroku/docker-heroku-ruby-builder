@@ -10,12 +10,8 @@ configure_opts=(
     --disable-install-doc
     --enable-load-relative
     --enable-shared
+    --enable-yjit
 )
-
-# YJIT is only available in Ruby 3.2+
-if [[ -n "${ENABLE_YJIT:-}" ]]; then
-    configure_opts+=(--enable-yjit)
-fi
 
 # Leader for `set -o xtrace` output <https://www.gnu.org/software/bash/manual/html_node/Bash-Variables.html>
 PS4='>\e[33m${BASH_SOURCE}:${LINENO} $\e[0m '

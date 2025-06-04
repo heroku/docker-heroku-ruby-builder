@@ -137,10 +137,6 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         docker_run.args(["--volume", &format!("{volume_output}:{INNER_OUTPUT}")]);
         docker_run.args(["--volume", &format!("{volume_cache}:{INNER_CACHE}")]);
 
-        if version.major > 3 || (version.major == 3 && version.minor >= 2) {
-            docker_run.args(["-e", "ENABLE_YJIT=1"]);
-        }
-
         docker_run.arg(&image_name);
         docker_run.args(["bash", "-c"]);
         docker_run.arg(format!(
