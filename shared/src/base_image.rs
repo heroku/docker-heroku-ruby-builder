@@ -3,11 +3,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-static KNOWN_BASE_IMAGES: &[(&str, &str)] = &[
-    ("heroku-20", "20"),
-    ("heroku-22", "22"),
-    ("heroku-24", "24"),
-];
+static KNOWN_BASE_IMAGES: &[(&str, &str)] = &[("heroku-22", "22"), ("heroku-24", "24")];
 static MULTI_ARCH_BASE_IMAGES: [&str; 1] = ["heroku-24"];
 
 #[derive(Debug, thiserror::Error)]

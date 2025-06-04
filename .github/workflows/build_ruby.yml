@@ -29,10 +29,8 @@ jobs:
     strategy:
       matrix:
         arch: ["amd64", "arm64"]
-        base_image: ["heroku-20", "heroku-22", "heroku-24"]
+        base_image: ["heroku-22", "heroku-24"]
         exclude:
-          - base_image: "heroku-20"
-            arch: "arm64"
           - base_image: "heroku-22"
             arch: "arm64"
     steps:

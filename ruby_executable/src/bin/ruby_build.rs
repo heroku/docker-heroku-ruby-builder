@@ -48,7 +48,7 @@ fn ruby_dockerfile_contents(base_image: &BaseImage) -> String {
         ENV PATH="/root/.cargo/bin:${PATH}"
 
         # https://bugs.ruby-lang.org/issues/20506
-        RUN rustup install 1.77 && rustup default 1.77
+        RUN rustup update
 
         WORKDIR /tmp/workdir/
         COPY make_ruby.sh /tmp/workdir/make_ruby.sh
@@ -136,10 +136,6 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         docker_run.args(["--platform", &format!("linux/{arch}")]);
         docker_run.args(["--volume", &format!("{volume_output}:{INNER_OUTPUT}")]);
         docker_run.args(["--volume", &format!("{volume_cache}:{INNER_CACHE}")]);
-
-        if version.major > 3 || (version.major == 3 && version.minor >= 2) {
-            docker_run.args(["-e", "ENABLE_YJIT=1"]);
-        }
 
         docker_run.arg(&image_name);
         docker_run.args(["bash", "-c"]);

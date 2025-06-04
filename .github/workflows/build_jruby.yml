@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        base_image: ["heroku-20", "heroku-22", "heroku-24"]
+        base_image: ["heroku-22", "heroku-24"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
