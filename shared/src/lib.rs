@@ -308,13 +308,13 @@ mod test {
     fn test_output_tar_path_pre_24() {
         let output = PathBuf::from("/tmp");
         let version = RubyDownloadVersion::from_str("2.7.3").unwrap();
-        let base_image = BaseImage::new("heroku-20").unwrap();
+        let base_image = BaseImage::new("heroku-22").unwrap();
         let cpu_architecture = Arch::Amd64;
 
         let tar_path = output_tar_path(&output, &version, &base_image, &cpu_architecture);
 
         // assert!(tar_path.is_absolute());
-        assert_eq!(PathBuf::from("/tmp/heroku-20/ruby-2.7.3.tgz"), tar_path);
+        assert_eq!(PathBuf::from("/tmp/heroku-22/ruby-2.7.3.tgz"), tar_path);
     }
 
     #[test]
