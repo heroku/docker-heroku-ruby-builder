@@ -46,8 +46,7 @@ pub fn append_filename_with(path: &Path, append: &str, ends_with: &str) -> Resul
 
     if !file_name.ends_with(ends_with) {
         Err(Error::Other(format!(
-            "File name {} does not end with {}",
-            file_name, ends_with
+            "File name {file_name} does not end with {ends_with}"
         )))?;
     }
     let file_base = file_name.trim_end_matches(ends_with);

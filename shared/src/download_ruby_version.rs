@@ -81,7 +81,7 @@ impl RubyDownloadVersion {
     }
 
     pub fn dir_name_format(&self) -> String {
-        format!("ruby-{}", self)
+        format!("ruby-{self}")
     }
 
     pub fn download_url(&self) -> String {
