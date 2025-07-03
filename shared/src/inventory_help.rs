@@ -151,7 +151,7 @@ fn parse_inventory(
 /// Returns the sha256 hash of the file at the given path
 pub fn sha256_from_path(path: &Path) -> Result<String, Error> {
     digest::<Sha256>(fs_err::File::open(path).map_err(Error::FsError)?)
-        .map(|digest| format!("{:x}", digest))
+        .map(|digest| format!("{digest:x}"))
         .map_err(|e| {
             Error::Other(format!(
                 "Error {e} calculating sha256 for {path}",
