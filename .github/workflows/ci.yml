@@ -47,7 +47,7 @@ jobs:
         run: cargo test --all-features --locked
 
   ruby_integration_test:
-    runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-24.04-arm-medium' || 'ubuntu-24.04' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     strategy:
       matrix:
         base_image: ["heroku-22", "heroku-24"]
@@ -73,7 +73,7 @@ jobs:
         run: cargo run --locked --bin ruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
 
   jruby_integration_test:
-    runs-on: ${{ matrix.arch == 'arm64' && 'pub-hk-ubuntu-24.04-arm-medium' || 'ubuntu-24.04' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     strategy:
       matrix:
         base_image: ["heroku-22", "heroku-24"]

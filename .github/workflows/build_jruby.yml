@@ -54,7 +54,7 @@ jobs:
 
   after-build-and-upload:
     needs: build-and-upload
-    runs-on: pub-hk-ubuntu-24.04-xlarge
+    runs-on: pub-hk-ubuntu-24.04-ip
     steps:
       - name: Update Jruby inventory file locally
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
