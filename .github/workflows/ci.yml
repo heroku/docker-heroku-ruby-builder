@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Run ShellCheck
         run: shellcheck *.sh -x
 
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Update Rust toolchain
         # Most of the time this will be a no-op, since GitHub releases new images every week
         # which include the latest stable release of Rust, Rustup, Clippy and rustfmt.
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Update Rust toolchain
         run: rustup update
       - name: Rust Cache
@@ -58,7 +58,7 @@ jobs:
             arch: "arm64"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Update Rust toolchain
         run: rustup update
       - name: Rust Cache
@@ -84,7 +84,7 @@ jobs:
             arch: "arm64"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Update Rust toolchain
         run: rustup update
       - name: Rust Cache
@@ -106,7 +106,7 @@ jobs:
         inventory: ["jruby_inventory.toml", "ruby_inventory.toml"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Grab prior commits
         run: |
           set -eu
