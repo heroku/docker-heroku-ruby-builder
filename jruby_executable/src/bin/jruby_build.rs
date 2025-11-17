@@ -48,24 +48,21 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         TarDownloadPath(volume_cache_dir.join(format!("jruby-dist-{version}-bin.tar.gz")));
 
     if download_path.as_ref().fs_err_try_exists()? {
-        log = log
-            .bullet(format!(
-                "Using cached JRuby archive {}",
-                download_path.as_ref().display()
-            ))
-            .done();
+        print::bullet(format!(
+            "Using cached JRuby archive {}",
+            download_path.as_ref().display()
+        ));
     } else {
         let url = format!(
             "https://repo1.maven.org/maven2/org/jruby/jruby-dist/{version}/jruby-dist-{version}-bin.tar.gz"
         );
-        let timer = log
-            .bullet("Download JRuby")
-            .sub_bullet(format!("To {}", download_path.as_ref().to_string_lossy()))
-            .sub_bullet(format!("From {}", style::url(&url)))
-            .start_timer("Downloading");
-        download_tar(&url, &download_path)?;
+        print::bullet("Download JRuby");
+        print::sub_bullet(format!("To {}", download_path.as_ref().to_string_lossy()));
+        print::sub_bullet(format!("From {}", style::url(&url)));
 
-        log = timer.done().done();
+        let timer = print::sub_start_timer("Downloading");
+        download_tar(&url, &download_path)?;
+        timer.done();
     }
 
     untar_to_dir(&download_path, &extracted_path)?;
