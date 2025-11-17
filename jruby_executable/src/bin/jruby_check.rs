@@ -1,6 +1,5 @@
-use bullet_stream::{Print, global::print, style};
+use bullet_stream::global::print;
 use clap::Parser;
-use fun_run::CommandWithName;
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory::artifact::Arch;
