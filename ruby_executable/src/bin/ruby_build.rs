@@ -153,7 +153,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
     };
 
     _ = {
-        let mut bullet = log.bullet(format!(
+        print::bullet(format!(
             "Updating manifest {}",
             style::value(inventory.to_string_lossy())
         ));
@@ -168,7 +168,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
             sha_seven_path.strip_prefix(&volume_output_dir)?.display()
         );
 
-        bullet = bullet.sub_bullet(format!("Copying SHA tgz {}", sha_seven_path.display(),));
+        print::sub_bullet(format!("Copying SHA tgz {}", sha_seven_path.display(),));
         fs_err::copy(output_tar, &sha_seven_path)?;
 
         let artifact = Artifact {
@@ -205,8 +205,6 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
 
             Ok(())
         })?;
-
-        bullet.done()
     };
 
     print::all_done(&Some(start));
