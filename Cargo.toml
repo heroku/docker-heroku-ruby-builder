@@ -17,7 +17,7 @@ clap = { version = "4.5", features = ["derive"] }
 flate2 = "1"
 fs-err = "3"
 fs2 = "0.4"
-fun_run = "0.2"
+fun_run = "0.6"
 gem_version = "0.3"
 glob = "0.3"
 hex = "0.4"
