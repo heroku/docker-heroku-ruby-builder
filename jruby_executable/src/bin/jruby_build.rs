@@ -89,16 +89,13 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         }
     };
 
-    _ = {
-        print::bullet("Checking for `ruby` binstub");
-        let ruby_bin = jruby_dir.join("bin").join("ruby");
-        if ruby_bin.fs_err_try_exists()? {
-            print::sub_bullet("File exists")
-        } else {
-            print::sub_bullet("Create ruby symlink to jruby");
-            fs_err::os::unix::fs::symlink("jruby", ruby_bin)?;
-        }
-    };
+    let ruby_bin = jruby_dir.join("bin").join("ruby");
+    if ruby_bin.fs_err_try_exists()? {
+        print::sub_bullet("File exists")
+    } else {
+        print::sub_bullet("Create ruby symlink to jruby");
+        fs_err::os::unix::fs::symlink("jruby", ruby_bin)?;
+    }
 
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
 
