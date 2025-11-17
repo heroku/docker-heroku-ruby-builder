@@ -60,20 +60,15 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         .join(" && "),
     );
 
-    let mut cmd_stream = log.bullet("Versions");
+    print::bullet("Versions");
+    let output = print::sub_stream_cmd(cmd)?;
 
-    let result = cmd_stream.stream_with(
-        format!("Running {}", style::command(cmd.name())),
-        |stdout, stderr| cmd.stream_output(stdout, stderr),
-    )?;
-
-    cmd_stream.done().done();
     eprintln!();
 
     // Print results to STDOUT for github summary
     println!("## Ruby {version} linux/{arch} for {base_image}");
     println!();
-    println!("{}", result.stdout_lossy());
+    println!("{}", output.stdout_lossy());
 
     Ok(())
 }
