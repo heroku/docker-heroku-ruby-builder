@@ -79,7 +79,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         bullet.done()
     };
 
-    let (log, result) = {
+    let (_, result) = {
         let inner_jruby_path = PathBuf::from(INNER_OUTPUT)
             .join(base_image.to_string())
             .join(format!("ruby-{jruby_stdlib_version}-jruby-{version}.tgz"));
@@ -110,17 +110,13 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
             .join(" && "),
         );
 
-        let mut cmd_stream = log.bullet("Versions");
+        print::bullet("Versions");
 
-        let result = cmd_stream.stream_with(
-            format!("Running {}", style::command(cmd.name())),
-            |stdout, stderr| cmd.stream_output(stdout, stderr),
-        )?;
+        let result = print::sub_stream_cmd(cmd)?;
 
-        (cmd_stream.done(), result)
+        ((), result)
     };
 
-    log.done();
     print::plain("");
 
     // Print results to STDOUT for github summary
