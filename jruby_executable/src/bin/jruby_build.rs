@@ -102,84 +102,80 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
 
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
 
-    _ = {
-        print::bullet("Creating tgz archives");
-        print::sub_bullet(format!(
-            "Inventory file {}",
-            style::value(inventory.to_string_lossy())
-        ));
-        let tar_dir = volume_output_dir.join(base_image.to_string());
+    print::bullet("Creating tgz archives");
+    print::sub_bullet(format!(
+        "Inventory file {}",
+        style::value(inventory.to_string_lossy())
+    ));
+    let tar_dir = volume_output_dir.join(base_image.to_string());
 
-        fs_err::create_dir_all(&tar_dir)?;
+    fs_err::create_dir_all(&tar_dir)?;
 
-        let tar_file = fs_err::File::create(tar_dir.join(&tgz_name))?;
+    let tar_file = fs_err::File::create(tar_dir.join(&tgz_name))?;
 
-        let timer = print::sub_start_timer(format!("Write {}", tar_file.path().display()));
-        tar_dir_to_file(&jruby_dir, &tar_file)?;
-        timer.done();
+    let timer = print::sub_start_timer(format!("Write {}", tar_file.path().display()));
+    tar_dir_to_file(&jruby_dir, &tar_file)?;
+    timer.done();
 
-        let tar_path = tar_file.path();
-        let sha = sha256_from_path(tar_path)?;
-        let sha_seven = sha.chars().take(7).collect::<String>();
-        let sha_seven_path = append_filename_with(tar_path, &format!("-{sha_seven}"), ".tgz")?;
+    let tar_path = tar_file.path();
+    let sha = sha256_from_path(tar_path)?;
+    let sha_seven = sha.chars().take(7).collect::<String>();
+    let sha_seven_path = append_filename_with(tar_path, &format!("-{sha_seven}"), ".tgz")?;
 
-        print::sub_bullet(format!("Write {}", sha_seven_path.display(),));
-        fs_err::copy(tar_file.path(), &sha_seven_path)?;
+    print::sub_bullet(format!("Write {}", sha_seven_path.display(),));
+    fs_err::copy(tar_file.path(), &sha_seven_path)?;
 
-        let timestamp = chrono::Utc::now();
-        for cpu_arch in [Arch::Amd64, Arch::Arm64] {
-            let distro_version = base_image.distro_version();
-            let artifact = Artifact {
-                version: GemVersion::from_str(version)?,
-                os: inventory::artifact::Os::Linux,
-                arch: cpu_arch,
-                url: format!(
-                    "{S3_BASE_URL}/{}",
-                    sha_seven_path.strip_prefix(&volume_output_dir)?.display()
-                ),
-                checksum: format!("sha256:{sha}").parse()?,
-                metadata: ArtifactMetadata {
-                    distro_version,
-                    timestamp,
-                },
-            };
-            atomic_inventory_update(&inventory, |inventory| {
-                for prior in &inventory.artifacts {
-                    if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
-                        // TODO: Investigate bullet stream ownership
-                        println!(
-                            "{}",
-                            style::important(format!(
-                                "!!!!!!!!!! Error updating inventory: {error}"
-                            ))
-                        );
+    let timestamp = chrono::Utc::now();
+    for cpu_arch in [Arch::Amd64, Arch::Arm64] {
+        let distro_version = base_image.distro_version();
+        let artifact = Artifact {
+            version: GemVersion::from_str(version)?,
+            os: inventory::artifact::Os::Linux,
+            arch: cpu_arch,
+            url: format!(
+                "{S3_BASE_URL}/{}",
+                sha_seven_path.strip_prefix(&volume_output_dir)?.display()
+            ),
+            checksum: format!("sha256:{sha}").parse()?,
+            metadata: ArtifactMetadata {
+                distro_version,
+                timestamp,
+            },
+        };
+        atomic_inventory_update(&inventory, |inventory| {
+            for prior in &inventory.artifacts {
+                if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
+                    // TODO: Investigate bullet stream ownership
+                    println!(
+                        "{}",
+                        style::important(format!("!!!!!!!!!! Error updating inventory: {error}"))
+                    );
 
-                        fs_err::remove_file(&sha_seven_path)?;
-                        return Err(error);
-                    };
-                }
+                    fs_err::remove_file(&sha_seven_path)?;
+                    return Err(error);
+                };
+            }
 
-                inventory
-                    .artifacts
-                    .retain(|a| artifact_is_different(a, &artifact));
+            inventory
+                .artifacts
+                .retain(|a| artifact_is_different(a, &artifact));
 
-                inventory.push(artifact);
-                Ok(())
-            })?
-        }
+            inventory.push(artifact);
+            Ok(())
+        })?
+    }
 
-        // Can be removed once manifest file support is fully rolled out
-        for cpu_arch in [Arch::Amd64, Arch::Arm64] {
-            let dir = volume_output_dir
-                .join(base_image.to_string())
-                .join(cpu_arch.to_string());
-            fs_err::create_dir_all(&dir)?;
+    // Can be removed once manifest file support is fully rolled out
+    for cpu_arch in [Arch::Amd64, Arch::Arm64] {
+        let dir = volume_output_dir
+            .join(base_image.to_string())
+            .join(cpu_arch.to_string());
+        fs_err::create_dir_all(&dir)?;
 
-            let path = dir.join(&tgz_name);
-            print::sub_bullet(format!("Write {}", path.display()));
-            fs_err::copy(tar_file.path(), &path)?;
-        }
-    };
+        let path = dir.join(&tgz_name);
+        print::sub_bullet(format!("Write {}", path.display()));
+        fs_err::copy(tar_file.path(), &path)?;
+    }
 
     print::all_done(&Some(start));
     Ok(())
