@@ -1,4 +1,4 @@
-use bullet_stream::{Print, style};
+use bullet_stream::{Print, global::print, style};
 use clap::Parser;
 use fs_err::PathExt;
 use fun_run::CommandWithName;
@@ -215,13 +215,11 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
 fn main() {
     let args = RubyArgs::parse();
     if let Err(error) = ruby_build(&args) {
-        Print::new(std::io::stderr())
-            .without_header()
-            .error(formatdoc! {"
-                ❌ Command failed ❌
+        print::error(formatdoc! {"
+            ❌ Command failed ❌
 
-                {error}
-            "});
+            {error}
+        "});
         std::process::exit(1);
     }
 }
