@@ -88,8 +88,8 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         bullet.done()
     };
 
-    log = {
-        let mut bullet = log.bullet(format!("Docker image {image_name}"));
+    _ = {
+        print::bullet(format!("Docker image {image_name}"));
         let mut docker_build = Command::new("docker");
         docker_build.arg("build");
         docker_build.args(["--platform", &format!("linux/{arch}")]);
@@ -97,12 +97,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         docker_build.args(["--tag", &image_name]);
         docker_build.args(["--file", &dockerfile_path.display().to_string()]);
         docker_build.arg(source_dir());
-        let _ = bullet.stream_with(
-            format!("Building via {}", style::command(docker_build.name())),
-            |stdout, stderr| docker_build.stream_output(stdout, stderr),
-        )?;
-
-        bullet.done()
+        print::sub_stream_cmd(docker_build)?;
     };
 
     let download_tar_path =
