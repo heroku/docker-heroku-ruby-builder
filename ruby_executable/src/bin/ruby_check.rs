@@ -1,6 +1,5 @@
-use bullet_stream::{Print, global::print, style};
+use bullet_stream::global::print;
 use clap::Parser;
-use fun_run::CommandWithName;
 use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
 use shared::{BaseImage, RubyDownloadVersion, output_tar_path, source_dir};
@@ -27,7 +26,7 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         base_image,
     } = args;
     let start = Instant::now();
-    let log = Print::new(std::io::stderr()).h1(format!(
+    print::h2(format!(
         "Checking Ruby version ({version} linux/{arch}) for {base_image}",
     ));
     let path = output_tar_path(&PathBuf::from(INNER_OUTPUT), version, base_image, arch);
