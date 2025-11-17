@@ -60,19 +60,17 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
 
     let outside_output = source_dir().join("output");
 
-    _ = {
-        print::bullet(format!("Docker image {image_name}"));
-        let mut docker_build = Command::new("docker");
-        docker_build.arg("build");
-        docker_build.args(["--platform", &format!("linux/{arch}")]);
-        docker_build.args(["--progress", "plain"]);
-        docker_build.args(["--tag", &image_name]);
-        docker_build.args(["--file", &dockerfile_path.display().to_string()]);
-        docker_build.arg(source_dir().to_str().expect("Path to str"));
-        print::sub_stream_cmd(docker_build)?;
-    };
+    print::bullet(format!("Docker image {image_name}"));
+    let mut docker_build = Command::new("docker");
+    docker_build.arg("build");
+    docker_build.args(["--platform", &format!("linux/{arch}")]);
+    docker_build.args(["--progress", "plain"]);
+    docker_build.args(["--tag", &image_name]);
+    docker_build.args(["--file", &dockerfile_path.display().to_string()]);
+    docker_build.arg(source_dir().to_str().expect("Path to str"));
+    print::sub_stream_cmd(docker_build)?;
 
-    let (_, result) = {
+    let output = {
         let inner_jruby_path = PathBuf::from(INNER_OUTPUT)
             .join(base_image.to_string())
             .join(format!("ruby-{jruby_stdlib_version}-jruby-{version}.tgz"));
@@ -105,9 +103,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
 
         print::bullet("Versions");
 
-        let result = print::sub_stream_cmd(cmd)?;
-
-        ((), result)
+        print::sub_stream_cmd(cmd)?
     };
 
     print::all_done(&Some(start));
@@ -117,7 +113,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     // Print results to STDOUT for github summary
     println!("## JRuby {version} stdlib {jruby_stdlib_version} linux/{arch} for {base_image}");
     println!();
-    println!("{}", result.stdout_lossy());
+    println!("{}", output.stdout_lossy());
     Ok(())
 }
 
