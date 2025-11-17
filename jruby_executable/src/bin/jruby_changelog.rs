@@ -32,7 +32,7 @@ fn jruby_changelog(args: &Args) -> Result<(), Box<dyn Error>> {
         The JRuby release notes can be found on the [JRuby website](https://www.jruby.org/news).
     "};
 
-    println!("{changelog}");
+    print::plain(changelog);
 
     Ok(())
 }
