@@ -108,19 +108,17 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
     let download_tar_path =
         TarDownloadPath(volume_cache_dir.join(format!("ruby-source-{version}.tgz")));
 
-    log = if Path::fs_err_try_exists(download_tar_path.as_ref())? {
-        log.bullet(format!(
+    if Path::fs_err_try_exists(download_tar_path.as_ref())? {
+        print::bullet(format!(
             "Using cached tarball {}",
             download_tar_path.as_ref().display()
         ))
-        .done()
     } else {
-        let bullet = log.bullet(format!(
+        print::bullet(format!(
             "Downloading {version} to {}",
             download_tar_path.as_ref().display()
         ));
         download_tar(&version.download_url(), &download_tar_path)?;
-        bullet.done()
     };
 
     _ = {
