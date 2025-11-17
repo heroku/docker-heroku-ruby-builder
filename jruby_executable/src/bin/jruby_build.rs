@@ -14,6 +14,7 @@ use shared::{
 use std::convert::From;
 use std::error::Error;
 use std::str::FromStr;
+use std::time::Instant;
 
 static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws.com";
 
@@ -32,7 +33,8 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         base_image,
     } = args;
 
-    let mut log = Print::new(std::io::stderr()).h1("Building JRuby");
+    let start = Instant::now();
+    print::h2("Building JRuby");
     let inventory = source_dir().join("jruby_inventory.toml");
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
@@ -179,8 +181,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         }
     };
 
-    log.done();
-
+    print::all_done(&Some(start));
     Ok(())
 }
 
