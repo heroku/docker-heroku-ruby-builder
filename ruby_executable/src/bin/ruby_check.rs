@@ -4,7 +4,7 @@ use fun_run::CommandWithName;
 use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
 use shared::{BaseImage, RubyDownloadVersion, output_tar_path, source_dir};
-use std::{error::Error, path::PathBuf, process::Command};
+use std::{error::Error, path::PathBuf, process::Command, time::Instant};
 
 static INNER_OUTPUT: &str = "/tmp/output";
 
@@ -26,6 +26,7 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         version,
         base_image,
     } = args;
+    let start = Instant::now();
     let log = Print::new(std::io::stderr()).h1(format!(
         "Checking Ruby version ({version} linux/{arch}) for {base_image}",
     ));
@@ -63,7 +64,8 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     print::bullet("Versions");
     let output = print::sub_stream_cmd(cmd)?;
 
-    eprintln!();
+    print::all_done(&Some(start));
+    print::plain("");
 
     // Print results to STDOUT for github summary
     println!("## Ruby {version} linux/{arch} for {base_image}");
