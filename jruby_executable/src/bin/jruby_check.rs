@@ -43,9 +43,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
 
     let image_name = format!("heroku/jruby-builder:{base_image}");
 
-    let mut stream = log
-        .bullet(format!("Dockerfile for {image_name}"))
-        .start_stream("Contents");
+    print::bullet(format!("Dockerfile for {image_name}"));
 
     let dockerfile = formatdoc! {"
         FROM heroku/heroku:{distro_number}-build
@@ -54,11 +52,9 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         RUN apt-get update -y; apt-get install default-jre default-jdk -y
     "};
 
-    write!(stream, "{dockerfile}")?;
+    print::sub_stream_with("Contents", |mut stream, _| write!(stream, "{dockerfile}"))?;
 
     fs_err::write(&dockerfile_path, dockerfile)?;
-
-    log = stream.done().done();
 
     let outside_output = source_dir().join("output");
 
