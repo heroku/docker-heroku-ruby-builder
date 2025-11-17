@@ -11,7 +11,7 @@ edition = "2024"
 rust-version = "1.88"
 
 [workspace.dependencies]
-bullet_stream = "0.2"
+bullet_stream = "0.11"
 chrono = {version = "0.4", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
 flate2 = "1"

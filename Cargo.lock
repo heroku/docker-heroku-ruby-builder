@@ -156,9 +156,12 @@ dependencies = [
 
 [[package]]
 name = "bullet_stream"
-version = "0.2.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bec939946cfeb7d4ba709fb24f035a14b78b89641cd4a09434a6d317c0ae28a6"
+checksum = "d0406178c12a122b39c437e4e8776f7af3a1c5e9eab0c766c31830c9f17a9ded"
+dependencies = [
+ "fun_run 0.6.0",
+]
 
 [[package]]
 name = "bumpalo"
@@ -475,6 +478,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac1060b826a0883f31399a72e983a55ad0b38830429a5d1dff3719aac9782415"
 dependencies = [
  "lazy_static",
+ "regex",
+]
+
+[[package]]
+name = "fun_run"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8edaa9292e7fb8dbab9a2a2b77e73ddb8b0d2504f74708ef0d265e0e9bf32b9b"
+dependencies = [
  "regex",
 ]
 
@@ -958,7 +970,7 @@ dependencies = [
  "clap",
  "flate2",
  "fs-err",
- "fun_run",
+ "fun_run 0.2.0",
  "gem_version",
  "glob",
  "indoc",
@@ -1351,7 +1363,7 @@ dependencies = [
  "clap",
  "flate2",
  "fs-err",
- "fun_run",
+ "fun_run 0.2.0",
  "gem_version",
  "indoc",
  "libherokubuildpack",
@@ -1552,7 +1564,7 @@ dependencies = [
  "flate2",
  "fs-err",
  "fs2",
- "fun_run",
+ "fun_run 0.2.0",
  "gem_version",
  "glob",
  "hex",
