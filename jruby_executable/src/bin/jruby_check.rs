@@ -121,7 +121,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     };
 
     log.done();
-    eprintln!();
+    print::plain("");
 
     // Print results to STDOUT for github summary
     println!("## JRuby {version} stdlib {jruby_stdlib_version} linux/{arch} for {base_image}");
