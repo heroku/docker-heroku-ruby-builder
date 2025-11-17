@@ -1,7 +1,6 @@
-use bullet_stream::{Print, global::print, style};
+use bullet_stream::{global::print, style};
 use clap::Parser;
 use fs_err::PathExt;
-use fun_run::CommandWithName;
 use gem_version::GemVersion;
 use indoc::{formatdoc, indoc};
 use libherokubuildpack::inventory::{
@@ -66,7 +65,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
     } = args;
 
     let start = Instant::now();
-    let mut log = Print::new(std::io::stderr()).h1("Building Ruby");
+    print::h2("Building Ruby");
     let inventory = source_dir().join("ruby_inventory.toml");
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
