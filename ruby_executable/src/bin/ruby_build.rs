@@ -79,13 +79,12 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
     let dockerfile = ruby_dockerfile_contents(base_image);
     let dockerfile_path = temp_dir.path().join("Dockerfile");
 
-    log = {
-        let mut bullet = log.bullet("Dockerfile");
-        bullet.stream_with("Writing contents to tmpdir", |mut stream, _| {
-            write!(stream, "{dockerfile}")?;
-            fs_err::write(&dockerfile_path, &dockerfile)
+    _ = {
+        print::bullet("Dockerfile");
+        print::sub_stream_with("Writing contents to tmpdir", |mut stream, _| {
+            write!(stream, "{dockerfile}")
+                .and_then(|_| fs_err::write(&dockerfile_path, &dockerfile))
         })?;
-        bullet.done()
     };
 
     _ = {
