@@ -160,7 +160,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0406178c12a122b39c437e4e8776f7af3a1c5e9eab0c766c31830c9f17a9ded"
 dependencies = [
- "fun_run 0.6.0",
+ "fun_run",
 ]
 
 [[package]]
@@ -469,16 +469,6 @@ checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "fun_run"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac1060b826a0883f31399a72e983a55ad0b38830429a5d1dff3719aac9782415"
-dependencies = [
- "lazy_static",
- "regex",
 ]
 
 [[package]]
@@ -970,7 +960,7 @@ dependencies = [
  "clap",
  "flate2",
  "fs-err",
- "fun_run 0.2.0",
+ "fun_run",
  "gem_version",
  "glob",
  "indoc",
@@ -1363,7 +1353,7 @@ dependencies = [
  "clap",
  "flate2",
  "fs-err",
- "fun_run 0.2.0",
+ "fun_run",
  "gem_version",
  "indoc",
  "libherokubuildpack",
@@ -1573,7 +1563,7 @@ dependencies = [
  "flate2",
  "fs-err",
  "fs2",
- "fun_run 0.2.0",
+ "fun_run",
  "gem_version",
  "glob",
  "hex",
