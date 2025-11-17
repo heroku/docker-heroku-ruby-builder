@@ -7,7 +7,7 @@ static KNOWN_BASE_IMAGES: &[(&str, &str)] = &[("heroku-22", "22"), ("heroku-24",
 static MULTI_ARCH_BASE_IMAGES: [&str; 1] = ["heroku-24"];
 
 #[derive(Debug, thiserror::Error)]
-#[error("Invalid base image {0} must be one of {}", KNOWN_BASE_IMAGES.iter().map(|(name, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
+#[error("Invalid base image {0} must be one of {known}", known = KNOWN_BASE_IMAGES.iter().map(|(name, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
 pub struct BaseImageError(String);
 
 #[derive(Debug, Clone)]
