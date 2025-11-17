@@ -7,6 +7,7 @@ use libherokubuildpack::inventory::artifact::Arch;
 use shared::{BaseImage, source_dir};
 use std::error::Error;
 use std::io::Write;
+use std::time::Instant;
 use std::{path::PathBuf, process::Command};
 
 static INNER_OUTPUT: &str = "/tmp/output";
@@ -33,7 +34,8 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     let jruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
 
     // Log progress to STDERR, print results to STDOUT directly
-    let mut log = Print::new(std::io::stderr()).h1(format!(
+    let start = Instant::now();
+    print::h2(format!(
         "Prepare: Checking JRuby version ({version} linux/{arch} stdlib {jruby_stdlib_version}) for {base_image}",
     ));
     let distro_number = base_image.distro_number();
@@ -107,6 +109,8 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
 
         ((), result)
     };
+
+    print::all_done(&Some(start));
 
     print::plain("");
 
