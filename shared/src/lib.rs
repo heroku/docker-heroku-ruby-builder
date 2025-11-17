@@ -84,8 +84,12 @@ pub enum Error {
     #[error("Command failed {0}")]
     CmdError(fun_run::CmdError),
 
-    #[error("Invalid version {0} for stack {1}")]
-    InvalidVersionForStack(String, String),
+    #[error("Invalid version {version} for stack {stack}. {reason}")]
+    InvalidVersionForStack {
+        version: String,
+        stack: String,
+        reason: String,
+    },
 
     #[error("Cannot convert to integer {0}")]
     ParseIntError(std::num::ParseIntError),
@@ -122,12 +126,14 @@ pub fn validate_version_for_stack(
     ruby_version: &RubyDownloadVersion,
     base_image: &BaseImage,
 ) -> Result<(), Error> {
-    // https://bugs.ruby-lang.org/issues/18658
-    if base_image.name() == "heroku-22" && ruby_version.major >= 3 && ruby_version.minor == 0 {
-        return Err(Error::InvalidVersionForStack(
-            ruby_version.bundler_format(),
-            base_image.to_string(),
-        ));
+    if base_image.name() == "heroku-22" && ruby_version.major == 3 && ruby_version.minor == 0 {
+        return Err(Error::InvalidVersionForStack {
+            version: ruby_version.bundler_format(),
+            stack: base_image.to_string(),
+            reason:
+                "Cannot use Ruby 3.0 on Heroku 22 due to https://bugs.ruby-lang.org/issues/18658"
+                    .to_string(),
+        });
     }
 
     Ok(())

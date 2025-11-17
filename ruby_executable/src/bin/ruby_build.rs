@@ -11,7 +11,7 @@ use libherokubuildpack::inventory::{
 use shared::{
     ArtifactMetadata, BaseImage, RubyDownloadVersion, TarDownloadPath, append_filename_with,
     artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
-    download_tar, output_tar_path, sha256_from_path, source_dir, validate_version_for_stack,
+    download_tar, output_tar_path, sha256_from_path, source_dir,
 };
 use std::{
     io::Write,
@@ -105,8 +105,6 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     let download_tar_path =
         TarDownloadPath(volume_cache_dir.join(format!("ruby-source-{version}.tgz")));
-
-    validate_version_for_stack(version, base_image)?;
 
     log = if Path::fs_err_try_exists(download_tar_path.as_ref())? {
         log.bullet(format!(
