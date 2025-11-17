@@ -18,6 +18,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
+    time::Instant,
 };
 
 static INNER_OUTPUT: &str = "/tmp/output";
@@ -64,6 +65,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         base_image,
     } = args;
 
+    let start = Instant::now();
     let mut log = Print::new(std::io::stderr()).h1("Building Ruby");
     let inventory = source_dir().join("ruby_inventory.toml");
     let volume_cache_dir = source_dir().join("cache");
@@ -150,7 +152,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         bullet.done()
     };
 
-    log = {
+    _ = {
         let mut bullet = log.bullet(format!(
             "Updating manifest {}",
             style::value(inventory.to_string_lossy())
@@ -207,7 +209,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         bullet.done()
     };
 
-    log.done();
+    print::all_done(&Some(start));
 
     Ok(())
 }
