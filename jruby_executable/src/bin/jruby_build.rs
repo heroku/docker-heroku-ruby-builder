@@ -1,4 +1,4 @@
-use bullet_stream::{Print, global::print, style};
+use bullet_stream::{global::print, style};
 use clap::Parser;
 use fs_err::PathExt;
 use gem_version::GemVersion;
@@ -179,13 +179,11 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
 fn main() {
     let args = Args::parse();
     if let Err(error) = jruby_build(&args) {
-        Print::new(std::io::stderr())
-            .without_header()
-            .error(formatdoc! {"
-                ❌ Command failed ❌
+        print::error(formatdoc! {"
+            ❌ Command failed ❌
 
-                {error}
-            "});
+            {error}
+        "});
         std::process::exit(1);
     }
 }
