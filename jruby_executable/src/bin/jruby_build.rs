@@ -72,24 +72,22 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
 
     let jruby_dir = extracted_path.join(format!("jruby-{version}"));
 
-    log = {
-        let mut bullet = log.bullet("Removing unnecessary files");
+    _ = {
+        print::bullet("Removing unnecessary files");
         for pattern in &["*.bat", "*.dll", "*.exe"] {
             for path in glob::glob(&jruby_dir.join("bin").join(pattern).to_string_lossy())?
                 .collect::<Result<Vec<_>, _>>()?
             {
-                bullet = bullet.sub_bullet(format!("Remove {}", path.display()));
+                print::sub_bullet(format!("Remove {}", path.display()));
                 fs_err::remove_file(path)?;
             }
         }
 
         let path = jruby_dir.join("lib").join("target");
         if path.fs_err_try_exists()? {
-            bullet = bullet.sub_bullet(format!("Remove recursive {}", path.display()));
+            print::sub_bullet(format!("Remove recursive {}", path.display()));
             fs_err::remove_dir_all(&path)?;
         }
-
-        bullet.done()
     };
 
     _ = {
