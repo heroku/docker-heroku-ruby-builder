@@ -123,8 +123,8 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         bullet.done()
     };
 
-    log = {
-        let mut bullet = log.bullet("Make Ruby");
+    _ = {
+        print::bullet("Make Ruby");
         let input_tar = PathBuf::from(INNER_CACHE).join(format!("ruby-source-{version}.tgz"));
         let output_tar = output_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch);
         let volume_cache = volume_cache_dir.display();
@@ -145,11 +145,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
             output_tar.display()
         ));
 
-        bullet.stream_with(
-            format!("Running {}", style::command(docker_run.name())),
-            |stdout, stderr| docker_run.stream_output(stdout, stderr),
-        )?;
-        bullet.done()
+        print::sub_stream_cmd(docker_run)?;
     };
 
     _ = {
