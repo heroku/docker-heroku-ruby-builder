@@ -1,9 +1,6 @@
-use bullet_stream::Print;
-use bullet_stream::state::SubBullet;
 use fs_err::{File, PathExt};
 use fun_run::CommandWithName;
 use libherokubuildpack::inventory::artifact::Arch;
-use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -184,51 +181,6 @@ pub fn tar_dir_to_file(compiled_dir: &Path, tar_file: &File) -> Result<(), Error
     Ok(())
 }
 
-// # Binstubs have a "shebang" on the first line that tells the OS
-// # how to execute the file if it's called directly i.e. `$ ./script.rb` instead
-// # of `$ ruby ./script.rb`.
-// #
-// # We need the shebang to be portable (not use an absolute path) so we check
-// # for any ruby shebang lines and replace them with `#!/usr/bin/env ruby`
-// # which translates to telling the os "Use the `ruby` executable from the same
-// location as `which ruby`" to run this program.
-pub fn update_shebangs_in_dir<W>(
-    mut log: Print<SubBullet<W>>,
-    path: &Path,
-) -> Result<Print<SubBullet<W>>, Error>
-where
-    W: Send + Write + Sync + 'static,
-{
-    let dir = fs_err::read_dir(path).map_err(Error::FsError)?;
-    for entry in dir {
-        let entry = entry.map_err(Error::FsError)?;
-        let entry_path = entry.path();
-        if entry_path.is_file() {
-            let mut file = fs_err::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(&entry_path)
-                .map_err(Error::FsError)?;
-            let mut contents = String::new();
-
-            log = log.sub_bullet(format!("Reading {}", entry_path.display()));
-            if file.read_to_string(&mut contents).is_ok() {
-                if let Some(contents) = update_shebang(contents) {
-                    log = log.sub_bullet(format!("Updating shebang in {}", entry_path.display()));
-                    file.seek(SeekFrom::Start(0)).map_err(Error::FsError)?;
-                    file.write_all(contents.as_bytes())
-                        .map_err(Error::FsError)?;
-                } else {
-                    log = log.sub_bullet("Skipping (no ruby shebang found)");
-                }
-            } else {
-                log = log.sub_bullet("Skipping (possibly binary file)");
-            }
-        }
-    }
-    Ok(log)
-}
-
 pub fn update_shebang(contents: String) -> Option<String> {
     if let Some(shebang) = contents.lines().next() {
         if shebang.starts_with("#!") && shebang.contains("/ruby") {
@@ -244,6 +196,7 @@ pub fn update_shebang(contents: String) -> Option<String> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::io::Read;
     use std::str::FromStr;
     use std::thread;
     use tempfile::tempdir;
@@ -271,23 +224,6 @@ mod test {
         let contents = "";
         let updated_contents = update_shebang(contents.to_string());
         assert_eq!(updated_contents, None);
-    }
-
-    #[test]
-    fn test_update_shebangs_in_dir() {
-        let dir = tempfile::tempdir().unwrap();
-        let file_path = dir.path().join("script.rb");
-
-        let mut file = File::create(&file_path).unwrap();
-        writeln!(file, "#!/path/to/ruby\nprint 'Hello, world!'").unwrap();
-
-        let log = Print::new(std::io::stdout())
-            .without_header()
-            .bullet("shebangs");
-        _ = update_shebangs_in_dir(log, dir.path()).unwrap();
-
-        let contents = fs_err::read_to_string(&file_path).unwrap();
-        assert_eq!(contents, "#!/usr/bin/env ruby\nprint 'Hello, world!'\n");
     }
 
     #[test]
