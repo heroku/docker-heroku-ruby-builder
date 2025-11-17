@@ -71,23 +71,21 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
 
     let jruby_dir = extracted_path.join(format!("jruby-{version}"));
 
-    _ = {
-        print::bullet("Removing unnecessary files");
-        for pattern in &["*.bat", "*.dll", "*.exe"] {
-            for path in glob::glob(&jruby_dir.join("bin").join(pattern).to_string_lossy())?
-                .collect::<Result<Vec<_>, _>>()?
-            {
-                print::sub_bullet(format!("Remove {}", path.display()));
-                fs_err::remove_file(path)?;
-            }
+    print::bullet("Removing unnecessary files");
+    for pattern in &["*.bat", "*.dll", "*.exe"] {
+        for path in glob::glob(&jruby_dir.join("bin").join(pattern).to_string_lossy())?
+            .collect::<Result<Vec<_>, _>>()?
+        {
+            print::sub_bullet(format!("Remove {}", path.display()));
+            fs_err::remove_file(path)?;
         }
+    }
 
-        let path = jruby_dir.join("lib").join("target");
-        if path.fs_err_try_exists()? {
-            print::sub_bullet(format!("Remove recursive {}", path.display()));
-            fs_err::remove_dir_all(&path)?;
-        }
-    };
+    let path = jruby_dir.join("lib").join("target");
+    if path.fs_err_try_exists()? {
+        print::sub_bullet(format!("Remove recursive {}", path.display()));
+        fs_err::remove_dir_all(&path)?;
+    }
 
     let ruby_bin = jruby_dir.join("bin").join("ruby");
     if ruby_bin.fs_err_try_exists()? {
