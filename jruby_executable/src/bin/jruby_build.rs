@@ -1,4 +1,4 @@
-use bullet_stream::{Print, style};
+use bullet_stream::{Print, global::print, style};
 use clap::Parser;
 use fs_err::PathExt;
 use gem_version::GemVersion;
@@ -107,9 +107,9 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
 
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
 
-    log = {
-        let mut bullet = log.bullet("Creating tgz archives");
-        bullet = bullet.sub_bullet(format!(
+    _ = {
+        print::bullet("Creating tgz archives");
+        print::sub_bullet(format!(
             "Inventory file {}",
             style::value(inventory.to_string_lossy())
         ));
@@ -119,16 +119,16 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
 
         let tar_file = fs_err::File::create(tar_dir.join(&tgz_name))?;
 
-        let timer = bullet.start_timer(format!("Write {}", tar_file.path().display()));
+        let timer = print::sub_start_timer(format!("Write {}", tar_file.path().display()));
         tar_dir_to_file(&jruby_dir, &tar_file)?;
-        bullet = timer.done();
+        timer.done();
 
         let tar_path = tar_file.path();
         let sha = sha256_from_path(tar_path)?;
         let sha_seven = sha.chars().take(7).collect::<String>();
         let sha_seven_path = append_filename_with(tar_path, &format!("-{sha_seven}"), ".tgz")?;
 
-        bullet = bullet.sub_bullet(format!("Write {}", sha_seven_path.display(),));
+        print::sub_bullet(format!("Write {}", sha_seven_path.display(),));
         fs_err::copy(tar_file.path(), &sha_seven_path)?;
 
         let timestamp = chrono::Utc::now();
@@ -181,11 +181,9 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
             fs_err::create_dir_all(&dir)?;
 
             let path = dir.join(&tgz_name);
-            bullet = bullet.sub_bullet(format!("Write {}", path.display()));
+            print::sub_bullet(format!("Write {}", path.display()));
             fs_err::copy(tar_file.path(), &path)?;
         }
-
-        bullet.done()
     };
 
     log.done();
