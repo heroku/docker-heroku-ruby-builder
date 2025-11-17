@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use bullet_stream::Print;
+use bullet_stream::global::print;
 use clap::Parser;
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
@@ -40,13 +40,11 @@ fn jruby_changelog(args: &Args) -> Result<(), Box<dyn Error>> {
 fn main() {
     let args = Args::parse();
     if let Err(error) = jruby_changelog(&args) {
-        Print::new(std::io::stderr())
-            .without_header()
-            .error(formatdoc! {"
-                ❌ Command failed ❌
+        print::error(formatdoc! {"
+            ❌ Command failed ❌
 
-                {error}
-            "});
+            {error}
+        "});
 
         std::process::exit(1);
     }
