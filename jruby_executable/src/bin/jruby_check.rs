@@ -1,4 +1,4 @@
-use bullet_stream::{Print, style};
+use bullet_stream::{Print, global::print, style};
 use clap::Parser;
 use fun_run::CommandWithName;
 use indoc::formatdoc;
@@ -133,13 +133,11 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
 fn main() {
     let args = RubyArgs::parse();
     if let Err(error) = jruby_check(&args) {
-        Print::new(std::io::stderr())
-            .without_header()
-            .error(formatdoc! {"
-                ❌ Command failed ❌
+        print::error(formatdoc! {"
+            ❌ Command failed ❌
 
-                {error}
-            "});
+            {error}
+        "});
         std::process::exit(1);
     }
 }
