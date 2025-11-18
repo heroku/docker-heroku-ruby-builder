@@ -141,11 +141,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         atomic_inventory_update(&inventory, |inventory| {
             for prior in &inventory.artifacts {
                 if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
-                    // TODO: Investigate bullet stream ownership
-                    println!(
-                        "{}",
-                        style::important(format!("!!!!!!!!!! Error updating inventory: {error}"))
-                    );
+                    print::error(format!("Error updating inventory\n\nError: {error}"));
 
                     fs_err::remove_file(&sha_seven_path)?;
                     return Err(error);
