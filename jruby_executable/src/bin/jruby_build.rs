@@ -87,6 +87,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         fs_err::remove_dir_all(&path)?;
     }
 
+    print::bullet("Checking for `ruby` binstub");
     let ruby_bin = jruby_dir.join("bin").join("ruby");
     if ruby_bin.fs_err_try_exists()? {
         print::sub_bullet("File exists")
