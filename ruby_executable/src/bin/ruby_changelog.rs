@@ -1,6 +1,6 @@
 use std::{error::Error, io::Write};
 
-use bullet_stream::Print;
+use bullet_stream::global::print;
 use clap::Parser;
 use indoc::formatdoc;
 use shared::RubyDownloadVersion;
@@ -58,13 +58,11 @@ where
 fn main() {
     let args = Args::parse();
     if let Err(error) = ruby_changelog(&args, std::io::stdout()) {
-        Print::new(std::io::stderr())
-            .without_header()
-            .error(formatdoc! {"
-                ❌ Command failed ❌
+        print::error(formatdoc! {"
+            ❌ Command failed ❌
 
-                {error}
-            "});
+            {error}
+        "});
         std::process::exit(1);
     }
 }

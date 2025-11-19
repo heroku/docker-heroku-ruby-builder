@@ -1,10 +1,9 @@
-use bullet_stream::{Print, style};
+use bullet_stream::global::print;
 use clap::Parser;
-use fun_run::CommandWithName;
 use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
 use shared::{BaseImage, RubyDownloadVersion, output_tar_path, source_dir};
-use std::{error::Error, path::PathBuf, process::Command};
+use std::{error::Error, path::PathBuf, process::Command, time::Instant};
 
 static INNER_OUTPUT: &str = "/tmp/output";
 
@@ -26,7 +25,8 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         version,
         base_image,
     } = args;
-    let log = Print::new(std::io::stderr()).h1(format!(
+    let start = Instant::now();
+    print::h2(format!(
         "Checking Ruby version ({version} linux/{arch}) for {base_image}",
     ));
     let path = output_tar_path(&PathBuf::from(INNER_OUTPUT), version, base_image, arch);
@@ -60,20 +60,16 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         .join(" && "),
     );
 
-    let mut cmd_stream = log.bullet("Versions");
+    print::bullet("Versions");
+    let output = print::sub_stream_cmd(cmd)?;
 
-    let result = cmd_stream.stream_with(
-        format!("Running {}", style::command(cmd.name())),
-        |stdout, stderr| cmd.stream_output(stdout, stderr),
-    )?;
-
-    cmd_stream.done().done();
-    eprintln!();
+    print::all_done(&Some(start));
+    print::plain("");
 
     // Print results to STDOUT for github summary
     println!("## Ruby {version} linux/{arch} for {base_image}");
     println!();
-    println!("{}", result.stdout_lossy());
+    println!("{}", output.stdout_lossy());
 
     Ok(())
 }
@@ -81,13 +77,11 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
 fn main() {
     let args = RubyArgs::parse();
     if let Err(error) = ruby_check(&args) {
-        Print::new(std::io::stderr())
-            .without_header()
-            .error(formatdoc! {"
-                ❌ Command failed ❌
+        print::error(formatdoc! {"
+            ❌ Command failed ❌
 
-                {error}
-            "});
+            {error}
+        "});
         std::process::exit(1);
     }
 }

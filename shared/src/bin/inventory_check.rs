@@ -1,3 +1,4 @@
+use bullet_stream::global::print;
 use clap::Parser;
 use indoc::formatdoc;
 use shared::inventory_check;
@@ -17,13 +18,11 @@ fn check(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
 fn main() {
     let args = Args::parse();
     if let Err(error) = check(&args.path) {
-        bullet_stream::Print::new(std::io::stderr())
-            .without_header()
-            .error(formatdoc! {"
-                ❌ Command failed ❌
+        print::error(formatdoc! {"
+            ❌ Command failed ❌
 
-                {error}
-            "});
+            {error}
+        "});
         std::process::exit(1);
     }
 }

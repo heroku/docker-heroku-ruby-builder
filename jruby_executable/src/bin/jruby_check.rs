@@ -1,12 +1,12 @@
-use bullet_stream::{Print, style};
+use bullet_stream::global::print;
 use clap::Parser;
-use fun_run::CommandWithName;
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory::artifact::Arch;
 use shared::{BaseImage, source_dir};
 use std::error::Error;
 use std::io::Write;
+use std::time::Instant;
 use std::{path::PathBuf, process::Command};
 
 static INNER_OUTPUT: &str = "/tmp/output";
@@ -33,7 +33,8 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     let jruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
 
     // Log progress to STDERR, print results to STDOUT directly
-    let mut log = Print::new(std::io::stderr()).h1(format!(
+    let start = Instant::now();
+    print::h2(format!(
         "Prepare: Checking JRuby version ({version} linux/{arch} stdlib {jruby_stdlib_version}) for {base_image}",
     ));
     let distro_number = base_image.distro_number();
@@ -43,9 +44,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
 
     let image_name = format!("heroku/jruby-builder:{base_image}");
 
-    let mut stream = log
-        .bullet(format!("Dockerfile for {image_name}"))
-        .start_stream("Contents");
+    print::bullet(format!("Dockerfile for {image_name}"));
 
     let dockerfile = formatdoc! {"
         FROM heroku/heroku:{distro_number}-build
@@ -54,32 +53,23 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         RUN apt-get update -y; apt-get install default-jre default-jdk -y
     "};
 
-    write!(stream, "{dockerfile}")?;
+    print::sub_stream_with("Contents", |mut stream, _| write!(stream, "{dockerfile}"))?;
 
     fs_err::write(&dockerfile_path, dockerfile)?;
 
-    log = stream.done().done();
-
     let outside_output = source_dir().join("output");
 
-    log = {
-        let mut bullet = log.bullet(format!("Docker image {image_name}"));
-        let mut docker_build = Command::new("docker");
-        docker_build.arg("build");
-        docker_build.args(["--platform", &format!("linux/{arch}")]);
-        docker_build.args(["--progress", "plain"]);
-        docker_build.args(["--tag", &image_name]);
-        docker_build.args(["--file", &dockerfile_path.display().to_string()]);
-        docker_build.arg(source_dir().to_str().expect("Path to str"));
-        let _ = bullet.stream_with(
-            format!("Building via {}", style::command(docker_build.name())),
-            |stdout, stderr| docker_build.stream_output(stdout, stderr),
-        )?;
+    print::bullet(format!("Docker image {image_name}"));
+    let mut docker_build = Command::new("docker");
+    docker_build.arg("build");
+    docker_build.args(["--platform", &format!("linux/{arch}")]);
+    docker_build.args(["--progress", "plain"]);
+    docker_build.args(["--tag", &image_name]);
+    docker_build.args(["--file", &dockerfile_path.display().to_string()]);
+    docker_build.arg(source_dir().to_str().expect("Path to str"));
+    print::sub_stream_cmd(docker_build)?;
 
-        bullet.done()
-    };
-
-    let (log, result) = {
+    let output = {
         let inner_jruby_path = PathBuf::from(INNER_OUTPUT)
             .join(base_image.to_string())
             .join(format!("ruby-{jruby_stdlib_version}-jruby-{version}.tgz"));
@@ -110,36 +100,30 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
             .join(" && "),
         );
 
-        let mut cmd_stream = log.bullet("Versions");
+        print::bullet("Versions");
 
-        let result = cmd_stream.stream_with(
-            format!("Running {}", style::command(cmd.name())),
-            |stdout, stderr| cmd.stream_output(stdout, stderr),
-        )?;
-
-        (cmd_stream.done(), result)
+        print::sub_stream_cmd(cmd)?
     };
 
-    log.done();
-    eprintln!();
+    print::all_done(&Some(start));
+
+    print::plain("");
 
     // Print results to STDOUT for github summary
     println!("## JRuby {version} stdlib {jruby_stdlib_version} linux/{arch} for {base_image}");
     println!();
-    println!("{}", result.stdout_lossy());
+    println!("{}", output.stdout_lossy());
     Ok(())
 }
 
 fn main() {
     let args = RubyArgs::parse();
     if let Err(error) = jruby_check(&args) {
-        Print::new(std::io::stderr())
-            .without_header()
-            .error(formatdoc! {"
-                ❌ Command failed ❌
+        print::error(formatdoc! {"
+            ❌ Command failed ❌
 
-                {error}
-            "});
+            {error}
+        "});
         std::process::exit(1);
     }
 }

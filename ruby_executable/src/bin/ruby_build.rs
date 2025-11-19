@@ -1,7 +1,6 @@
-use bullet_stream::{Print, style};
+use bullet_stream::{global::print, style};
 use clap::Parser;
 use fs_err::PathExt;
-use fun_run::CommandWithName;
 use gem_version::GemVersion;
 use indoc::{formatdoc, indoc};
 use libherokubuildpack::inventory::{
@@ -18,6 +17,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
+    time::Instant,
 };
 
 static INNER_OUTPUT: &str = "/tmp/output";
@@ -64,7 +64,8 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         base_image,
     } = args;
 
-    let mut log = Print::new(std::io::stderr()).h1("Building Ruby");
+    let start = Instant::now();
+    print::h2("Building Ruby");
     let inventory = source_dir().join("ruby_inventory.toml");
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
@@ -77,137 +78,110 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
     let dockerfile = ruby_dockerfile_contents(base_image);
     let dockerfile_path = temp_dir.path().join("Dockerfile");
 
-    log = {
-        let mut bullet = log.bullet("Dockerfile");
-        bullet.stream_with("Writing contents to tmpdir", |mut stream, _| {
-            write!(stream, "{dockerfile}")?;
-            fs_err::write(&dockerfile_path, &dockerfile)
-        })?;
-        bullet.done()
-    };
+    print::bullet("Dockerfile");
+    print::sub_stream_with("Writing contents to tmpdir", |mut stream, _| {
+        write!(stream, "{dockerfile}").and_then(|_| fs_err::write(&dockerfile_path, &dockerfile))
+    })?;
 
-    log = {
-        let mut bullet = log.bullet(format!("Docker image {image_name}"));
-        let mut docker_build = Command::new("docker");
-        docker_build.arg("build");
-        docker_build.args(["--platform", &format!("linux/{arch}")]);
-        docker_build.args(["--progress", "plain"]);
-        docker_build.args(["--tag", &image_name]);
-        docker_build.args(["--file", &dockerfile_path.display().to_string()]);
-        docker_build.arg(source_dir());
-        let _ = bullet.stream_with(
-            format!("Building via {}", style::command(docker_build.name())),
-            |stdout, stderr| docker_build.stream_output(stdout, stderr),
-        )?;
-
-        bullet.done()
-    };
+    print::bullet(format!("Docker image {image_name}"));
+    let mut docker_build = Command::new("docker");
+    docker_build.arg("build");
+    docker_build.args(["--platform", &format!("linux/{arch}")]);
+    docker_build.args(["--progress", "plain"]);
+    docker_build.args(["--tag", &image_name]);
+    docker_build.args(["--file", &dockerfile_path.display().to_string()]);
+    docker_build.arg(source_dir());
+    print::sub_stream_cmd(docker_build)?;
 
     let download_tar_path =
         TarDownloadPath(volume_cache_dir.join(format!("ruby-source-{version}.tgz")));
 
-    log = if Path::fs_err_try_exists(download_tar_path.as_ref())? {
-        log.bullet(format!(
+    if Path::fs_err_try_exists(download_tar_path.as_ref())? {
+        print::bullet(format!(
             "Using cached tarball {}",
             download_tar_path.as_ref().display()
         ))
-        .done()
     } else {
-        let bullet = log.bullet(format!(
+        print::bullet(format!(
             "Downloading {version} to {}",
             download_tar_path.as_ref().display()
         ));
         download_tar(&version.download_url(), &download_tar_path)?;
-        bullet.done()
     };
 
-    log = {
-        let mut bullet = log.bullet("Make Ruby");
-        let input_tar = PathBuf::from(INNER_CACHE).join(format!("ruby-source-{version}.tgz"));
-        let output_tar = output_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch);
-        let volume_cache = volume_cache_dir.display();
-        let volume_output = volume_output_dir.display();
+    print::bullet("Make Ruby");
+    let input_tar = PathBuf::from(INNER_CACHE).join(format!("ruby-source-{version}.tgz"));
+    let output_tar = output_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch);
+    let volume_cache = volume_cache_dir.display();
+    let volume_output = volume_output_dir.display();
 
-        let mut docker_run = Command::new("docker");
-        docker_run.arg("run");
-        docker_run.arg("--rm");
-        docker_run.args(["--platform", &format!("linux/{arch}")]);
-        docker_run.args(["--volume", &format!("{volume_output}:{INNER_OUTPUT}")]);
-        docker_run.args(["--volume", &format!("{volume_cache}:{INNER_CACHE}")]);
+    let mut docker_run = Command::new("docker");
+    docker_run.arg("run");
+    docker_run.arg("--rm");
+    docker_run.args(["--platform", &format!("linux/{arch}")]);
+    docker_run.args(["--volume", &format!("{volume_output}:{INNER_OUTPUT}")]);
+    docker_run.args(["--volume", &format!("{volume_cache}:{INNER_CACHE}")]);
 
-        docker_run.arg(&image_name);
-        docker_run.args(["bash", "-c"]);
-        docker_run.arg(format!(
-            "./make_ruby.sh {} {}",
-            input_tar.display(),
-            output_tar.display()
-        ));
+    docker_run.arg(&image_name);
+    docker_run.args(["bash", "-c"]);
+    docker_run.arg(format!(
+        "./make_ruby.sh {} {}",
+        input_tar.display(),
+        output_tar.display()
+    ));
 
-        bullet.stream_with(
-            format!("Running {}", style::command(docker_run.name())),
-            |stdout, stderr| docker_run.stream_output(stdout, stderr),
-        )?;
-        bullet.done()
+    print::sub_stream_cmd(docker_run)?;
+
+    print::bullet(format!(
+        "Updating manifest {}",
+        style::value(inventory.to_string_lossy())
+    ));
+
+    let output_tar = output_tar_path(&volume_output_dir, version, base_image, arch);
+
+    let sha = sha256_from_path(&output_tar)?;
+    let sha_seven = sha.chars().take(7).collect::<String>();
+    let sha_seven_path = append_filename_with(&output_tar, &format!("-{sha_seven}"), ".tgz")?;
+    let url = format!(
+        "{S3_BASE_URL}/{}",
+        sha_seven_path.strip_prefix(&volume_output_dir)?.display()
+    );
+
+    print::sub_bullet(format!("Copying SHA tgz {}", sha_seven_path.display(),));
+    fs_err::copy(output_tar, &sha_seven_path)?;
+
+    let artifact = Artifact {
+        version: GemVersion::from_str(&version.bundler_format())?,
+        os: inventory::artifact::Os::Linux,
+        arch: *arch,
+        url,
+        checksum: format!("sha256:{sha}").parse()?,
+        metadata: ArtifactMetadata {
+            distro_version: base_image.distro_version(),
+            timestamp: chrono::Utc::now(),
+        },
     };
 
-    log = {
-        let mut bullet = log.bullet(format!(
-            "Updating manifest {}",
-            style::value(inventory.to_string_lossy())
-        ));
+    atomic_inventory_update(&inventory, |inventory| {
+        for prior in &inventory.artifacts {
+            if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
+                print::error(format!("Error updating inventory\n\nError: {error}"));
 
-        let output_tar = output_tar_path(&volume_output_dir, version, base_image, arch);
+                fs_err::remove_file(&sha_seven_path)?;
+                return Err(error);
+            };
+        }
 
-        let sha = sha256_from_path(&output_tar)?;
-        let sha_seven = sha.chars().take(7).collect::<String>();
-        let sha_seven_path = append_filename_with(&output_tar, &format!("-{sha_seven}"), ".tgz")?;
-        let url = format!(
-            "{S3_BASE_URL}/{}",
-            sha_seven_path.strip_prefix(&volume_output_dir)?.display()
-        );
+        inventory
+            .artifacts
+            .retain(|a| artifact_is_different(a, &artifact));
 
-        bullet = bullet.sub_bullet(format!("Copying SHA tgz {}", sha_seven_path.display(),));
-        fs_err::copy(output_tar, &sha_seven_path)?;
+        inventory.push(artifact);
 
-        let artifact = Artifact {
-            version: GemVersion::from_str(&version.bundler_format())?,
-            os: inventory::artifact::Os::Linux,
-            arch: *arch,
-            url,
-            checksum: format!("sha256:{sha}").parse()?,
-            metadata: ArtifactMetadata {
-                distro_version: base_image.distro_version(),
-                timestamp: chrono::Utc::now(),
-            },
-        };
+        Ok(())
+    })?;
 
-        atomic_inventory_update(&inventory, |inventory| {
-            for prior in &inventory.artifacts {
-                if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
-                    // TODO: Investigate bullet stream ownership
-                    println!(
-                        "{}",
-                        style::important(format!("!!!!!!!!!! Error updating inventory: {error}"))
-                    );
-
-                    fs_err::remove_file(&sha_seven_path)?;
-                    return Err(error);
-                };
-            }
-
-            inventory
-                .artifacts
-                .retain(|a| artifact_is_different(a, &artifact));
-
-            inventory.push(artifact);
-
-            Ok(())
-        })?;
-
-        bullet.done()
-    };
-
-    log.done();
+    print::all_done(&Some(start));
 
     Ok(())
 }
@@ -215,13 +189,11 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
 fn main() {
     let args = RubyArgs::parse();
     if let Err(error) = ruby_build(&args) {
-        Print::new(std::io::stderr())
-            .without_header()
-            .error(formatdoc! {"
-                ❌ Command failed ❌
+        print::error(formatdoc! {"
+            ❌ Command failed ❌
 
-                {error}
-            "});
+            {error}
+        "});
         std::process::exit(1);
     }
 }
