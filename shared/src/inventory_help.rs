@@ -1,6 +1,7 @@
 use crate::base_image::DistroVersion;
 use crate::{Error, TarDownloadPath, download_tar};
 use chrono::{DateTime, Utc};
+use fs_err::{self as fs};
 use fs2::FileExt;
 use gem_version::GemVersion;
 use libherokubuildpack::inventory::checksum::Checksum;
@@ -96,14 +97,14 @@ fn atomic_file_contents<F, T>(path: &Path, f: F) -> Result<T, Box<dyn std::error
 where
     F: FnOnce(&mut std::fs::File, &str) -> Result<T, Box<dyn std::error::Error>>,
 {
-    fs_err::create_dir_all(
+    fs::create_dir_all(
         path.parent().ok_or_else(|| {
             Error::Other(format!("Cannot determine parent from {}", path.display()))
         })?,
     )
     .map_err(Error::FsError)?;
 
-    let mut file: std::fs::File = fs_err::OpenOptions::new()
+    let mut file: std::fs::File = fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -150,7 +151,7 @@ fn parse_inventory(
 
 /// Returns the sha256 hash of the file at the given path
 pub fn sha256_from_path(path: &Path) -> Result<String, Error> {
-    digest::<Sha256>(fs_err::File::open(path).map_err(Error::FsError)?)
+    digest::<Sha256>(fs::File::open(path).map_err(Error::FsError)?)
         .map(|digest| format!("{digest:x}"))
         .map_err(|e| {
             Error::Other(format!(
@@ -304,7 +305,7 @@ mod test {
         })
         .unwrap();
 
-        let inventory = parse_inventory(&fs_err::read_to_string(&path).unwrap()).unwrap();
+        let inventory = parse_inventory(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(1, inventory.artifacts.len());
 
         atomic_file_contents(&path, |file, contents| {
@@ -314,7 +315,7 @@ mod test {
             Ok(())
         })
         .unwrap();
-        let inventory = parse_inventory(&fs_err::read_to_string(&path).unwrap()).unwrap();
+        let inventory = parse_inventory(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(2, inventory.artifacts.len());
     }
 }

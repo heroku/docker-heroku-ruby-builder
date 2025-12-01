@@ -1,5 +1,6 @@
 use bullet_stream::global::print;
 use clap::Parser;
+use fs_err::{self as fs};
 use indoc::formatdoc;
 use shared::inventory_check;
 use std::path::{Path, PathBuf};
@@ -10,7 +11,7 @@ struct Args {
 }
 
 fn check(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let contents = fs_err::read_to_string(path)?;
+    let contents = fs::read_to_string(path)?;
     inventory_check(&contents)?;
     Ok(())
 }
