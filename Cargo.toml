@@ -24,7 +24,7 @@ hex = "0.4"
 indoc = "2"
 java-properties = "2"
 lazy_static = "1"
-libherokubuildpack = { version = "0.24.0", default-features = false, features = ["inventory", "inventory-sha2"] }
+libherokubuildpack = { version = "0.29.1", default-features = false, features = ["inventory", "inventory-sha2"] }
 nom = "7"
 pretty_assertions = "1"
 rayon = "1"
