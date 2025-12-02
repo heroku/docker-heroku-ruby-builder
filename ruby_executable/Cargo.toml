@@ -13,7 +13,6 @@ fun_run = { workspace = true }
 gem_version = { workspace = true }
 indoc = { workspace = true }
 libherokubuildpack = { workspace = true }
-nom = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 sha2 = { workspace = true }

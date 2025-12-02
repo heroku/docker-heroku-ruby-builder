@@ -14,7 +14,7 @@ indoc = { workspace = true }
 flate2 = { workspace = true }
 fs-err = { workspace = true }
 fun_run = { workspace = true }
-nom = { workspace = true }
+winnow = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 tar = { workspace = true }

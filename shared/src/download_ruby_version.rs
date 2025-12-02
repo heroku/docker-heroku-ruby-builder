@@ -1,9 +1,9 @@
 use crate::Error;
-use nom::bytes::complete::tag;
-use nom::character::complete::digit1;
-use nom::combinator::map_res;
 use std::fmt::Display;
 use std::str::FromStr;
+use winnow::Parser;
+use winnow::ascii::dec_uint;
+use winnow::token::literal;
 
 #[derive(Debug, Clone)]
 pub struct RubyDownloadVersion {
@@ -31,29 +31,27 @@ impl FromStr for RubyDownloadVersion {
     }
 }
 
-type VerboseResult<T, U> = nom::IResult<T, U, nom::error::VerboseError<T>>;
-fn parse_version(input: &str) -> VerboseResult<&str, RubyDownloadVersion> {
-    let mut parse_num = map_res(digit1, |s: &str| s.parse::<u32>());
-    let (input, major) = parse_num(input)?;
-    let (input, _) = tag(".")(input)?;
-    let (input, minor) = parse_num(input)?;
-    let (input, _) = tag(".")(input)?;
-    let (input, patch) = parse_num(input)?;
+fn parse_version(input: &mut &str) -> winnow::Result<RubyDownloadVersion> {
+    let major = dec_uint.parse_next(input)?;
+    literal(".").parse_next(input)?;
+    let minor = dec_uint.parse_next(input)?;
+    literal(".").parse_next(input)?;
+    let patch = dec_uint.parse_next(input)?;
 
-    Ok((
-        "",
-        RubyDownloadVersion {
-            major,
-            minor,
-            patch,
-            rest: input.to_string(),
-        },
-    ))
+    let rest = input.to_string();
+    *input = "";
+
+    Ok(RubyDownloadVersion {
+        major,
+        minor,
+        patch,
+        rest,
+    })
 }
 
 impl RubyDownloadVersion {
     pub fn new(s: impl AsRef<str>) -> Result<Self, Error> {
-        let (_, version) = parse_version(s.as_ref()).map_err(|err| Error::InvalidVersion {
+        let version = parse_version(&mut s.as_ref()).map_err(|err| Error::InvalidVersion {
             version: s.as_ref().to_string(),
             reason: err.to_string(),
         })?;
