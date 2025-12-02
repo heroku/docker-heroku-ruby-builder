@@ -1,5 +1,6 @@
 use bullet_stream::global::print;
 use clap::Parser;
+use fs_err::{self as fs};
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory::artifact::Arch;
@@ -55,7 +56,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
 
     print::sub_stream_with("Contents", |mut stream, _| write!(stream, "{dockerfile}"))?;
 
-    fs_err::write(&dockerfile_path, dockerfile)?;
+    fs::write(&dockerfile_path, dockerfile)?;
 
     let outside_output = source_dir().join("output");
 

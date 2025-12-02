@@ -1,6 +1,6 @@
 use bullet_stream::{global::print, style};
 use clap::Parser;
-use fs_err::PathExt;
+use fs_err::{self as fs, PathExt};
 use gem_version::GemVersion;
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
@@ -39,7 +39,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
 
-    fs_err::create_dir_all(&volume_cache_dir)?;
+    fs::create_dir_all(&volume_cache_dir)?;
 
     let temp_dir = tempfile::tempdir()?;
     let extracted_path = temp_dir.path().join("extracted");
@@ -77,14 +77,14 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
             .collect::<Result<Vec<_>, _>>()?
         {
             print::sub_bullet(format!("Remove {}", path.display()));
-            fs_err::remove_file(path)?;
+            fs::remove_file(path)?;
         }
     }
 
     let path = jruby_dir.join("lib").join("target");
     if path.fs_err_try_exists()? {
         print::sub_bullet(format!("Remove recursive {}", path.display()));
-        fs_err::remove_dir_all(&path)?;
+        fs::remove_dir_all(&path)?;
     }
 
     print::bullet("Checking for `ruby` binstub");
@@ -93,7 +93,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         print::sub_bullet("File exists")
     } else {
         print::sub_bullet("Create ruby symlink to jruby");
-        fs_err::os::unix::fs::symlink("jruby", ruby_bin)?;
+        fs::os::unix::fs::symlink("jruby", ruby_bin)?;
     }
 
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
@@ -105,9 +105,9 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
     ));
     let tar_dir = volume_output_dir.join(base_image.to_string());
 
-    fs_err::create_dir_all(&tar_dir)?;
+    fs::create_dir_all(&tar_dir)?;
 
-    let tar_file = fs_err::File::create(tar_dir.join(&tgz_name))?;
+    let tar_file = fs::File::create(tar_dir.join(&tgz_name))?;
 
     let timer = print::sub_start_timer(format!("Write {}", tar_file.path().display()));
     tar_dir_to_file(&jruby_dir, &tar_file)?;
@@ -119,7 +119,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
     let sha_seven_path = append_filename_with(tar_path, &format!("-{sha_seven}"), ".tgz")?;
 
     print::sub_bullet(format!("Write {}", sha_seven_path.display(),));
-    fs_err::copy(tar_file.path(), &sha_seven_path)?;
+    fs::copy(tar_file.path(), &sha_seven_path)?;
 
     let timestamp = chrono::Utc::now();
     for cpu_arch in [Arch::Amd64, Arch::Arm64] {
@@ -143,7 +143,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
                 if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
                     print::error(format!("Error updating inventory\n\nError: {error}"));
 
-                    fs_err::remove_file(&sha_seven_path)?;
+                    fs::remove_file(&sha_seven_path)?;
                     return Err(error);
                 };
             }
@@ -162,11 +162,11 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         let dir = volume_output_dir
             .join(base_image.to_string())
             .join(cpu_arch.to_string());
-        fs_err::create_dir_all(&dir)?;
+        fs::create_dir_all(&dir)?;
 
         let path = dir.join(&tgz_name);
         print::sub_bullet(format!("Write {}", path.display()));
-        fs_err::copy(tar_file.path(), &path)?;
+        fs::copy(tar_file.path(), &path)?;
     }
 
     print::all_done(&Some(start));

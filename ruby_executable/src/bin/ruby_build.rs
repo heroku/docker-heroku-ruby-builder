@@ -1,6 +1,6 @@
 use bullet_stream::{global::print, style};
 use clap::Parser;
-use fs_err::PathExt;
+use fs_err::{self as fs, PathExt};
 use gem_version::GemVersion;
 use indoc::{formatdoc, indoc};
 use libherokubuildpack::inventory::{
@@ -70,8 +70,8 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
 
-    fs_err::create_dir_all(&volume_cache_dir)?;
-    fs_err::create_dir_all(&volume_output_dir)?;
+    fs::create_dir_all(&volume_cache_dir)?;
+    fs::create_dir_all(&volume_output_dir)?;
 
     let temp_dir = tempfile::tempdir()?;
     let image_name = format!("heroku/ruby-builder:{base_image}");
@@ -80,7 +80,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     print::bullet("Dockerfile");
     print::sub_stream_with("Writing contents to tmpdir", |mut stream, _| {
-        write!(stream, "{dockerfile}").and_then(|_| fs_err::write(&dockerfile_path, &dockerfile))
+        write!(stream, "{dockerfile}").and_then(|_| fs::write(&dockerfile_path, &dockerfile))
     })?;
 
     print::bullet(format!("Docker image {image_name}"));
@@ -148,7 +148,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
     );
 
     print::sub_bullet(format!("Copying SHA tgz {}", sha_seven_path.display(),));
-    fs_err::copy(output_tar, &sha_seven_path)?;
+    fs::copy(output_tar, &sha_seven_path)?;
 
     let artifact = Artifact {
         version: GemVersion::from_str(&version.bundler_format())?,
@@ -167,7 +167,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
             if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
                 print::error(format!("Error updating inventory\n\nError: {error}"));
 
-                fs_err::remove_file(&sha_seven_path)?;
+                fs::remove_file(&sha_seven_path)?;
                 return Err(error);
             };
         }

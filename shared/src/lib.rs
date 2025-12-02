@@ -1,4 +1,4 @@
-use fs_err::{File, PathExt};
+use fs_err::{self as fs, File, PathExt};
 use fun_run::CommandWithName;
 use libherokubuildpack::inventory::artifact::Arch;
 use std::path::{Path, PathBuf};
@@ -61,7 +61,7 @@ impl AsRef<Path> for TarDownloadPath {
 }
 
 pub fn untar_to_dir(tar_path: &TarDownloadPath, workspace: &Path) -> Result<(), Error> {
-    fs_err::create_dir_all(workspace).map_err(Error::FsError)?;
+    fs::create_dir_all(workspace).map_err(Error::FsError)?;
 
     // Shelling out due to https://github.com/alexcrichton/tar-rs/issues/369
     let mut cmd = Command::new("bash");
@@ -137,7 +137,7 @@ pub fn validate_version_for_stack(
 }
 
 pub fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
-    let mut dest = fs_err::File::create(path.as_ref()).map_err(Error::FsError)?;
+    let mut dest = fs::File::create(path.as_ref()).map_err(Error::FsError)?;
 
     let client = reqwest::blocking::Client::new();
     let mut response = client.get(url).send().map_err(Error::FailedRequest)?;
@@ -288,7 +288,7 @@ mod test {
 
         download_tar(&addr, &tar_path).unwrap();
 
-        let mut file = fs_err::File::open(tar_path.as_ref()).unwrap();
+        let mut file = fs::File::open(tar_path.as_ref()).unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
 
@@ -375,17 +375,17 @@ mod test {
     fn test_untar_to_dir() {
         let tempdir = tempfile::tempdir().unwrap();
         let temp_path = tempdir.path().join("ruby-3.3.1");
-        fs_err::create_dir_all(&temp_path).unwrap();
-        fs_err::write(temp_path.join("array.c"), "").unwrap();
+        fs::create_dir_all(&temp_path).unwrap();
+        fs::write(temp_path.join("array.c"), "").unwrap();
 
         let bin_path = temp_path.join("bin");
-        fs_err::create_dir_all(&bin_path).unwrap();
-        fs_err::write(bin_path.join("gem"), "").unwrap();
+        fs::create_dir_all(&bin_path).unwrap();
+        fs::write(bin_path.join("gem"), "").unwrap();
 
         let temptar_dir = tempfile::tempdir().unwrap();
         let tar_path = temptar_dir.path().join("ruby-source-3.3.1.tgz");
 
-        tar_dir_to_file(tempdir.path(), &fs_err::File::create(&tar_path).unwrap()).unwrap();
+        tar_dir_to_file(tempdir.path(), &fs::File::create(&tar_path).unwrap()).unwrap();
 
         let temp_out = tempfile::tempdir().unwrap();
         untar_to_dir(&TarDownloadPath(tar_path), temp_out.path()).unwrap();
@@ -398,7 +398,7 @@ mod test {
     }
 
     fn filenames_in_path(path: &Path) -> Vec<String> {
-        let mut filenames = fs_err::read_dir(path)
+        let mut filenames = fs::read_dir(path)
             .unwrap()
             .filter_map(|entry| {
                 entry.ok().and_then(|e| {
