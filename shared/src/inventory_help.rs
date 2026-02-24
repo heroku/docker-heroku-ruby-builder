@@ -28,7 +28,7 @@ pub struct ArtifactMetadata {
 /// version = "9.4.8.0"
 /// os = "linux"
 /// arch = "amd64"
-/// url = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.8.0.tgz"
+/// url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.8.0.tgz"
 /// checksum = "sha256:815b31d2b204a524bf74aabae341bf85353add4d1128d5d276d08fa5e8ff3c39"
 ///
 /// [artifacts.metadata]

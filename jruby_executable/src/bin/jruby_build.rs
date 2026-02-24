@@ -16,7 +16,7 @@ use std::error::Error;
 use std::str::FromStr;
 use std::time::Instant;
 
-static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.us-east-1.amazonaws.com";
+static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 
 #[derive(Parser, Debug)]
 struct Args {
