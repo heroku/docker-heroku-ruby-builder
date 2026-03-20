@@ -50,7 +50,7 @@ jobs:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     strategy:
       matrix:
-        base_image: ["heroku-22", "heroku-24"]
+        base_image: ["heroku-22", "heroku-24", "heroku-26"]
         version: ["3.2.3"]
         arch: ["arm64", "amd64"]
         exclude:
@@ -76,7 +76,7 @@ jobs:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     strategy:
       matrix:
-        base_image: ["heroku-22", "heroku-24"]
+        base_image: ["heroku-22", "heroku-24", "heroku-26"]
         version: ["9.4.7.0"]
         arch: ["arm64", "amd64"]
         exclude:
