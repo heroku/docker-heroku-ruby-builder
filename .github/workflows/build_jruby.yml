@@ -24,6 +24,18 @@ env:
   S3_BUCKET: "heroku-buildpack-ruby"
 
 jobs:
+  changelog:
+    runs-on: pub-hk-ubuntu-24.04-xlarge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Output CHANGELOG
+        run: cargo run --locked --bin jruby_changelog -- --version "${{inputs.jruby_version}}" | tee "$GITHUB_STEP_SUMMARY"
+
   build-and-upload:
     runs-on: pub-hk-ubuntu-24.04-xlarge
     strategy:
@@ -39,8 +51,6 @@ jobs:
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Cargo build
         run: cargo build --locked
-      - name: Output CHANGELOG
-        run: cargo run --locked --bin jruby_changelog -- --version "${{inputs.jruby_version}}"
       - name: Build Ruby
         run: cargo run --locked --bin jruby_build -- --version ${{inputs.jruby_version}} --base-image ${{matrix.base_image}}
       - name: Check Ruby
