@@ -19,6 +19,12 @@ pub struct BaseImage {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DistroVersion(String);
 
+impl Display for DistroVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl BaseImage {
     pub fn new(s: &str) -> Result<Self, BaseImageError> {
         KNOWN_BASE_IMAGES
