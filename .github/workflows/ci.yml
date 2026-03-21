@@ -68,9 +68,17 @@ jobs:
       - name: Output CHANGELOG
         run: cargo run --locked --bin ruby_changelog -- --version "${{matrix.version}}"
       - name: Build Ruby
-        run: cargo run --locked --bin ruby_build -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+        run: |
+          cargo run --locked --bin ruby_build -- \
+            --version ${{matrix.version}} \
+            --base-image ${{matrix.base_image}} \
+            --arch ${{matrix.arch}}
       - name: Check Ruby
-        run: cargo run --locked --bin ruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+        run: |
+          cargo run --locked --bin ruby_check -- \
+            --version ${{matrix.version}} \
+            --base-image ${{matrix.base_image}} \
+            --arch ${{matrix.arch}}
 
   jruby_integration_test:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
@@ -94,9 +102,16 @@ jobs:
       - name: Output CHANGELOG
         run: cargo run --locked --bin jruby_changelog -- --version "${{matrix.version}}"
       - name: Build JRuby
-        run: cargo run --locked --bin jruby_build -- --version ${{matrix.version}} --base-image ${{matrix.base_image}}
+        run: |
+          cargo run --locked --bin jruby_build -- \
+            --version ${{matrix.version}} \
+            --base-image ${{matrix.base_image}}
       - name: Check JRuby
-        run: cargo run --locked --bin jruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+        run: |
+          cargo run --locked --bin jruby_check -- \
+            --version ${{matrix.version}} \
+            --base-image ${{matrix.base_image}} \
+            --arch ${{matrix.arch}}
 
   check_inventory_urls:
     runs-on: ubuntu-24.04
