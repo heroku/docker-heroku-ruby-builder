@@ -83,15 +83,41 @@ jobs:
       - name: Upload JRuby runtime archive to S3 production
         if: ${{ !inputs.dry_run }}
         run: aws s3 sync ./output "s3://${S3_BUCKET}"
+      - name: Upload inventory artifact
+        if: ${{ !inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jruby-inventory-${{ matrix.base_image }}
+          path: jruby_inventory.toml
 
-  # # TODO: Pass data from prior jobs to generate one single inventory file
-  # #       before generating a PR.
-  # after-build-and-upload:
-  #   needs: build-and-upload
-  #   runs-on: pub-hk-ubuntu-24.04-ip
-  #   steps:
-  #     - name: Update Jruby inventory file locally
-  #       uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
-  #       with:
-  #         path: jruby_inventory.toml
-  #         title: "Add JRuby ${{inputs.jruby_version}} to inventory"
+  update-inventory:
+    needs: build-and-upload
+    if: ${{ !inputs.dry_run }}
+    runs-on: pub-hk-ubuntu-24.04-xlarge
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Download all inventory artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/inventory-artifacts
+          pattern: jruby-inventory-*
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Merge inventory
+        run: |
+          cargo run --locked --bin inventory_merge -- \
+            --target jruby_inventory.toml \
+            /tmp/inventory-artifacts/*/jruby_inventory.toml
+      - name: Create inventory branch
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        with:
+          branch: inventory/jruby-${{ inputs.jruby_version }}
+          title: "Add JRuby ${{ inputs.jruby_version }} to inventory"
+          commit-message: "Add JRuby ${{ inputs.jruby_version }} to inventory"
+          add-paths: jruby_inventory.toml

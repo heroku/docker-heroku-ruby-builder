@@ -87,13 +87,41 @@ jobs:
       - name: Upload Ruby runtime archive to S3 production
         if: ${{ !inputs.dry_run }}
         run: aws s3 sync ./output "s3://${S3_BUCKET}"
+      - name: Upload inventory artifact
+        if: ${{ !inputs.dry_run }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruby-inventory-${{ matrix.base_image }}-${{ matrix.arch }}
+          path: ruby_inventory.toml
 
-  # after-build-and-upload:
-  #   needs: build-and-upload
-  #   runs-on: pub-hk-ubuntu-24.04-ip
-  #   steps:
-  #     - name: Update Ruby inventory file locally
-  #       uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
-  #       with:
-  #         path: ruby_inventory.toml
-  #         title: "Add Ruby ${{inputs.ruby_version}} to inventory"
+  update-inventory:
+    needs: build-and-upload
+    if: ${{ !inputs.dry_run }}
+    runs-on: pub-hk-ubuntu-24.04-xlarge
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Download all inventory artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/inventory-artifacts
+          pattern: ruby-inventory-*
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Merge inventory
+        run: |
+          cargo run --locked --bin inventory_merge -- \
+            --target ruby_inventory.toml \
+            /tmp/inventory-artifacts/*/ruby_inventory.toml
+      - name: Create inventory branch
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        with:
+          branch: inventory/ruby-${{ inputs.ruby_version }}
+          title: "Add Ruby ${{ inputs.ruby_version }} to inventory"
+          commit-message: "Add Ruby ${{ inputs.ruby_version }} to inventory"
+          add-paths: ruby_inventory.toml
