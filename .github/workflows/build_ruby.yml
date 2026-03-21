@@ -8,6 +8,14 @@ on:
           description: "The Ruby version to build, specified as X.Y.Z"
           type: string
           required: true
+      on_conflict:
+          description: "Behavior when the artifact already exists in S3 (or locally)"
+          type: choice
+          options:
+            - skip
+            - overwrite
+          default: skip
+          required: true
       dry_run:
           description: "Skip deploying to S3 (e.g. for testing)"
           type: boolean
@@ -59,14 +67,20 @@ jobs:
           cargo run --locked --bin ruby_build -- \
             --version ${{inputs.ruby_version}} \
             --base-image ${{matrix.base_image}} \
-            --arch ${{matrix.arch}}
+            --arch ${{matrix.arch}} \
+            --on-conflict ${{inputs.on_conflict}}
       - name: Check Ruby
         run: |
-          cargo run --locked --bin ruby_check -- \
-            --version ${{inputs.ruby_version}} \
-            --base-image ${{matrix.base_image}} \
-            --arch ${{matrix.arch}} \
-            | tee $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          if [ "${{ inputs.on_conflict }}" = "skip" ] && ! ls ./output/**/*.tgz &>/dev/null; then
+            echo "Build skipped (on_conflict=skip), nothing to check"
+          else
+            cargo run --locked --bin ruby_check -- \
+              --version ${{inputs.ruby_version}} \
+              --base-image ${{matrix.base_image}} \
+              --arch ${{matrix.arch}} \
+              | tee $GITHUB_STEP_SUMMARY
+          fi
       - name: Upload Ruby runtime archive to S3 dry run
         if: ${{ inputs.dry_run }}
         run: aws s3 sync ./output "s3://${S3_BUCKET}" --dryrun

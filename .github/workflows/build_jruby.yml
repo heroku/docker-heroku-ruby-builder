@@ -8,6 +8,14 @@ on:
           description: "The JRuby version to build, specified as X.Y.Z (i.e. 9.4.7.0)"
           type: string
           required: true
+      on_conflict:
+          description: "Behavior when the artifact already exists in S3 (or locally)"
+          type: choice
+          options:
+            - skip
+            - overwrite
+          default: skip
+          required: true
       dry_run:
           description: "Skip deploying to S3 (e.g. for testing)"
           type: boolean
@@ -55,14 +63,20 @@ jobs:
         run: |
           cargo run --locked --bin jruby_build -- \
             --version ${{inputs.jruby_version}} \
-            --base-image ${{matrix.base_image}}
+            --base-image ${{matrix.base_image}} \
+            --on-conflict ${{inputs.on_conflict}}
       - name: Check JRuby
         run: |
-          cargo run --locked --bin jruby_check -- \
-            --version ${{inputs.jruby_version}} \
-            --base-image ${{matrix.base_image}} \
-            --arch amd64 \
-            | tee $GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          if [ "${{ inputs.on_conflict }}" = "skip" ] && ! ls ./output/**/*.tgz &>/dev/null; then
+            echo "Build skipped (on_conflict=skip), nothing to check"
+          else
+            cargo run --locked --bin jruby_check -- \
+              --version ${{inputs.jruby_version}} \
+              --base-image ${{matrix.base_image}} \
+              --arch amd64 \
+              | tee $GITHUB_STEP_SUMMARY
+          fi
       - name: Upload JRuby runtime archive to S3 dry run
         if: ${{ inputs.dry_run }}
         run: aws s3 sync ./output "s3://${S3_BUCKET}" --dryrun
