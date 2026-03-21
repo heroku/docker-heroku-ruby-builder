@@ -7,6 +7,10 @@ rust-version.workspace = true
 name = "inventory_check"
 path = "src/bin/inventory_check.rs"
 
+[[bin]]
+name = "inventory_merge"
+path = "src/bin/inventory_merge.rs"
+
 [dependencies]
 glob = { workspace = true }
 clap = { workspace = true }

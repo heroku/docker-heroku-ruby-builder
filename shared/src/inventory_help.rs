@@ -135,7 +135,7 @@ where
     })
 }
 
-fn parse_inventory(
+pub fn parse_inventory(
     contents: &str,
 ) -> Result<Inventory<GemVersion, Sha256, ArtifactMetadata>, Error> {
     if contents.trim().is_empty() {
@@ -203,6 +203,36 @@ pub fn artifact_same_url_different_checksum(
     }
 }
 
+pub fn merge_inventories<'a>(
+    target: &Inventory<GemVersion, Sha256, ArtifactMetadata>,
+    sources: impl IntoIterator<Item = &'a Inventory<GemVersion, Sha256, ArtifactMetadata>>,
+) -> Result<Inventory<GemVersion, Sha256, ArtifactMetadata>, Box<dyn std::error::Error>> {
+    let mut merged = Inventory {
+        artifacts: target.artifacts.clone(),
+    };
+    for source in sources {
+        for artifact in &source.artifacts {
+            for prior in &merged.artifacts {
+                artifact_same_url_different_checksum(prior, artifact)?;
+            }
+
+            let already_exists = merged.artifacts.iter().any(|a| {
+                !artifact_is_different(a, artifact)
+                    && a.url == artifact.url
+                    && a.checksum == artifact.checksum
+            });
+
+            if !already_exists {
+                merged
+                    .artifacts
+                    .retain(|a| artifact_is_different(a, artifact));
+                merged.push(artifact.clone());
+            }
+        }
+    }
+    Ok(merged)
+}
+
 pub fn artifact_is_different(
     a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
     b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
@@ -220,6 +250,22 @@ mod test {
     use std::str::FromStr;
 
     use super::*;
+
+    fn fake_artifact(version: &str, url: &str) -> Artifact<GemVersion, Sha256, ArtifactMetadata> {
+        Artifact {
+            os: inventory::artifact::Os::Linux,
+            arch: inventory::artifact::Arch::Amd64,
+            version: GemVersion::from_str(version).unwrap(),
+            checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
+                .parse()
+                .unwrap(),
+            metadata: ArtifactMetadata {
+                timestamp: Utc::now(),
+                distro_version: BaseImage::new("heroku-24").unwrap().distro_version(),
+            },
+            url: url.to_string(),
+        }
+    }
 
     #[test]
     fn test_same_url_different_checksum_raises_error() {
@@ -317,5 +363,85 @@ mod test {
         .unwrap();
         let inventory = parse_inventory(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(2, inventory.artifacts.len());
+    }
+
+    #[test]
+    fn test_merge_target_one_empty_sources() {
+        let mut target = Inventory { artifacts: vec![] };
+        target.push(fake_artifact("1.0.0", "https://example.com/1"));
+
+        let result = merge_inventories(&target, &[]).unwrap();
+        assert_eq!(1, result.artifacts.len());
+    }
+
+    #[test]
+    fn test_merge_empty_target_one_source() {
+        let target = Inventory { artifacts: vec![] };
+
+        let mut source = Inventory { artifacts: vec![] };
+        source.push(fake_artifact("1.0.0", "https://example.com/1"));
+
+        let result = merge_inventories(&target, &[source]).unwrap();
+        assert_eq!(1, result.artifacts.len());
+    }
+
+    #[test]
+    fn test_merge_inventories_skips_exact_duplicate() {
+        let mut target = Inventory { artifacts: vec![] };
+        target.push(fake_artifact("1.0.0", "https://example.com/1"));
+
+        let mut source = Inventory { artifacts: vec![] };
+        source.push(fake_artifact("1.0.0", "https://example.com/1"));
+
+        let result = merge_inventories(&target, &[source]).unwrap();
+        assert_eq!(1, result.artifacts.len());
+    }
+
+    #[test]
+    fn test_merge_inventories_replaces_same_version_different_url() {
+        let mut target = Inventory { artifacts: vec![] };
+        target.push(fake_artifact("1.0.0", "https://example.com/old"));
+
+        let mut source = Inventory { artifacts: vec![] };
+        source.push(fake_artifact("1.0.0", "https://example.com/new"));
+
+        let result = merge_inventories(&target, &[source]).unwrap();
+        assert_eq!(1, result.artifacts.len());
+        assert_eq!("https://example.com/new", result.artifacts[0].url);
+    }
+
+    #[test]
+    fn test_merge_inventories_same_url_different_checksum_errors() {
+        let mut target = Inventory { artifacts: vec![] };
+        target.push(fake_artifact("1.0.0", "https://example.com/1"));
+
+        let mut artifact = fake_artifact("2.0.0", "https://example.com/1");
+        artifact.checksum =
+            "sha256:7bebeee1b9128bdbb290331b813fa01cf43e30cd0098286f7de011796cb8eee5"
+                .parse()
+                .unwrap();
+        let mut source = Inventory { artifacts: vec![] };
+        source.push(artifact);
+        let err = merge_inventories(&target, &[source]).err().unwrap();
+
+        let expected = "has different checksum";
+        assert!(
+            format!("{err}").contains(expected),
+            "Expected `{err}` to contain `{expected}` but it did not"
+        )
+    }
+
+    #[test]
+    fn test_merge_inventories_multiple_sources() {
+        let target = Inventory { artifacts: vec![] };
+
+        let mut source_a = Inventory { artifacts: vec![] };
+        source_a.push(fake_artifact("1.0.0", "https://example.com/1"));
+
+        let mut source_b = Inventory { artifacts: vec![] };
+        source_b.push(fake_artifact("2.0.0", "https://example.com/2"));
+
+        let result = merge_inventories(&target, &[source_a, source_b]).unwrap();
+        assert_eq!(2, result.artifacts.len());
     }
 }
