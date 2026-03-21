@@ -1,6 +1,7 @@
 use fs_err::{self as fs, File, PathExt};
 use fun_run::CommandWithName;
 use libherokubuildpack::inventory::artifact::Arch;
+use reqwest::Url;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -134,6 +135,22 @@ pub fn validate_version_for_stack(
     }
 
     Ok(())
+}
+
+/// Performs an HTTP HEAD request to check if a URL returns a successful status.
+pub fn url_exists(url: Url) -> Result<bool, Error> {
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .head(url.clone())
+        .send()
+        .map_err(Error::FailedRequest)?;
+    match response.status() {
+        status if status.is_success() => Ok(true),
+        reqwest::StatusCode::NOT_FOUND => Ok(false),
+        status => Err(Error::Other(format!(
+            "Unexpected status {status} checking {url}"
+        ))),
+    }
 }
 
 pub fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {

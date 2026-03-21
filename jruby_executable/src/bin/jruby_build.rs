@@ -6,10 +6,11 @@ use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory;
 use libherokubuildpack::inventory::artifact::{Arch, Artifact};
+use reqwest::Url;
 use shared::{
     ArtifactMetadata, BaseImage, TarDownloadPath, append_filename_with, artifact_is_different,
     artifact_same_url_different_checksum, atomic_inventory_update, download_tar, sha256_from_path,
-    source_dir, tar_dir_to_file, untar_to_dir,
+    source_dir, tar_dir_to_file, untar_to_dir, url_exists,
 };
 use std::convert::From;
 use std::error::Error;
@@ -18,6 +19,12 @@ use std::time::Instant;
 
 static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum OnConflict {
+    Skip,
+    Overwrite,
+}
+
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(long)]
@@ -25,12 +32,16 @@ struct Args {
 
     #[arg(long)]
     base_image: BaseImage,
+
+    #[arg(long)]
+    on_conflict: OnConflict,
 }
 
 fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
     let Args {
         version,
         base_image,
+        on_conflict,
     } = args;
 
     let start = Instant::now();
@@ -41,10 +52,42 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
 
     fs::create_dir_all(&volume_cache_dir)?;
 
+    let ruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
+    let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
+    let expected_output = volume_output_dir
+        .join(base_image.to_string())
+        .join(&tgz_name);
+
+    match on_conflict {
+        OnConflict::Skip => {
+            if expected_output.fs_err_try_exists()? {
+                print::bullet(format!(
+                    "Output already exists locally: {}, skipping",
+                    expected_output.display()
+                ));
+                return Ok(());
+            }
+
+            let s3_path = expected_output.strip_prefix(&volume_output_dir)?;
+            let url = {
+                let mut url = Url::parse(S3_BASE_URL)?;
+                url.path_segments_mut()
+                    .expect("valid base URL")
+                    .extend(s3_path.iter().map(|s| s.to_string_lossy()));
+                url
+            };
+
+            print::bullet(format!("Checking if already uploaded: {url}"));
+            if url_exists(url.clone())? {
+                print::bullet(format!("Already exists: {url}, skipping"));
+                return Ok(());
+            }
+        }
+        OnConflict::Overwrite => {}
+    }
+
     let temp_dir = tempfile::tempdir()?;
     let extracted_path = temp_dir.path().join("extracted");
-
-    let ruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
 
     let download_path =
         TarDownloadPath(volume_cache_dir.join(format!("jruby-dist-{version}-bin.tar.gz")));
@@ -95,8 +138,6 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
         print::sub_bullet("Create ruby symlink to jruby");
         fs::os::unix::fs::symlink("jruby", ruby_bin)?;
     }
-
-    let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
 
     print::bullet("Creating tgz archives");
     print::sub_bullet(format!(

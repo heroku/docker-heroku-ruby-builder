@@ -68,9 +68,18 @@ jobs:
       - name: Output CHANGELOG
         run: cargo run --locked --bin ruby_changelog -- --version "${{matrix.version}}"
       - name: Build Ruby
-        run: cargo run --locked --bin ruby_build -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+        run: |
+          cargo run --locked --bin ruby_build -- \
+            --version ${{matrix.version}} \
+            --base-image ${{matrix.base_image}} \
+            --arch ${{matrix.arch}} \
+            --on-conflict overwrite
       - name: Check Ruby
-        run: cargo run --locked --bin ruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+        run: |
+          cargo run --locked --bin ruby_check -- \
+            --version ${{matrix.version}} \
+            --base-image ${{matrix.base_image}} \
+            --arch ${{matrix.arch}}
 
   jruby_integration_test:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
@@ -94,9 +103,87 @@ jobs:
       - name: Output CHANGELOG
         run: cargo run --locked --bin jruby_changelog -- --version "${{matrix.version}}"
       - name: Build JRuby
-        run: cargo run --locked --bin jruby_build -- --version ${{matrix.version}} --base-image ${{matrix.base_image}}
+        run: |
+          cargo run --locked --bin jruby_build -- \
+            --version ${{matrix.version}} \
+            --base-image ${{matrix.base_image}} \
+            --on-conflict overwrite
       - name: Check JRuby
-        run: cargo run --locked --bin jruby_check -- --version ${{matrix.version}} --base-image ${{matrix.base_image}} --arch ${{matrix.arch}}
+        run: |
+          cargo run --locked --bin jruby_check -- \
+            --version ${{matrix.version}} \
+            --base-image ${{matrix.base_image}} \
+            --arch ${{matrix.arch}}
+
+  ruby_on_conflict_test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Cargo build
+        run: cargo build --locked
+      - name: "on-conflict=skip: skips when S3 URL exists"
+        run: |
+          set -euo pipefail
+          TMPFILE=$(mktemp)
+          cargo run --locked --bin ruby_build -- \
+            --version 3.2.3 \
+            --base-image heroku-24 \
+            --arch amd64 \
+            --on-conflict skip 2>&1 | tee "$TMPFILE"
+          grep -q "Already exists" "$TMPFILE"
+          grep -q "skipping" "$TMPFILE"
+      - name: "on-conflict=skip: skips when local file exists"
+        run: |
+          set -euo pipefail
+          TMPFILE=$(mktemp)
+          mkdir -p ./output/heroku-24/amd64
+          touch ./output/heroku-24/amd64/ruby-1.9.9.tgz
+          cargo run --locked --bin ruby_build -- \
+            --version 1.9.9 \
+            --base-image heroku-24 \
+            --arch amd64 \
+            --on-conflict skip 2>&1 | tee "$TMPFILE"
+          grep -q "Output already exists locally" "$TMPFILE"
+          grep -q "skipping" "$TMPFILE"
+
+  jruby_on_conflict_test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Cargo build
+        run: cargo build --locked
+      - name: "on-conflict=skip: skips when S3 URL exists"
+        run: |
+          set -euo pipefail
+          TMPFILE=$(mktemp)
+          cargo run --locked --bin jruby_build -- \
+            --version 9.4.7.0 \
+            --base-image heroku-22 \
+            --on-conflict skip 2>&1 | tee "$TMPFILE"
+          grep -q "Already exists" "$TMPFILE"
+          grep -q "skipping" "$TMPFILE"
+      - name: "on-conflict=skip: skips when local file exists"
+        run: |
+          set -euo pipefail
+          TMPFILE=$(mktemp)
+          mkdir -p ./output/heroku-22
+          touch "./output/heroku-22/ruby-3.1.4-jruby-9.4.7.0.tgz"
+          cargo run --locked --bin jruby_build -- \
+            --version 9.4.7.0 \
+            --base-image heroku-22 \
+            --on-conflict skip 2>&1 | tee "$TMPFILE"
+          grep -q "Output already exists locally" "$TMPFILE"
+          grep -q "skipping" "$TMPFILE"
 
   check_inventory_urls:
     runs-on: ubuntu-24.04
