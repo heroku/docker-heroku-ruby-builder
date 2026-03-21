@@ -7,10 +7,11 @@ use libherokubuildpack::inventory::{
     self,
     artifact::{Arch, Artifact},
 };
+use reqwest::Url;
 use shared::{
     ArtifactMetadata, BaseImage, RubyDownloadVersion, TarDownloadPath, append_filename_with,
     artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
-    download_tar, output_tar_path, sha256_from_path, source_dir,
+    download_tar, output_tar_path, sha256_from_path, source_dir, url_exists,
 };
 use std::{
     io::Write,
@@ -24,6 +25,12 @@ static INNER_OUTPUT: &str = "/tmp/output";
 static INNER_CACHE: &str = "/tmp/cache";
 static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 
+#[derive(clap::ValueEnum, Clone, Debug)]
+enum OnConflict {
+    Skip,
+    Overwrite,
+}
+
 #[derive(Parser, Debug)]
 struct RubyArgs {
     #[arg(long)]
@@ -34,6 +41,9 @@ struct RubyArgs {
 
     #[arg(long = "base-image")]
     base_image: BaseImage,
+
+    #[arg(long)]
+    on_conflict: OnConflict,
 }
 
 fn ruby_dockerfile_contents(base_image: &BaseImage) -> String {
@@ -62,6 +72,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
         arch,
         version,
         base_image,
+        on_conflict,
     } = args;
 
     let start = Instant::now();
@@ -72,6 +83,36 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     fs::create_dir_all(&volume_cache_dir)?;
     fs::create_dir_all(&volume_output_dir)?;
+
+    let expected_output = output_tar_path(&volume_output_dir, version, base_image, arch);
+
+    match on_conflict {
+        OnConflict::Skip => {
+            if expected_output.fs_err_try_exists()? {
+                print::bullet(format!(
+                    "Output already exists locally: {}, skipping",
+                    expected_output.display()
+                ));
+                return Ok(());
+            }
+
+            let s3_path = expected_output.strip_prefix(&volume_output_dir)?;
+            let url = {
+                let mut url = Url::parse(S3_BASE_URL)?;
+                url.path_segments_mut()
+                    .expect("valid base URL")
+                    .extend(s3_path.iter().map(|s| s.to_string_lossy()));
+                url
+            };
+
+            print::bullet(format!("Checking if already uploaded: {url}"));
+            if url_exists(url.clone())? {
+                print::bullet(format!("Already exists: {url}, skipping"));
+                return Ok(());
+            }
+        }
+        OnConflict::Overwrite => {}
+    }
 
     let temp_dir = tempfile::tempdir()?;
     let image_name = format!("heroku/ruby-builder:{base_image}");

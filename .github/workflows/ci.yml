@@ -72,7 +72,8 @@ jobs:
           cargo run --locked --bin ruby_build -- \
             --version ${{matrix.version}} \
             --base-image ${{matrix.base_image}} \
-            --arch ${{matrix.arch}}
+            --arch ${{matrix.arch}} \
+            --on-conflict overwrite
       - name: Check Ruby
         run: |
           cargo run --locked --bin ruby_check -- \
@@ -105,7 +106,8 @@ jobs:
         run: |
           cargo run --locked --bin jruby_build -- \
             --version ${{matrix.version}} \
-            --base-image ${{matrix.base_image}}
+            --base-image ${{matrix.base_image}} \
+            --on-conflict overwrite
       - name: Check JRuby
         run: |
           cargo run --locked --bin jruby_check -- \
