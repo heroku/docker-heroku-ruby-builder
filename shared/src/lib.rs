@@ -138,7 +138,7 @@ pub fn validate_version_for_stack(
 }
 
 /// Performs an HTTP HEAD request to check if a URL returns a successful status.
-pub fn url_exists(url: Url) -> Result<bool, Error> {
+pub fn s3_url_exists(url: Url) -> Result<bool, Error> {
     let client = reqwest::blocking::Client::new();
     let response = client
         .head(url.clone())
@@ -146,7 +146,7 @@ pub fn url_exists(url: Url) -> Result<bool, Error> {
         .map_err(Error::FailedRequest)?;
     match response.status() {
         status if status.is_success() => Ok(true),
-        reqwest::StatusCode::NOT_FOUND => Ok(false),
+        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(false),
         status => Err(Error::Other(format!(
             "Unexpected status {status} checking {url}"
         ))),

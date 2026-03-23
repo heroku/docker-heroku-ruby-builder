@@ -11,7 +11,7 @@ use reqwest::Url;
 use shared::{
     ArtifactMetadata, BaseImage, RubyDownloadVersion, TarDownloadPath, append_filename_with,
     artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
-    download_tar, output_tar_path, sha256_from_path, source_dir, url_exists,
+    download_tar, output_tar_path, s3_url_exists, sha256_from_path, source_dir,
 };
 use std::{
     io::Write,
@@ -106,7 +106,7 @@ fn ruby_build(args: &RubyArgs) -> Result<(), Box<dyn std::error::Error>> {
             };
 
             print::bullet(format!("Checking if already uploaded: {url}"));
-            if url_exists(url.clone())? {
+            if s3_url_exists(url.clone())? {
                 print::bullet(format!("Already exists: {url}, skipping"));
                 return Ok(());
             }
