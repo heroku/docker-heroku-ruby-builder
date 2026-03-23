@@ -53,7 +53,7 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
             "mkdir /tmp/unzipped",
             &format!("tar xzf {} -C /tmp/unzipped", path.display()),
             "echo -n '- Rubygems version: '",
-            "tmp/unzipped/bin/gem -v",
+            "/tmp/unzipped/bin/gem -v",
             "echo -n '- Ruby version: '",
             "/tmp/unzipped/bin/ruby -v",
         ]
