@@ -8,12 +8,14 @@ use libherokubuildpack::inventory;
 use libherokubuildpack::inventory::artifact::{Arch, Artifact};
 use reqwest::Url;
 use shared::{
-    ArtifactMetadata, BaseImage, TarDownloadPath, append_filename_with, artifact_is_different,
-    artifact_same_url_different_checksum, atomic_inventory_update, download_tar, s3_url_exists,
-    sha256_from_path, source_dir, tar_dir_to_file, untar_to_dir,
+    ArtifactMetadata, BaseImage, BuildStatus, TarDownloadPath, append_filename_with,
+    artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
+    download_tar, s3_url_exists, sha256_from_path, source_dir, tar_dir_to_file, untar_to_dir,
+    write_job_metadata,
 };
 use std::convert::From;
 use std::error::Error;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Instant;
 
@@ -35,13 +37,17 @@ struct Args {
 
     #[arg(long)]
     on_conflict: OnConflict,
+
+    #[arg(long = "job-metadata")]
+    job_metadata: Option<PathBuf>,
 }
 
-fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
+fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     let Args {
         version,
         base_image,
         on_conflict,
+        job_metadata: _,
     } = args;
 
     let start = Instant::now();
@@ -65,7 +71,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
                     "Output already exists locally: {}, skipping",
                     expected_output.display()
                 ));
-                return Ok(());
+                return Ok(BuildStatus::Skipped);
             }
 
             let s3_path = expected_output.strip_prefix(&volume_output_dir)?;
@@ -80,7 +86,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
             print::bullet(format!("Checking if already uploaded: {url}"));
             if s3_url_exists(url.clone())? {
                 print::bullet(format!("Already exists: {url}, skipping"));
-                return Ok(());
+                return Ok(BuildStatus::Skipped);
             }
         }
         OnConflict::Overwrite => {}
@@ -211,17 +217,28 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
     }
 
     print::all_done(&Some(start));
-    Ok(())
+    Ok(BuildStatus::Success)
 }
 
 fn main() {
     let args = Args::parse();
-    if let Err(error) = jruby_build(&args) {
-        print::error(formatdoc! {"
-            ❌ Command failed ❌
+    let metadata = args.job_metadata.as_deref();
+    match jruby_build(&args) {
+        Ok(status) => {
+            if let Err(e) = write_job_metadata(metadata, "status", status.as_str()) {
+                print::error(format!("Failed to write job metadata: {e}"));
+            }
+        }
+        Err(error) => {
+            if let Err(e) = write_job_metadata(metadata, "status", "error") {
+                print::error(format!("Failed to write job metadata: {e}"));
+            }
+            print::error(formatdoc! {"
+                ❌ Command failed ❌
 
-            {error}
-        "});
-        std::process::exit(1);
+                {error}
+            "});
+            std::process::exit(1);
+        }
     }
 }
