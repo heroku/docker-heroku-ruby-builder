@@ -9,8 +9,8 @@ use libherokubuildpack::inventory::artifact::{Arch, Artifact};
 use reqwest::Url;
 use shared::{
     ArtifactMetadata, BaseImage, TarDownloadPath, append_filename_with, artifact_is_different,
-    artifact_same_url_different_checksum, atomic_inventory_update, download_tar, sha256_from_path,
-    source_dir, tar_dir_to_file, untar_to_dir, url_exists,
+    artifact_same_url_different_checksum, atomic_inventory_update, download_tar, s3_url_exists,
+    sha256_from_path, source_dir, tar_dir_to_file, untar_to_dir,
 };
 use std::convert::From;
 use std::error::Error;
@@ -78,7 +78,7 @@ fn jruby_build(args: &Args) -> Result<(), Box<dyn Error>> {
             };
 
             print::bullet(format!("Checking if already uploaded: {url}"));
-            if url_exists(url.clone())? {
+            if s3_url_exists(url.clone())? {
                 print::bullet(format!("Already exists: {url}, skipping"));
                 return Ok(());
             }
