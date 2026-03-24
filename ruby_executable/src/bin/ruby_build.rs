@@ -194,7 +194,33 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
     );
 
     print::sub_bullet(format!("Copying SHA tgz {}", sha_seven_path.display(),));
-    fs::copy(output_tar, &sha_seven_path)?;
+    fs::copy(&output_tar, &sha_seven_path)?;
+
+    if base_image.has_legacy_path() {
+        let arch_dir = volume_output_dir
+            .join(base_image.to_string())
+            .join(arch.to_string());
+        fs::create_dir_all(&arch_dir)?;
+
+        let arch_tar = arch_dir.join(
+            output_tar
+                .file_name()
+                .expect("output_tar must have a file name"),
+        );
+        print::sub_bullet(format!("Copying arch-aware tgz {}", arch_tar.display()));
+        fs::copy(&output_tar, &arch_tar)?;
+
+        let arch_sha_tar = arch_dir.join(
+            sha_seven_path
+                .file_name()
+                .expect("sha_seven_path must have a file name"),
+        );
+        print::sub_bullet(format!(
+            "Copying arch-aware SHA tgz {}",
+            arch_sha_tar.display()
+        ));
+        fs::copy(&sha_seven_path, &arch_sha_tar)?;
+    }
 
     let artifact = Artifact {
         version: GemVersion::from_str(&version.bundler_format())?,

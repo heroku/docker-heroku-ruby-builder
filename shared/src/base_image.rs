@@ -39,7 +39,11 @@ impl BaseImage {
     }
 
     pub fn is_arch_aware(&self) -> bool {
-        self.name != "heroku-22"
+        !self.has_legacy_path()
+    }
+
+    pub fn has_legacy_path(&self) -> bool {
+        self.name == "heroku-22"
     }
 }
 
