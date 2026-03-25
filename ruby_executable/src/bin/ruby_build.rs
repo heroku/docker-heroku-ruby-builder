@@ -11,7 +11,7 @@ use reqwest::Url;
 use shared::{
     ArtifactMetadata, BaseImage, BuildStatus, RubyDownloadVersion, TarDownloadPath,
     append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
-    atomic_inventory_update, download_tar, output_tar_path, output_target_dir, s3_url_exists,
+    atomic_inventory_update, download_tar, output_ruby_tar_path, output_target_dir, s3_url_exists,
     sha256_from_path, source_dir, write_job_metadata,
 };
 use std::{
@@ -94,7 +94,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
     } else {
         None
     };
-    let expected_output = output_tar_path(&volume_output_dir, version, base_image, arch_path);
+    let expected_output = output_ruby_tar_path(&volume_output_dir, version, base_image, arch_path);
 
     match on_conflict {
         OnConflict::Skip => {
@@ -162,7 +162,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     print::bullet("Make Ruby");
     let input_tar = PathBuf::from(INNER_CACHE).join(format!("ruby-source-{version}.tgz"));
-    let output_tar = output_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch_path);
+    let output_tar = output_ruby_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch_path);
     let volume_cache = volume_cache_dir.display();
     let volume_output = volume_output_dir.display();
 
@@ -188,7 +188,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
         style::value(inventory.to_string_lossy())
     ));
 
-    let output_tar = output_tar_path(&volume_output_dir, version, base_image, arch);
+    let output_tar = output_ruby_tar_path(&volume_output_dir, version, base_image, Some(arch));
 
     let sha = sha256_from_path(&output_tar)?;
     let sha_seven = sha.chars().take(7).collect::<String>();

@@ -2,7 +2,7 @@ use bullet_stream::global::print;
 use clap::Parser;
 use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
-use shared::{BaseImage, RubyDownloadVersion, output_tar_path, source_dir};
+use shared::{BaseImage, RubyDownloadVersion, output_ruby_tar_path, source_dir};
 use std::{error::Error, path::PathBuf, process::Command, time::Instant};
 
 static INNER_OUTPUT: &str = "/tmp/output";
@@ -34,7 +34,7 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     } else {
         None
     };
-    let path = output_tar_path(&PathBuf::from(INNER_OUTPUT), version, base_image, arch_path);
+    let path = output_ruby_tar_path(&PathBuf::from(INNER_OUTPUT), version, base_image, arch_path);
     let distro_number = base_image.distro_number();
 
     let image_name = format!("heroku/heroku:{distro_number}-build");

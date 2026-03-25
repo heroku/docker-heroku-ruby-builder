@@ -182,7 +182,7 @@ pub fn output_target_dir(
     base.join(target)
 }
 
-pub fn output_tar_path(
+pub fn output_ruby_tar_path(
     output: &Path,
     version: &RubyDownloadVersion,
     base_image: &BaseImage,
@@ -304,7 +304,7 @@ mod test {
         let version = RubyDownloadVersion::from_str("2.7.3").unwrap();
         let base_image = BaseImage::new("heroku-22").unwrap();
 
-        let tar_path = output_tar_path(&output, &version, &base_image, None);
+        let tar_path = output_ruby_tar_path(&output, &version, &base_image, None);
 
         // assert!(tar_path.is_absolute());
         assert_eq!(PathBuf::from("/tmp/heroku-22/ruby-2.7.3.tgz"), tar_path);
@@ -317,7 +317,8 @@ mod test {
         let base_image = BaseImage::new("heroku-24").unwrap();
         let cpu_architecture = Arch::Amd64;
 
-        let tar_path = output_tar_path(&output, &version, &base_image, Some(&cpu_architecture));
+        let tar_path =
+            output_ruby_tar_path(&output, &version, &base_image, Some(&cpu_architecture));
 
         assert_eq!(
             PathBuf::from("/tmp/heroku-24/amd64/ruby-2.7.3.tgz"),
