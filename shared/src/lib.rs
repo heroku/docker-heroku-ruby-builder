@@ -169,20 +169,31 @@ pub fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
     Ok(())
 }
 
+pub fn output_target_dir(
+    base: &Path,
+    base_image: &BaseImage,
+    cpu_architecture: Option<&Arch>,
+) -> PathBuf {
+    let target = if let Some(arch) = cpu_architecture {
+        PathBuf::from(base_image.to_string()).join(arch.to_string())
+    } else {
+        PathBuf::from(base_image.to_string())
+    };
+    base.join(target)
+}
+
 pub fn output_tar_path(
     output: &Path,
     version: &RubyDownloadVersion,
     base_image: &BaseImage,
     cpu_architecture: &Arch,
 ) -> PathBuf {
-    let directory = if base_image.is_arch_aware() {
-        PathBuf::from(base_image.to_string()).join(cpu_architecture.to_string())
+    let arch = if base_image.is_arch_aware() {
+        Some(cpu_architecture)
     } else {
-        PathBuf::from(base_image.to_string())
+        None
     };
-
-    output
-        .join(directory)
+    output_target_dir(output, base_image, arch)
         .join(format!("ruby-{}.tgz", version.bundler_format()))
 }
 
