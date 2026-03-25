@@ -2,6 +2,7 @@ use fs_err::{self as fs, File, PathExt};
 use fun_run::CommandWithName;
 use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -196,6 +197,35 @@ pub fn tar_dir_to_file(compiled_dir: &Path, tar_file: &File) -> Result<(), Error
     tar.finish().map_err(Error::FsError)?;
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildStatus {
+    Success,
+    Skipped,
+}
+
+impl BuildStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            BuildStatus::Success => "success",
+            BuildStatus::Skipped => "skipped",
+        }
+    }
+}
+
+/// Appends `key=value` to the given file path. Used to write structured
+/// metadata (e.g. to `$GITHUB_OUTPUT`) from build binaries.
+///
+/// Returns `Ok(())` when `path` is `None` (no-op), so callers can pass
+/// the optional `--job-metadata` argument directly.
+pub fn write_job_metadata(path: Option<&Path>, key: &str, value: &str) -> std::io::Result<()> {
+    let Some(path) = path else { return Ok(()) };
+    fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)
+        .and_then(|mut file| writeln!(file, "{key}={value}"))
 }
 
 pub fn update_shebang(contents: String) -> Option<String> {
@@ -412,6 +442,29 @@ mod test {
 
         let filenames = filenames_in_path(&temp_out.path().join("ruby-3.3.1"));
         assert!(filenames.iter().any(|name| *name == "array.c"));
+    }
+
+    #[test]
+    fn test_build_status_as_str() {
+        assert_eq!(BuildStatus::Success.as_str(), "success");
+        assert_eq!(BuildStatus::Skipped.as_str(), "skipped");
+    }
+
+    #[test]
+    fn test_write_job_metadata_writes_key_value() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("metadata");
+
+        write_job_metadata(Some(&path), "status", "success").unwrap();
+        write_job_metadata(Some(&path), "status", "skipped").unwrap();
+
+        let contents = fs::read_to_string(&path).unwrap();
+        assert_eq!(contents, "status=success\nstatus=skipped\n");
+    }
+
+    #[test]
+    fn test_write_job_metadata_none_is_noop() {
+        write_job_metadata(None, "status", "success").unwrap();
     }
 
     fn filenames_in_path(path: &Path) -> Vec<String> {

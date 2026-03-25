@@ -69,11 +69,15 @@ jobs:
         run: cargo run --locked --bin ruby_changelog -- --version "${{matrix.version}}"
       - name: Build Ruby
         run: |
+          set -euo pipefail
+          METAFILE=$(mktemp)
           cargo run --locked --bin ruby_build -- \
             --version ${{matrix.version}} \
             --base-image ${{matrix.base_image}} \
             --arch ${{matrix.arch}} \
-            --on-conflict overwrite
+            --on-conflict overwrite \
+            --job-metadata "$METAFILE"
+          grep -q "status=success" "$METAFILE"
       - name: Check Ruby
         run: |
           cargo run --locked --bin ruby_check -- \
@@ -104,10 +108,14 @@ jobs:
         run: cargo run --locked --bin jruby_changelog -- --version "${{matrix.version}}"
       - name: Build JRuby
         run: |
+          set -euo pipefail
+          METAFILE=$(mktemp)
           cargo run --locked --bin jruby_build -- \
             --version ${{matrix.version}} \
             --base-image ${{matrix.base_image}} \
-            --on-conflict overwrite
+            --on-conflict overwrite \
+            --job-metadata "$METAFILE"
+          grep -q "status=success" "$METAFILE"
       - name: Check JRuby
         run: |
           cargo run --locked --bin jruby_check -- \
@@ -129,27 +137,33 @@ jobs:
       - name: "on-conflict=skip: skips when S3 URL exists"
         run: |
           set -euo pipefail
-          TMPFILE=$(mktemp)
+          LOGFILE=$(mktemp)
+          METAFILE=$(mktemp)
           cargo run --locked --bin ruby_build -- \
             --version 3.2.3 \
             --base-image heroku-24 \
             --arch amd64 \
-            --on-conflict skip 2>&1 | tee "$TMPFILE"
-          grep -q "Already exists" "$TMPFILE"
-          grep -q "skipping" "$TMPFILE"
+            --on-conflict skip \
+            --job-metadata "$METAFILE" 2>&1 | tee "$LOGFILE"
+          grep -q "Already exists" "$LOGFILE"
+          grep -q "skipping" "$LOGFILE"
+          grep -q "status=skipped" "$METAFILE"
       - name: "on-conflict=skip: skips when local file exists"
         run: |
           set -euo pipefail
-          TMPFILE=$(mktemp)
+          LOGFILE=$(mktemp)
+          METAFILE=$(mktemp)
           mkdir -p ./output/heroku-24/amd64
           touch ./output/heroku-24/amd64/ruby-1.9.9.tgz
           cargo run --locked --bin ruby_build -- \
             --version 1.9.9 \
             --base-image heroku-24 \
             --arch amd64 \
-            --on-conflict skip 2>&1 | tee "$TMPFILE"
-          grep -q "Output already exists locally" "$TMPFILE"
-          grep -q "skipping" "$TMPFILE"
+            --on-conflict skip \
+            --job-metadata "$METAFILE" 2>&1 | tee "$LOGFILE"
+          grep -q "Output already exists locally" "$LOGFILE"
+          grep -q "skipping" "$LOGFILE"
+          grep -q "status=skipped" "$METAFILE"
 
   jruby_on_conflict_test:
     runs-on: ubuntu-24.04
@@ -165,25 +179,31 @@ jobs:
       - name: "on-conflict=skip: skips when S3 URL exists"
         run: |
           set -euo pipefail
-          TMPFILE=$(mktemp)
+          LOGFILE=$(mktemp)
+          METAFILE=$(mktemp)
           cargo run --locked --bin jruby_build -- \
             --version 9.4.7.0 \
             --base-image heroku-22 \
-            --on-conflict skip 2>&1 | tee "$TMPFILE"
-          grep -q "Already exists" "$TMPFILE"
-          grep -q "skipping" "$TMPFILE"
+            --on-conflict skip \
+            --job-metadata "$METAFILE" 2>&1 | tee "$LOGFILE"
+          grep -q "Already exists" "$LOGFILE"
+          grep -q "skipping" "$LOGFILE"
+          grep -q "status=skipped" "$METAFILE"
       - name: "on-conflict=skip: skips when local file exists"
         run: |
           set -euo pipefail
-          TMPFILE=$(mktemp)
+          LOGFILE=$(mktemp)
+          METAFILE=$(mktemp)
           mkdir -p ./output/heroku-22
           touch "./output/heroku-22/ruby-3.1.4-jruby-9.4.7.0.tgz"
           cargo run --locked --bin jruby_build -- \
             --version 9.4.7.0 \
             --base-image heroku-22 \
-            --on-conflict skip 2>&1 | tee "$TMPFILE"
-          grep -q "Output already exists locally" "$TMPFILE"
-          grep -q "skipping" "$TMPFILE"
+            --on-conflict skip \
+            --job-metadata "$METAFILE" 2>&1 | tee "$LOGFILE"
+          grep -q "Output already exists locally" "$LOGFILE"
+          grep -q "skipping" "$LOGFILE"
+          grep -q "status=skipped" "$METAFILE"
 
   check_inventory_urls:
     runs-on: ubuntu-24.04
