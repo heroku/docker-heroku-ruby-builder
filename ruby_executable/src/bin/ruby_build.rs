@@ -195,7 +195,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     if base_image.has_legacy_path() {
         let legacy_output = output_ruby_tar_path(&volume_output_dir, version, base_image, None);
-        fs::copy(expected_output, legacy_output);
+        fs::copy(expected_output, &legacy_output)?;
         cp_file_sha_seven_same_dir(&legacy_output)?;
     }
 
