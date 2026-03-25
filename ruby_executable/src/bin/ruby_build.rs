@@ -89,7 +89,12 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
     fs::create_dir_all(&volume_cache_dir)?;
     fs::create_dir_all(&volume_output_dir)?;
 
-    let expected_output = output_tar_path(&volume_output_dir, version, base_image, arch);
+    let arch_path = if base_image.is_arch_aware() {
+        Some(arch)
+    } else {
+        None
+    };
+    let expected_output = output_tar_path(&volume_output_dir, version, base_image, arch_path);
 
     match on_conflict {
         OnConflict::Skip => {
@@ -157,7 +162,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     print::bullet("Make Ruby");
     let input_tar = PathBuf::from(INNER_CACHE).join(format!("ruby-source-{version}.tgz"));
-    let output_tar = output_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch);
+    let output_tar = output_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch_path);
     let volume_cache = volume_cache_dir.display();
     let volume_output = volume_output_dir.display();
 

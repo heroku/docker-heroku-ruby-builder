@@ -29,7 +29,12 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     print::h2(format!(
         "Checking Ruby version ({version} linux/{arch}) for {base_image}",
     ));
-    let path = output_tar_path(&PathBuf::from(INNER_OUTPUT), version, base_image, arch);
+    let arch_path = if base_image.is_arch_aware() {
+        Some(arch)
+    } else {
+        None
+    };
+    let path = output_tar_path(&PathBuf::from(INNER_OUTPUT), version, base_image, arch_path);
     let distro_number = base_image.distro_number();
 
     let image_name = format!("heroku/heroku:{distro_number}-build");
