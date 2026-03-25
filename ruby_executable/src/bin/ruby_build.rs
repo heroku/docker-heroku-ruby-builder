@@ -89,12 +89,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
     fs::create_dir_all(&volume_cache_dir)?;
     fs::create_dir_all(&volume_output_dir)?;
 
-    let arch_path = if base_image.is_arch_aware() {
-        Some(arch)
-    } else {
-        None
-    };
-    let expected_output = output_ruby_tar_path(&volume_output_dir, version, base_image, arch_path);
+    let expected_output = output_ruby_tar_path(&volume_output_dir, version, base_image, Some(arch));
 
     match on_conflict {
         OnConflict::Skip => {
@@ -162,7 +157,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     print::bullet("Make Ruby");
     let input_tar = PathBuf::from(INNER_CACHE).join(format!("ruby-source-{version}.tgz"));
-    let output_tar = output_ruby_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch_path);
+    let output_tar = output_ruby_tar_path(Path::new(INNER_OUTPUT), version, base_image, Some(arch));
     let volume_cache = volume_cache_dir.display();
     let volume_output = volume_output_dir.display();
 
@@ -199,12 +194,9 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
     print::sub_bullet(format!("Copied SHA tgz {}", sha_seven_path.display(),));
 
     if base_image.has_legacy_path() {
-        let source = output_target_dir(&volume_output_dir, base_image, None);
-        let target = output_target_dir(&volume_output_dir, base_image, Some(arch));
-
-        print::sub_bullet(format!("Copying to arch-aware folder {}", target.display()));
-        fs::create_dir_all(&target)?;
-        fs::copy(&source, &target)?;
+        let legacy_output = output_ruby_tar_path(&volume_output_dir, version, base_image, None);
+        fs::copy(expected_output, legacy_output);
+        cp_file_sha_seven_same_dir(&legacy_output)?;
     }
 
     let artifact = Artifact {
