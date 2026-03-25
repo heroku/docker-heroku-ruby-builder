@@ -38,10 +38,6 @@ impl BaseImage {
         DistroVersion(format!("{}.04", self.distro_number))
     }
 
-    pub fn is_arch_aware(&self) -> bool {
-        !self.has_legacy_path()
-    }
-
     pub fn has_legacy_path(&self) -> bool {
         self.name == "heroku-22"
     }
