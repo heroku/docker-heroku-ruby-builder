@@ -11,8 +11,8 @@ use reqwest::Url;
 use shared::{
     ArtifactMetadata, BaseImage, BuildStatus, RubyDownloadVersion, TarDownloadPath,
     append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
-    atomic_inventory_update, download_tar, output_tar_path, s3_url_exists, sha256_from_path,
-    source_dir, write_job_metadata,
+    atomic_inventory_update, download_tar, output_tar_path, output_target_dir, s3_url_exists,
+    sha256_from_path, source_dir, write_job_metadata,
 };
 use std::{
     io::Write,
@@ -197,29 +197,12 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
     fs::copy(&output_tar, &sha_seven_path)?;
 
     if base_image.has_legacy_path() {
-        let arch_dir = volume_output_dir
-            .join(base_image.to_string())
-            .join(arch.to_string());
-        fs::create_dir_all(&arch_dir)?;
+        let source = output_target_dir(&volume_output_dir, base_image, None);
+        let target = output_target_dir(&volume_output_dir, base_image, Some(arch));
 
-        let arch_tar = arch_dir.join(
-            output_tar
-                .file_name()
-                .expect("output_tar must have a file name"),
-        );
-        print::sub_bullet(format!("Copying arch-aware tgz {}", arch_tar.display()));
-        fs::copy(&output_tar, &arch_tar)?;
-
-        let arch_sha_tar = arch_dir.join(
-            sha_seven_path
-                .file_name()
-                .expect("sha_seven_path must have a file name"),
-        );
-        print::sub_bullet(format!(
-            "Copying arch-aware SHA tgz {}",
-            arch_sha_tar.display()
-        ));
-        fs::copy(&sha_seven_path, &arch_sha_tar)?;
+        print::sub_bullet(format!("Copying to arch-aware folder {}", target.display()));
+        fs::create_dir_all(&target)?;
+        fs::copy(&source, &target)?;
     }
 
     let artifact = Artifact {
