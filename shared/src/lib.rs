@@ -169,20 +169,26 @@ pub fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn output_tar_path(
-    output: &Path,
-    version: &RubyDownloadVersion,
+pub fn output_target_dir(
+    base: &Path,
     base_image: &BaseImage,
-    cpu_architecture: &Arch,
+    cpu_architecture: Option<&Arch>,
 ) -> PathBuf {
-    let directory = if base_image.is_arch_aware() {
-        PathBuf::from(base_image.to_string()).join(cpu_architecture.to_string())
+    let target = if let Some(arch) = cpu_architecture {
+        PathBuf::from(base_image.to_string()).join(arch.to_string())
     } else {
         PathBuf::from(base_image.to_string())
     };
+    base.join(target)
+}
 
-    output
-        .join(directory)
+pub fn output_ruby_tar_path(
+    output: &Path,
+    version: &RubyDownloadVersion,
+    base_image: &BaseImage,
+    cpu_architecture: Option<&Arch>,
+) -> PathBuf {
+    output_target_dir(output, base_image, cpu_architecture)
         .join(format!("ruby-{}.tgz", version.bundler_format()))
 }
 
@@ -297,9 +303,8 @@ mod test {
         let output = PathBuf::from("/tmp");
         let version = RubyDownloadVersion::from_str("2.7.3").unwrap();
         let base_image = BaseImage::new("heroku-22").unwrap();
-        let cpu_architecture = Arch::Amd64;
 
-        let tar_path = output_tar_path(&output, &version, &base_image, &cpu_architecture);
+        let tar_path = output_ruby_tar_path(&output, &version, &base_image, None);
 
         // assert!(tar_path.is_absolute());
         assert_eq!(PathBuf::from("/tmp/heroku-22/ruby-2.7.3.tgz"), tar_path);
@@ -312,7 +317,8 @@ mod test {
         let base_image = BaseImage::new("heroku-24").unwrap();
         let cpu_architecture = Arch::Amd64;
 
-        let tar_path = output_tar_path(&output, &version, &base_image, &cpu_architecture);
+        let tar_path =
+            output_ruby_tar_path(&output, &version, &base_image, Some(&cpu_architecture));
 
         assert_eq!(
             PathBuf::from("/tmp/heroku-24/amd64/ruby-2.7.3.tgz"),

@@ -8,7 +8,6 @@ static KNOWN_BASE_IMAGES: &[(&str, &str)] = &[
     ("heroku-24", "24"),
     ("heroku-26", "26"),
 ];
-static MULTI_ARCH_BASE_IMAGES: [&str; 2] = ["heroku-24", "heroku-26"];
 
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid base image {0} must be one of {known}", known = KNOWN_BASE_IMAGES.iter().map(|(name, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
@@ -39,8 +38,8 @@ impl BaseImage {
         DistroVersion(format!("{}.04", self.distro_number))
     }
 
-    pub fn is_arch_aware(&self) -> bool {
-        MULTI_ARCH_BASE_IMAGES.contains(&self.name.as_str())
+    pub fn has_legacy_path(&self) -> bool {
+        self.name == "heroku-22"
     }
 }
 

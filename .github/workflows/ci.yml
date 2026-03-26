@@ -84,6 +84,13 @@ jobs:
             --version ${{matrix.version}} \
             --base-image ${{matrix.base_image}} \
             --arch ${{matrix.arch}}
+      - name: Verify output paths
+        run: |
+          set -euo pipefail
+          test -f "./output/${{matrix.base_image}}/${{matrix.arch}}/ruby-${{matrix.version}}.tgz"
+          if [ "${{matrix.base_image}}" = "heroku-22" ]; then
+            test -f "./output/heroku-22/ruby-${{matrix.version}}.tgz"
+          fi
 
   jruby_integration_test:
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
