@@ -190,16 +190,13 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     let output_tar = output_ruby_tar_path(&volume_output_dir, version, base_image, Some(arch));
 
-    let sha = sha256_from_path(&output_tar)?;
-    let sha_seven = sha.chars().take(7).collect::<String>();
-    let sha_seven_path = append_filename_with(&output_tar, &format!("-{sha_seven}"), ".tgz")?;
+    let sha_seven_path = cp_file_sha_seven_same_dir(&output_tar)?;
     let url = format!(
         "{S3_BASE_URL}/{}",
         sha_seven_path.strip_prefix(&volume_output_dir)?.display()
     );
 
-    print::sub_bullet(format!("Copying SHA tgz {}", sha_seven_path.display(),));
-    fs::copy(&output_tar, &sha_seven_path)?;
+    print::sub_bullet(format!("Copied SHA tgz {}", sha_seven_path.display(),));
 
     if base_image.has_legacy_path() {
         let source = output_target_dir(&volume_output_dir, base_image, None);
@@ -244,6 +241,14 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
     print::all_done(&Some(start));
 
     Ok(BuildStatus::Success)
+}
+
+fn cp_file_sha_seven_same_dir(path: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let sha = sha256_from_path(path)?;
+    let sha_seven = sha.chars().take(7).collect::<String>();
+    let sha_seven_path = append_filename_with(path, &format!("-{sha_seven}"), ".tgz")?;
+    fs::copy(path, &sha_seven_path)?;
+    Ok(sha_seven_path)
 }
 
 fn main() {
