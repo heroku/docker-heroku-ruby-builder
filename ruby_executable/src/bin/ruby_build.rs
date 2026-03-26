@@ -1,24 +1,18 @@
-use bullet_stream::{global::print, style};
+use bullet_stream::global::print;
 use clap::Parser;
 use fs_err::{self as fs, PathExt};
-use gem_version::GemVersion;
 use indoc::{formatdoc, indoc};
-use libherokubuildpack::inventory::{
-    self,
-    artifact::{Arch, Artifact},
-};
+use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use shared::{
-    ArtifactMetadata, BaseImage, BuildStatus, RubyDownloadVersion, TarDownloadPath,
-    append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
-    atomic_inventory_update, download_tar, output_tar_path, s3_url_exists, sha256_from_path,
-    source_dir, write_job_metadata,
+    BaseImage, BuildStatus, RubyDownloadVersion, TarDownloadPath, append_filename_with,
+    download_tar, output_ruby_tar_path, s3_url_exists, sha256_from_path, source_dir,
+    write_job_metadata,
 };
 use std::{
     io::Write,
     path::{Path, PathBuf},
     process::Command,
-    str::FromStr,
     time::Instant,
 };
 
@@ -82,14 +76,13 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     let start = Instant::now();
     print::h2("Building Ruby");
-    let inventory = source_dir().join("ruby_inventory.toml");
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
 
     fs::create_dir_all(&volume_cache_dir)?;
     fs::create_dir_all(&volume_output_dir)?;
 
-    let expected_output = output_tar_path(&volume_output_dir, version, base_image, arch);
+    let expected_output = output_ruby_tar_path(&volume_output_dir, version, base_image, Some(arch));
 
     match on_conflict {
         OnConflict::Skip => {
@@ -157,7 +150,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     print::bullet("Make Ruby");
     let input_tar = PathBuf::from(INNER_CACHE).join(format!("ruby-source-{version}.tgz"));
-    let output_tar = output_tar_path(Path::new(INNER_OUTPUT), version, base_image, arch);
+    let output_tar = output_ruby_tar_path(Path::new(INNER_OUTPUT), version, base_image, Some(arch));
     let volume_cache = volume_cache_dir.display();
     let volume_output = volume_output_dir.display();
 
@@ -178,84 +171,29 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     print::sub_stream_cmd(docker_run)?;
 
-    print::bullet(format!(
-        "Updating manifest {}",
-        style::value(inventory.to_string_lossy())
-    ));
+    let output_tar = output_ruby_tar_path(&volume_output_dir, version, base_image, Some(arch));
 
-    let output_tar = output_tar_path(&volume_output_dir, version, base_image, arch);
+    let sha_seven_path = cp_file_sha_seven_same_dir(&output_tar)?;
 
-    let sha = sha256_from_path(&output_tar)?;
-    let sha_seven = sha.chars().take(7).collect::<String>();
-    let sha_seven_path = append_filename_with(&output_tar, &format!("-{sha_seven}"), ".tgz")?;
-    let url = format!(
-        "{S3_BASE_URL}/{}",
-        sha_seven_path.strip_prefix(&volume_output_dir)?.display()
-    );
-
-    print::sub_bullet(format!("Copying SHA tgz {}", sha_seven_path.display(),));
-    fs::copy(&output_tar, &sha_seven_path)?;
+    print::sub_bullet(format!("Copied SHA tgz {}", sha_seven_path.display(),));
 
     if base_image.has_legacy_path() {
-        let arch_dir = volume_output_dir
-            .join(base_image.to_string())
-            .join(arch.to_string());
-        fs::create_dir_all(&arch_dir)?;
-
-        let arch_tar = arch_dir.join(
-            output_tar
-                .file_name()
-                .expect("output_tar must have a file name"),
-        );
-        print::sub_bullet(format!("Copying arch-aware tgz {}", arch_tar.display()));
-        fs::copy(&output_tar, &arch_tar)?;
-
-        let arch_sha_tar = arch_dir.join(
-            sha_seven_path
-                .file_name()
-                .expect("sha_seven_path must have a file name"),
-        );
-        print::sub_bullet(format!(
-            "Copying arch-aware SHA tgz {}",
-            arch_sha_tar.display()
-        ));
-        fs::copy(&sha_seven_path, &arch_sha_tar)?;
+        let legacy_output = output_ruby_tar_path(&volume_output_dir, version, base_image, None);
+        fs::copy(expected_output, &legacy_output)?;
+        cp_file_sha_seven_same_dir(&legacy_output)?;
     }
-
-    let artifact = Artifact {
-        version: GemVersion::from_str(&version.bundler_format())?,
-        os: inventory::artifact::Os::Linux,
-        arch: *arch,
-        url,
-        checksum: format!("sha256:{sha}").parse()?,
-        metadata: ArtifactMetadata {
-            distro_version: base_image.distro_version(),
-            timestamp: chrono::Utc::now(),
-        },
-    };
-
-    atomic_inventory_update(&inventory, |inventory| {
-        for prior in &inventory.artifacts {
-            if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
-                print::error(format!("Error updating inventory\n\nError: {error}"));
-
-                fs::remove_file(&sha_seven_path)?;
-                return Err(error);
-            };
-        }
-
-        inventory
-            .artifacts
-            .retain(|a| artifact_is_different(a, &artifact));
-
-        inventory.push(artifact);
-
-        Ok(())
-    })?;
 
     print::all_done(&Some(start));
 
     Ok(BuildStatus::Success)
+}
+
+fn cp_file_sha_seven_same_dir(path: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    let sha = sha256_from_path(path)?;
+    let sha_seven = sha.chars().take(7).collect::<String>();
+    let sha_seven_path = append_filename_with(path, &format!("-{sha_seven}"), ".tgz")?;
+    fs::copy(path, &sha_seven_path)?;
+    Ok(sha_seven_path)
 }
 
 fn main() {

@@ -21,7 +21,11 @@ set -o xtrace
 mkdir -p "$(dirname "$OUT_TAR")"
 
 # Docker issue with permissions
+# The container runs as root, so directories it creates are root-owned.
+# The host process needs write access to both the arch dir and its parent
+# (for legacy non-arch copies on heroku-22).
 chmod a+w "$(dirname "$OUT_TAR")"
+chmod a+w "$(dirname "$(dirname "$OUT_TAR")")"
 mkdir -p /tmp/source
 mkdir -p /tmp/compiled
 
