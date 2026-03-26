@@ -1,24 +1,18 @@
-use bullet_stream::{global::print, style};
+use bullet_stream::global::print;
 use clap::Parser;
 use fs_err::{self as fs, PathExt};
-use gem_version::GemVersion;
 use indoc::{formatdoc, indoc};
-use libherokubuildpack::inventory::{
-    self,
-    artifact::{Arch, Artifact},
-};
+use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use shared::{
-    ArtifactMetadata, BaseImage, BuildStatus, RubyDownloadVersion, TarDownloadPath,
-    append_filename_with, artifact_is_different, artifact_same_url_different_checksum,
-    atomic_inventory_update, download_tar, output_ruby_tar_path, output_target_dir, s3_url_exists,
-    sha256_from_path, source_dir, write_job_metadata,
+    BaseImage, BuildStatus, RubyDownloadVersion, TarDownloadPath, append_filename_with,
+    download_tar, output_ruby_tar_path, s3_url_exists, sha256_from_path, source_dir,
+    write_job_metadata,
 };
 use std::{
     io::Write,
     path::{Path, PathBuf},
     process::Command,
-    str::FromStr,
     time::Instant,
 };
 
@@ -82,7 +76,6 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     let start = Instant::now();
     print::h2("Building Ruby");
-    let inventory = source_dir().join("ruby_inventory.toml");
     let volume_cache_dir = source_dir().join("cache");
     let volume_output_dir = source_dir().join("output");
 
@@ -178,18 +171,9 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     print::sub_stream_cmd(docker_run)?;
 
-    print::bullet(format!(
-        "Updating manifest {}",
-        style::value(inventory.to_string_lossy())
-    ));
-
     let output_tar = output_ruby_tar_path(&volume_output_dir, version, base_image, Some(arch));
 
     let sha_seven_path = cp_file_sha_seven_same_dir(&output_tar)?;
-    let url = format!(
-        "{S3_BASE_URL}/{}",
-        sha_seven_path.strip_prefix(&volume_output_dir)?.display()
-    );
 
     print::sub_bullet(format!("Copied SHA tgz {}", sha_seven_path.display(),));
 
@@ -198,37 +182,6 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
         fs::copy(expected_output, &legacy_output)?;
         cp_file_sha_seven_same_dir(&legacy_output)?;
     }
-
-    let artifact = Artifact {
-        version: GemVersion::from_str(&version.bundler_format())?,
-        os: inventory::artifact::Os::Linux,
-        arch: *arch,
-        url,
-        checksum: format!("sha256:{sha}").parse()?,
-        metadata: ArtifactMetadata {
-            distro_version: base_image.distro_version(),
-            timestamp: chrono::Utc::now(),
-        },
-    };
-
-    atomic_inventory_update(&inventory, |inventory| {
-        for prior in &inventory.artifacts {
-            if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
-                print::error(format!("Error updating inventory\n\nError: {error}"));
-
-                fs::remove_file(&sha_seven_path)?;
-                return Err(error);
-            };
-        }
-
-        inventory
-            .artifacts
-            .retain(|a| artifact_is_different(a, &artifact));
-
-        inventory.push(artifact);
-
-        Ok(())
-    })?;
 
     print::all_done(&Some(start));
 
