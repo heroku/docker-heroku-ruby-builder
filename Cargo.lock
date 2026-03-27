@@ -1400,7 +1400,6 @@ dependencies = [
  "sha2",
  "shared",
  "tar",
- "tempfile",
  "thiserror",
 ]
 
