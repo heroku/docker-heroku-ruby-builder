@@ -6,8 +6,6 @@ USER root
 RUN apt-get update -y && apt-get install -y libreadline-dev ruby
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
-
-# https://bugs.ruby-lang.org/issues/20506
 RUN rustup update
 
 WORKDIR /tmp/workdir/
