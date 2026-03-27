@@ -18,7 +18,6 @@ reqwest = { workspace = true }
 sha2 = { workspace = true }
 shared = { workspace = true }
 tar = { workspace = true }
-tempfile = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

@@ -1,6 +1,5 @@
 use bullet_stream::global::print;
 use clap::Parser;
-use fs_err::{self as fs};
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory::artifact::Arch;
@@ -40,23 +39,15 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     ));
     let distro_number = base_image.distro_number();
 
-    let tempdir = tempfile::tempdir()?;
-    let dockerfile_path = tempdir.path().join("Dockerfile");
+    let dockerfile_path = source_dir().join("dockerfiles").join("jruby_check").join("Dockerfile");
 
     let image_name = format!("heroku/jruby-builder:{base_image}");
 
     print::bullet(format!("Dockerfile for {image_name}"));
 
-    let dockerfile = formatdoc! {"
-        FROM heroku/heroku:{distro_number}-build
-
-        USER root
-        RUN apt-get update -y; apt-get install default-jre default-jdk -y
-    "};
-
-    print::sub_stream_with("Contents", |mut stream, _| write!(stream, "{dockerfile}"))?;
-
-    fs::write(&dockerfile_path, dockerfile)?;
+    print::sub_stream_with("Using", |mut stream, _| {
+        write!(stream, "{}", dockerfile_path.display())
+    })?;
 
     let outside_output = source_dir().join("output");
 
@@ -65,6 +56,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     docker_build.arg("build");
     docker_build.args(["--platform", &format!("linux/{arch}")]);
     docker_build.args(["--progress", "plain"]);
+    docker_build.args(["--build-arg", &format!("STACK_VERSION={distro_number}")]);
     docker_build.args(["--tag", &image_name]);
     docker_build.args(["--file", &dockerfile_path.display().to_string()]);
     docker_build.arg(source_dir().to_str().expect("Path to str"));

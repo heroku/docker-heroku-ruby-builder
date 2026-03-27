@@ -1,7 +1,7 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err::{self as fs, PathExt};
-use indoc::{formatdoc, indoc};
+use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use shared::{
@@ -44,25 +44,8 @@ struct RubyArgs {
     job_metadata: Option<PathBuf>,
 }
 
-fn ruby_dockerfile_contents(base_image: &BaseImage) -> String {
-    let distro_number = base_image.distro_number();
-    let mut dockerfile = String::new();
-    dockerfile.push_str(&format!("FROM heroku/heroku:{distro_number}-build\n"));
-    dockerfile.push_str(indoc! {r#"
-        USER root
-
-        RUN apt-get update -y && apt-get install -y libreadline-dev ruby
-        RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-        ENV PATH="/root/.cargo/bin:${PATH}"
-
-        # https://bugs.ruby-lang.org/issues/20506
-        RUN rustup update
-
-        WORKDIR /tmp/workdir/
-        COPY make_ruby.sh /tmp/workdir/make_ruby.sh
-    "#});
-
-    dockerfile
+fn ruby_dockerfile_path() -> PathBuf {
+    source_dir().join("dockerfiles").join("ruby_build").join("Dockerfile")
 }
 
 fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>> {
@@ -112,14 +95,13 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
         OnConflict::Overwrite => {}
     }
 
-    let temp_dir = tempfile::tempdir()?;
     let image_name = format!("heroku/ruby-builder:{base_image}");
-    let dockerfile = ruby_dockerfile_contents(base_image);
-    let dockerfile_path = temp_dir.path().join("Dockerfile");
+    let dockerfile_path = ruby_dockerfile_path();
+    let distro_number = base_image.distro_number();
 
     print::bullet("Dockerfile");
-    print::sub_stream_with("Writing contents to tmpdir", |mut stream, _| {
-        write!(stream, "{dockerfile}").and_then(|_| fs::write(&dockerfile_path, &dockerfile))
+    print::sub_stream_with("Using", |mut stream, _| {
+        write!(stream, "{}", dockerfile_path.display())
     })?;
 
     print::bullet(format!("Docker image {image_name}"));
@@ -127,6 +109,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
     docker_build.arg("build");
     docker_build.args(["--platform", &format!("linux/{arch}")]);
     docker_build.args(["--progress", "plain"]);
+    docker_build.args(["--build-arg", &format!("STACK_VERSION={distro_number}")]);
     docker_build.args(["--tag", &image_name]);
     docker_build.args(["--file", &dockerfile_path.display().to_string()]);
     docker_build.arg(source_dir());
