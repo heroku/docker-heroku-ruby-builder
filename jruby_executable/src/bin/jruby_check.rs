@@ -39,7 +39,10 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     ));
     let distro_number = base_image.distro_number();
 
-    let dockerfile_path = source_dir().join("dockerfiles").join("jruby_check").join("Dockerfile");
+    let dockerfile_path = source_dir()
+        .join("dockerfiles")
+        .join("jruby_check")
+        .join("Dockerfile");
 
     let image_name = format!("heroku/jruby-builder:{base_image}");
 

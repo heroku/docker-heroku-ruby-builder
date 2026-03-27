@@ -45,7 +45,10 @@ struct RubyArgs {
 }
 
 fn ruby_dockerfile_path() -> PathBuf {
-    source_dir().join("dockerfiles").join("ruby_build").join("Dockerfile")
+    source_dir()
+        .join("dockerfiles")
+        .join("ruby_build")
+        .join("Dockerfile")
 }
 
 fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>> {
