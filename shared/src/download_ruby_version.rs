@@ -90,3 +90,30 @@ impl RubyDownloadVersion {
         )
     }
 }
+
+#[cfg(test)]
+mod test {
+    use serde::Serialize;
+
+    use super::*;
+
+    #[test]
+    fn test_pre_version_serialization() {
+        let version = gem_version::GemVersion::from_str(
+            &RubyDownloadVersion::new("4.0.0-preview2")
+                .unwrap()
+                .bundler_format(),
+        )
+        .unwrap();
+
+        #[derive(Serialize)]
+        struct FakeInventory {
+            version: gem_version::GemVersion,
+        }
+
+        assert_eq!(
+            "version = \"4.0.0.preview2\"",
+            toml::to_string(&FakeInventory { version }).unwrap().trim()
+        );
+    }
+}

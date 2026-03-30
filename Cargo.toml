@@ -18,7 +18,7 @@ flate2 = "1"
 fs-err = { version = "3", features = ["debug"] }
 fs2 = "0.4"
 fun_run = "0.6"
-gem_version = "0.3"
+gem_version = "1.0"
 glob = "0.3"
 hex = "0.4"
 indoc = "2"
