@@ -36,4 +36,4 @@ shared = { path = "shared" }
 tar = "0.4"
 tempfile = "3"
 thiserror = "2"
-toml = "1.0"
+toml = "1.1"
