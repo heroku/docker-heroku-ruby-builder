@@ -10,7 +10,7 @@ mod base_image;
 mod download_ruby_version;
 mod inventory_help;
 
-pub use base_image::BaseImage;
+pub use base_image::{BaseImage, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
 
 pub static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
