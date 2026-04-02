@@ -1,3 +1,4 @@
+use libherokubuildpack::inventory::artifact::Arch;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -65,4 +66,18 @@ impl FromStr for BaseImage {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         BaseImage::new(s)
     }
+}
+
+/// Returns all valid (BaseImage, Arch) pairs for building Ruby binaries.
+/// heroku-22 supports only amd64; heroku-24 and heroku-26 support amd64 + arm64.
+pub fn build_matrix() -> Vec<(BaseImage, Arch)> {
+    let mut matrix = Vec::new();
+    for &(name, _) in KNOWN_BASE_IMAGES {
+        let base_image = BaseImage::new(name).expect("known base image");
+        matrix.push((base_image.clone(), Arch::Amd64));
+        if name != "heroku-22" {
+            matrix.push((base_image, Arch::Arm64));
+        }
+    }
+    matrix
 }

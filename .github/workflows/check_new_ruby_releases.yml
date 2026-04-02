@@ -1,0 +1,50 @@
+name: Check for new Ruby releases
+run-name: "Check for new Ruby releases"
+
+on:
+  schedule:
+    - cron: '0 */2 * * *' # Every 2 hours
+  workflow_dispatch:
+    inputs:
+      dry_run:
+          description: "Print what would be triggered without actually dispatching builds"
+          type: boolean
+          default: false
+          required: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  check-releases:
+    runs-on: pub-hk-ubuntu-24.04-xlarge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+      - name: Check for missing Ruby versions
+        run: |
+          cargo run --locked --bin ruby_release_check -- \
+            --minimum-version 3.2.0 \
+            --output versions.json \
+            2>"$GITHUB_STEP_SUMMARY"
+      - name: Trigger builds for missing versions
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSIONS=$(jq -r '.[]' versions.json)
+          if [ -z "$VERSIONS" ]; then
+            echo "No versions to build"
+            exit 0
+          fi
+          echo "$VERSIONS" | while IFS= read -r version; do
+            echo "Triggering build for Ruby $version"
+            gh workflow run build_ruby.yml \
+              -f ruby_version="$version" \
+              -f on_conflict=skip
+          done
