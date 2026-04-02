@@ -5,9 +5,9 @@ use indoc::{formatdoc, indoc};
 use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use shared::{
-    BaseImage, BuildStatus, RubyDownloadVersion, TarDownloadPath, append_filename_with,
-    download_tar, output_ruby_tar_path, s3_url_exists, sha256_from_path, source_dir,
-    write_job_metadata,
+    BaseImage, BuildStatus, RubyDownloadVersion, S3_BASE_URL, TarDownloadPath,
+    append_filename_with, download_tar, output_ruby_tar_path, s3_url_exists, sha256_from_path,
+    source_dir, write_job_metadata,
 };
 use std::{
     io::Write,
@@ -18,7 +18,6 @@ use std::{
 
 static INNER_OUTPUT: &str = "/tmp/output";
 static INNER_CACHE: &str = "/tmp/cache";
-static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 enum OnConflict {
