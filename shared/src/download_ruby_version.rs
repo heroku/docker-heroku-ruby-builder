@@ -5,12 +5,27 @@ use winnow::Parser;
 use winnow::ascii::dec_uint;
 use winnow::token::literal;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(into = "String", try_from = "String")]
 pub struct RubyDownloadVersion {
     pub major: u32,
     pub minor: u32,
     pub patch: u32,
     pub rest: String,
+}
+
+impl From<RubyDownloadVersion> for String {
+    fn from(v: RubyDownloadVersion) -> Self {
+        v.to_string()
+    }
+}
+
+impl TryFrom<String> for RubyDownloadVersion {
+    type Error = Error;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        s.parse()
+    }
 }
 
 impl Display for RubyDownloadVersion {
