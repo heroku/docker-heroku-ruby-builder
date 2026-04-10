@@ -2,13 +2,13 @@ use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
 use reqwest::Url;
-use serde::Deserialize;
 use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path};
 use std::{
     error::Error,
     path::{Path, PathBuf},
 };
 use tokio::task::JoinSet;
+use yaml_rust2::YamlLoader;
 
 static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
     Url::parse("https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml")
@@ -37,14 +37,16 @@ async fn fetch_releases(url: &Url) -> Result<Vec<RubyDownloadVersion>, Box<dyn s
         .text()
         .await?;
 
-    #[derive(Deserialize)]
-    struct RawEntry {
-        version: String,
-    }
-    let raw: Vec<RawEntry> = serde_yaml::from_str(&body)?;
-    let releases = raw
-        .into_iter()
-        .filter_map(|entry| RubyDownloadVersion::new(&entry.version).ok())
+    let docs = YamlLoader::load_from_str(&body)?;
+    let releases = docs[0]
+        .as_vec()
+        .unwrap_or(&Vec::new())
+        .iter()
+        .filter_map(|entry| {
+            entry["version"]
+                .as_str()
+                .and_then(|v| RubyDownloadVersion::new(v).ok())
+        })
         .collect();
     Ok(releases)
 }
