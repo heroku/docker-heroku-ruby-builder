@@ -4,14 +4,14 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-static KNOWN_BASE_IMAGES: &[(&str, &str)] = &[
-    ("heroku-22", "22"),
-    ("heroku-24", "24"),
-    ("heroku-26", "26"),
+static KNOWN_BASE_IMAGES: &[(&str, &str, &[Arch])] = &[
+    ("heroku-22", "22", &[Arch::Amd64]),
+    ("heroku-24", "24", &[Arch::Amd64, Arch::Arm64]),
+    ("heroku-26", "26", &[Arch::Amd64, Arch::Arm64]),
 ];
 
 #[derive(Debug, thiserror::Error)]
-#[error("Invalid base image {0} must be one of {known}", known = KNOWN_BASE_IMAGES.iter().map(|(name, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
+#[error("Invalid base image {0} must be one of {known}", known = KNOWN_BASE_IMAGES.iter().map(|(name, _, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
 pub struct BaseImageError(String);
 
 #[derive(Debug, Clone)]
@@ -27,8 +27,8 @@ impl BaseImage {
     pub fn new(s: &str) -> Result<Self, BaseImageError> {
         KNOWN_BASE_IMAGES
             .iter()
-            .find(|&&(name, _)| name == s)
-            .map(|&(name, version)| Self {
+            .find(|&&(name, _, _)| name == s)
+            .map(|&(name, version, _)| Self {
                 name: name.to_owned(),
                 distro_number: version.to_owned(),
             })
@@ -69,14 +69,12 @@ impl FromStr for BaseImage {
 }
 
 /// Returns all valid (BaseImage, Arch) pairs for building Ruby binaries.
-/// heroku-22 supports only amd64; heroku-24 and heroku-26 support amd64 + arm64.
 pub fn build_matrix() -> Vec<(BaseImage, Arch)> {
     let mut matrix = Vec::new();
-    for &(name, _) in KNOWN_BASE_IMAGES {
+    for &(name, _, archs) in KNOWN_BASE_IMAGES {
         let base_image = BaseImage::new(name).expect("known base image");
-        matrix.push((base_image.clone(), Arch::Amd64));
-        if name != "heroku-22" {
-            matrix.push((base_image, Arch::Arm64));
+        for arch in archs {
+            matrix.push((base_image.clone(), *arch));
         }
     }
     matrix
