@@ -6,14 +6,19 @@ use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_pat
 use std::{
     error::Error,
     path::{Path, PathBuf},
+    time::Duration,
 };
 use tokio::task::JoinSet;
+use tokio::time::sleep;
 use yaml_rust2::YamlLoader;
 
 static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
     Url::parse("https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml")
         .expect("valid releases URL constant")
 });
+
+const MAX_RETRY_ATTEMPTS: u8 = 3;
+const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
@@ -28,7 +33,27 @@ struct Args {
 }
 
 async fn fetch_releases(url: &Url) -> Result<Vec<RubyDownloadVersion>, Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
+    let mut attempts = 0;
+    loop {
+        attempts += 1;
+        match fetch_releases_inner(url).await {
+            Ok(val) => return Ok(val),
+            Err(error) => {
+                if attempts >= MAX_RETRY_ATTEMPTS {
+                    return Err(error);
+                }
+                sleep(RETRY_DELAY).await;
+            }
+        }
+    }
+}
+
+async fn fetch_releases_inner(
+    url: &Url,
+) -> Result<Vec<RubyDownloadVersion>, Box<dyn std::error::Error>> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?;
     let body = client
         .get(url.clone())
         .send()
@@ -85,7 +110,25 @@ fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
 }
 
 async fn s3_url_exists(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let client = reqwest::Client::new();
+    let mut attempts = 0;
+    loop {
+        attempts += 1;
+        match s3_url_exists_inner(url.clone()).await {
+            Ok(val) => return Ok(val),
+            Err(error) => {
+                if attempts >= MAX_RETRY_ATTEMPTS {
+                    return Err(error);
+                }
+                sleep(RETRY_DELAY).await;
+            }
+        }
+    }
+}
+
+async fn s3_url_exists_inner(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?;
     let response = client.head(url.clone()).send().await?;
     match response.status() {
         status if status.is_success() => Ok(true),
