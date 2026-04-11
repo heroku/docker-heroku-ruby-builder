@@ -87,12 +87,34 @@ impl BuildProperties {
     }
 }
 
+const MAX_RETRY_ATTEMPTS: u8 = 3;
+const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+
 pub fn jruby_build_properties(jruby_version: &str) -> Result<BuildProperties, Error> {
+    let mut attempts = 0;
+    loop {
+        attempts += 1;
+        match jruby_build_properties_inner(jruby_version) {
+            Ok(val) => return Ok(val),
+            Err(error) => {
+                if attempts >= MAX_RETRY_ATTEMPTS {
+                    return Err(error);
+                }
+                std::thread::sleep(RETRY_DELAY);
+            }
+        }
+    }
+}
+
+fn jruby_build_properties_inner(jruby_version: &str) -> Result<BuildProperties, Error> {
     let url = format!(
         "https://raw.githubusercontent.com/jruby/jruby/{jruby_version}/default.build.properties",
     );
 
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(Error::FailedRequest)?;
     let response = client.get(&url).send().map_err(Error::FailedRequest)?;
 
     let body = response

@@ -16,9 +16,13 @@ libherokubuildpack = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
 sha2 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+yaml-rust2 = { workspace = true }
 shared = { workspace = true }
 tar = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
