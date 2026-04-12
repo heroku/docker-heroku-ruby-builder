@@ -142,8 +142,14 @@ async fn check_version_on_s3(
 ) -> Result<(RubyDownloadVersion, Vec<String>), Box<dyn std::error::Error + Send + Sync>> {
     let mut set = JoinSet::new();
     for (label, url) in urls_to_check(&version) {
+        let version_for_err = format!("{version:?}");
         set.spawn(async move {
-            let exists = s3_url_exists(url).await?;
+            let label_for_err = label.clone();
+            let exists = s3_url_exists(url).await.map_err(
+                |e| -> Box<dyn std::error::Error + Send + Sync> {
+                    format!("Error checking {version_for_err} ({label_for_err}): {e}").into()
+                },
+            )?;
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>((label, exists))
         });
     }
