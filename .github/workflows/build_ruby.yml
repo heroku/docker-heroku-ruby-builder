@@ -33,7 +33,7 @@ env:
 
 jobs:
   changelog:
-    runs-on: pub-hk-ubuntu-24.04-xlarge
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v6
