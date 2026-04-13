@@ -5,13 +5,38 @@ use reqwest::Url;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
+
+const MAX_RETRY_ATTEMPTS: u8 = 3;
+const RETRY_DELAY: Duration = Duration::from_secs(1);
+
+fn with_retries<T, F>(f: F) -> Result<T, Error>
+where
+    F: Fn() -> Result<T, Error>,
+{
+    let mut attempts = 0;
+    loop {
+        attempts += 1;
+        match f() {
+            Ok(val) => return Ok(val),
+            Err(error) => {
+                if attempts >= MAX_RETRY_ATTEMPTS {
+                    return Err(error);
+                }
+                std::thread::sleep(RETRY_DELAY);
+            }
+        }
+    }
+}
 
 mod base_image;
 mod download_ruby_version;
 mod inventory_help;
 
-pub use base_image::BaseImage;
+pub use base_image::{BaseImage, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
+
+pub static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 pub use inventory_help::{
     ArtifactMetadata, artifact_is_different, artifact_same_url_different_checksum,
     atomic_inventory_update, inventory_check, sha256_from_path,
@@ -140,7 +165,14 @@ pub fn validate_version_for_stack(
 
 /// Performs an HTTP HEAD request to check if a URL returns a successful status.
 pub fn s3_url_exists(url: Url) -> Result<bool, Error> {
-    let client = reqwest::blocking::Client::new();
+    with_retries(|| s3_url_exists_inner(url.clone()))
+}
+
+fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(Error::FailedRequest)?;
     let response = client
         .head(url.clone())
         .send()
@@ -155,16 +187,21 @@ pub fn s3_url_exists(url: Url) -> Result<bool, Error> {
 }
 
 pub fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
-    let mut dest = fs::File::create(path.as_ref()).map_err(Error::FsError)?;
+    with_retries(|| download_tar_inner(url, path))
+}
 
-    let client = reqwest::blocking::Client::new();
+fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
+    let mut dest = fs::File::create(path.as_ref()).map_err(Error::FsError)?;
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(300))
+        .build()
+        .map_err(Error::FailedRequest)?;
     let mut response = client.get(url).send().map_err(Error::FailedRequest)?;
     std::io::copy(&mut response, &mut dest).map_err(|err| Error::UrlToFileError {
         url: url.to_string(),
         file: path.as_ref().to_path_buf(),
         source: err,
     })?;
-
     response.error_for_status().map_err(Error::FailedRequest)?;
     Ok(())
 }
