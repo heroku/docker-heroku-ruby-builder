@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   check-releases:
-    runs-on: pub-hk-ubuntu-24.04-xlarge
+    runs-on: pub-hk-ubuntu-24.04-ip # `gh workflow run` needs to be in an IP allow list
     steps:
       - name: Checkout
         uses: actions/checkout@v6
