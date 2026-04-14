@@ -7,12 +7,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-const MAX_RETRY_ATTEMPTS: u8 = 3;
-const RETRY_DELAY: Duration = Duration::from_secs(1);
+pub const MAX_RETRY_ATTEMPTS: u8 = 3;
+pub const RETRY_DELAY: Duration = Duration::from_secs(1);
 
-fn with_retries<T, F>(f: F) -> Result<T, Error>
+pub fn with_retries<T, E, F>(f: F) -> Result<T, E>
 where
-    F: Fn() -> Result<T, Error>,
+    F: Fn() -> Result<T, E>,
 {
     let mut attempts = 0;
     loop {
