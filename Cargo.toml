@@ -24,14 +24,14 @@ hex = "0.4"
 indoc = "2"
 java-properties = "2"
 lazy_static = "1"
-libherokubuildpack = { version = "0.30.3", default-features = false, features = ["inventory", "inventory-sha2"] }
+libherokubuildpack = { version = "0.30.4", default-features = false, features = ["inventory", "inventory-sha2"] }
 winnow = "1.0"
 pretty_assertions = "1"
 rayon = "1"
 regex = "1"
 reqwest = { version = "0.13", features = ["blocking"] }
 serde = {version = "1", features = ["derive"] }
-sha2 = "0.10"
+sha2 = "0.11"
 shared = { path = "shared" }
 tar = "0.4"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
