@@ -31,7 +31,7 @@ rayon = "1"
 regex = "1"
 reqwest = { version = "0.13", features = ["blocking"] }
 serde = {version = "1", features = ["derive"] }
-sha2 = "0.10"
+sha2 = "0.11"
 shared = { path = "shared" }
 tar = "0.4"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
