@@ -196,6 +196,7 @@ jobs:
           grep -q "Already exists" "$LOGFILE"
           grep -q "skipping" "$LOGFILE"
           grep -q "status=skipped" "$METAFILE"
+          test -d ./output
       - name: "on-conflict=skip: skips when local file exists"
         run: |
           set -euo pipefail
@@ -211,6 +212,7 @@ jobs:
           grep -q "Output already exists locally" "$LOGFILE"
           grep -q "skipping" "$LOGFILE"
           grep -q "status=skipped" "$METAFILE"
+          test -d ./output
 
   check_inventory_urls:
     runs-on: ubuntu-24.04
