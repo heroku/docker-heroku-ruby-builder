@@ -38,6 +38,12 @@ struct Args {
     #[arg(long)]
     on_conflict: OnConflict,
 
+    #[arg(long = "artifact-dir")]
+    artifact_dir: PathBuf,
+
+    #[arg(long = "cache-dir")]
+    cache_dir: PathBuf,
+
     #[arg(long = "job-metadata")]
     job_metadata: Option<PathBuf>,
 }
@@ -47,17 +53,19 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
         version,
         base_image,
         on_conflict,
+        artifact_dir,
+        cache_dir,
         job_metadata: _,
     } = args;
 
     let start = Instant::now();
     print::h2("Building JRuby");
     let inventory = source_dir().join("jruby_inventory.toml");
-    let volume_cache_dir = source_dir().join("cache");
-    let volume_output_dir = source_dir().join("output");
+    let volume_cache_dir = cache_dir;
+    let volume_output_dir = artifact_dir;
 
-    fs::create_dir_all(&volume_cache_dir)?;
-    fs::create_dir_all(&volume_output_dir)?;
+    fs::create_dir_all(volume_cache_dir)?;
+    fs::create_dir_all(volume_output_dir)?;
 
     let ruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
@@ -75,7 +83,7 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
                 return Ok(BuildStatus::Skipped);
             }
 
-            let s3_path = expected_output.strip_prefix(&volume_output_dir)?;
+            let s3_path = expected_output.strip_prefix(volume_output_dir)?;
             let url = {
                 let mut url = Url::parse(S3_BASE_URL)?;
                 url.path_segments_mut()
@@ -178,7 +186,7 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
             arch: cpu_arch,
             url: format!(
                 "{S3_BASE_URL}/{}",
-                sha_seven_path.strip_prefix(&volume_output_dir)?.display()
+                sha_seven_path.strip_prefix(volume_output_dir)?.display()
             ),
             checksum: format!("sha256:{sha}").parse()?,
             metadata: ArtifactMetadata {
