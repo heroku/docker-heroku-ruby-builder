@@ -66,6 +66,8 @@ jobs:
             --version ${{inputs.jruby_version}} \
             --base-image ${{matrix.base_image}} \
             --on-conflict ${{inputs.on_conflict}} \
+            --artifact-dir ./output \
+            --cache-dir ./cache \
             --job-metadata "$GITHUB_OUTPUT"
       - name: Check JRuby
         if: steps.build.outputs.status == 'success'
@@ -74,6 +76,7 @@ jobs:
             --version ${{inputs.jruby_version}} \
             --base-image ${{matrix.base_image}} \
             --arch amd64 \
+            --artifact-dir ./output \
             | tee $GITHUB_STEP_SUMMARY
       - name: Upload JRuby runtime archive to S3 dry run
         if: ${{ inputs.dry_run }}

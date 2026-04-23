@@ -39,6 +39,12 @@ struct RubyArgs {
     #[arg(long)]
     on_conflict: OnConflict,
 
+    #[arg(long = "artifact-dir")]
+    artifact_dir: PathBuf,
+
+    #[arg(long = "cache-dir")]
+    cache_dir: PathBuf,
+
     #[arg(long = "job-metadata")]
     job_metadata: Option<PathBuf>,
 }
@@ -56,18 +62,20 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
         version,
         base_image,
         on_conflict,
+        artifact_dir,
+        cache_dir,
         job_metadata: _,
     } = args;
 
     let start = Instant::now();
     print::h2("Building Ruby");
-    let volume_cache_dir = source_dir().join("cache");
-    let volume_output_dir = source_dir().join("output");
+    let volume_cache_dir = cache_dir;
+    let volume_output_dir = artifact_dir;
 
-    fs::create_dir_all(&volume_cache_dir)?;
-    fs::create_dir_all(&volume_output_dir)?;
+    fs::create_dir_all(volume_cache_dir)?;
+    fs::create_dir_all(volume_output_dir)?;
 
-    let expected_output = output_ruby_tar_path(&volume_output_dir, version, base_image, Some(arch));
+    let expected_output = output_ruby_tar_path(volume_output_dir, version, base_image, Some(arch));
 
     match on_conflict {
         OnConflict::Skip => {
@@ -79,7 +87,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
                 return Ok(BuildStatus::Skipped);
             }
 
-            let s3_path = expected_output.strip_prefix(&volume_output_dir)?;
+            let s3_path = expected_output.strip_prefix(volume_output_dir)?;
             let url = {
                 let mut url = Url::parse(S3_BASE_URL)?;
                 url.path_segments_mut()
@@ -156,14 +164,14 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
     print::sub_stream_cmd(docker_run)?;
 
-    let output_tar = output_ruby_tar_path(&volume_output_dir, version, base_image, Some(arch));
+    let output_tar = output_ruby_tar_path(volume_output_dir, version, base_image, Some(arch));
 
     let sha_seven_path = cp_file_sha_seven_same_dir(&output_tar)?;
 
     print::sub_bullet(format!("Copied SHA tgz {}", sha_seven_path.display(),));
 
     if base_image.has_legacy_path() {
-        let legacy_output = output_ruby_tar_path(&volume_output_dir, version, base_image, None);
+        let legacy_output = output_ruby_tar_path(volume_output_dir, version, base_image, None);
         fs::copy(expected_output, &legacy_output)?;
         cp_file_sha_seven_same_dir(&legacy_output)?;
     }

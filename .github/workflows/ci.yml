@@ -76,6 +76,8 @@ jobs:
             --base-image ${{matrix.base_image}} \
             --arch ${{matrix.arch}} \
             --on-conflict overwrite \
+            --artifact-dir ./output \
+            --cache-dir ./cache \
             --job-metadata "$METAFILE"
           grep -q "status=success" "$METAFILE"
       - name: Check Ruby
@@ -83,7 +85,8 @@ jobs:
           cargo run --locked --bin ruby_check -- \
             --version ${{matrix.version}} \
             --base-image ${{matrix.base_image}} \
-            --arch ${{matrix.arch}}
+            --arch ${{matrix.arch}} \
+            --artifact-dir ./output
       - name: Verify output paths
         run: |
           set -euo pipefail
@@ -121,6 +124,8 @@ jobs:
             --version ${{matrix.version}} \
             --base-image ${{matrix.base_image}} \
             --on-conflict overwrite \
+            --artifact-dir ./output \
+            --cache-dir ./cache \
             --job-metadata "$METAFILE"
           grep -q "status=success" "$METAFILE"
       - name: Check JRuby
@@ -128,7 +133,8 @@ jobs:
           cargo run --locked --bin jruby_check -- \
             --version ${{matrix.version}} \
             --base-image ${{matrix.base_image}} \
-            --arch ${{matrix.arch}}
+            --arch ${{matrix.arch}} \
+            --artifact-dir ./output
 
   ruby_on_conflict_test:
     runs-on: ubuntu-24.04
@@ -151,6 +157,8 @@ jobs:
             --base-image heroku-24 \
             --arch amd64 \
             --on-conflict skip \
+            --artifact-dir ./output \
+            --cache-dir ./cache \
             --job-metadata "$METAFILE" 2>&1 | tee "$LOGFILE"
           grep -q "Already exists" "$LOGFILE"
           grep -q "skipping" "$LOGFILE"
@@ -167,6 +175,8 @@ jobs:
             --base-image heroku-24 \
             --arch amd64 \
             --on-conflict skip \
+            --artifact-dir ./output \
+            --cache-dir ./cache \
             --job-metadata "$METAFILE" 2>&1 | tee "$LOGFILE"
           grep -q "Output already exists locally" "$LOGFILE"
           grep -q "skipping" "$LOGFILE"
@@ -192,6 +202,8 @@ jobs:
             --version 9.4.7.0 \
             --base-image heroku-22 \
             --on-conflict skip \
+            --artifact-dir ./output \
+            --cache-dir ./cache \
             --job-metadata "$METAFILE" 2>&1 | tee "$LOGFILE"
           grep -q "Already exists" "$LOGFILE"
           grep -q "skipping" "$LOGFILE"
@@ -208,6 +220,8 @@ jobs:
             --version 9.4.7.0 \
             --base-image heroku-22 \
             --on-conflict skip \
+            --artifact-dir ./output \
+            --cache-dir ./cache \
             --job-metadata "$METAFILE" 2>&1 | tee "$LOGFILE"
           grep -q "Output already exists locally" "$LOGFILE"
           grep -q "skipping" "$LOGFILE"

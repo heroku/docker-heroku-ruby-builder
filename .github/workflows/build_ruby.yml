@@ -71,6 +71,8 @@ jobs:
             --base-image ${{matrix.base_image}} \
             --arch ${{matrix.arch}} \
             --on-conflict ${{inputs.on_conflict}} \
+            --artifact-dir ./output \
+            --cache-dir ./cache \
             --job-metadata "$GITHUB_OUTPUT"
       - name: Check Ruby
         if: steps.build.outputs.status == 'success'
@@ -79,6 +81,7 @@ jobs:
             --version ${{inputs.ruby_version}} \
             --base-image ${{matrix.base_image}} \
             --arch ${{matrix.arch}} \
+            --artifact-dir ./output \
             | tee $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3 dry run
         if: ${{ inputs.dry_run }}

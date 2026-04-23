@@ -21,6 +21,9 @@ struct RubyArgs {
 
     #[arg(long = "base-image")]
     base_image: BaseImage,
+
+    #[arg(long = "artifact-dir")]
+    artifact_dir: PathBuf,
 }
 
 fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
@@ -28,6 +31,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         arch,
         version,
         base_image,
+        artifact_dir,
     } = args;
 
     let jruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
@@ -52,7 +56,7 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         write!(stream, "{}", dockerfile_path.display())
     })?;
 
-    let outside_output = source_dir().join("output");
+    let outside_output = artifact_dir;
 
     print::bullet(format!("Docker image {image_name}"));
     let mut docker_build = Command::new("docker");

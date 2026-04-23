@@ -2,7 +2,7 @@ use bullet_stream::global::print;
 use clap::Parser;
 use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
-use shared::{BaseImage, RubyDownloadVersion, output_ruby_tar_path, source_dir};
+use shared::{BaseImage, RubyDownloadVersion, output_ruby_tar_path};
 use std::{error::Error, path::PathBuf, process::Command, time::Instant};
 
 static INNER_OUTPUT: &str = "/tmp/output";
@@ -17,6 +17,9 @@ struct RubyArgs {
 
     #[arg(long = "base-image")]
     base_image: BaseImage,
+
+    #[arg(long = "artifact-dir")]
+    artifact_dir: PathBuf,
 }
 
 fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
@@ -24,6 +27,7 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         arch,
         version,
         base_image,
+        artifact_dir,
     } = args;
     let start = Instant::now();
     print::h2(format!(
@@ -38,7 +42,7 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     let distro_number = base_image.distro_number();
 
     let image_name = format!("heroku/heroku:{distro_number}-build");
-    let outside_output = source_dir().join("output");
+    let outside_output = artifact_dir;
 
     let mut cmd = Command::new("docker");
     cmd.arg("run");
