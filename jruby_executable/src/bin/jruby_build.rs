@@ -1,22 +1,17 @@
 use bullet_stream::{global::print, style};
 use clap::Parser;
 use fs_err::{self as fs, PathExt};
-use gem_version::GemVersion;
 use indoc::formatdoc;
 use jruby_executable::jruby_build_properties;
-use libherokubuildpack::inventory;
-use libherokubuildpack::inventory::artifact::{Arch, Artifact};
+use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use shared::{
-    ArtifactMetadata, BaseImage, BuildStatus, TarDownloadPath, append_filename_with,
-    artifact_is_different, artifact_same_url_different_checksum, atomic_inventory_update,
-    download_tar, s3_url_exists, sha256_from_path, source_dir, tar_dir_to_file, untar_to_dir,
-    write_job_metadata,
+    BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar, s3_url_exists,
+    sha256_from_path, tar_dir_to_file, untar_to_dir, write_job_metadata,
 };
 use std::convert::From;
 use std::error::Error;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::time::Instant;
 
 static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
@@ -60,7 +55,6 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
 
     let start = Instant::now();
     print::h2("Building JRuby");
-    let inventory = source_dir().join("jruby_inventory.toml");
     let volume_cache_dir = cache_dir;
     let volume_output_dir = artifact_dir;
 
@@ -155,10 +149,6 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     }
 
     print::bullet("Creating tgz archives");
-    print::sub_bullet(format!(
-        "Inventory file {}",
-        style::value(inventory.to_string_lossy())
-    ));
     let tar_dir = volume_output_dir.join(base_image.to_string());
 
     fs::create_dir_all(&tar_dir)?;
@@ -176,42 +166,6 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
 
     print::sub_bullet(format!("Write {}", sha_seven_path.display(),));
     fs::copy(tar_file.path(), &sha_seven_path)?;
-
-    let timestamp = chrono::Utc::now();
-    for cpu_arch in [Arch::Amd64, Arch::Arm64] {
-        let distro_version = base_image.distro_version();
-        let artifact = Artifact {
-            version: GemVersion::from_str(version)?,
-            os: inventory::artifact::Os::Linux,
-            arch: cpu_arch,
-            url: format!(
-                "{S3_BASE_URL}/{}",
-                sha_seven_path.strip_prefix(volume_output_dir)?.display()
-            ),
-            checksum: format!("sha256:{sha}").parse()?,
-            metadata: ArtifactMetadata {
-                distro_version,
-                timestamp,
-            },
-        };
-        atomic_inventory_update(&inventory, |inventory| {
-            for prior in &inventory.artifacts {
-                if let Err(error) = artifact_same_url_different_checksum(prior, &artifact) {
-                    print::error(format!("Error updating inventory\n\nError: {error}"));
-
-                    fs::remove_file(&sha_seven_path)?;
-                    return Err(error);
-                };
-            }
-
-            inventory
-                .artifacts
-                .retain(|a| artifact_is_different(a, &artifact));
-
-            inventory.push(artifact);
-            Ok(())
-        })?
-    }
 
     // Can be removed once manifest file support is fully rolled out
     for cpu_arch in [Arch::Amd64, Arch::Arm64] {
