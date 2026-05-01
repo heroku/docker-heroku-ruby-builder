@@ -13,7 +13,7 @@ rust-version = "1.88"
 [workspace.dependencies]
 bullet_stream = "0.11"
 chrono = {version = "0.4", features = ["serde"] }
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 flate2 = "1"
 fs-err = { version = "3", features = ["debug"] }
 fs2 = "0.4"
