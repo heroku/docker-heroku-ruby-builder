@@ -84,4 +84,5 @@ jobs:
             --artifact-dir ./output \
             | tee $GITHUB_STEP_SUMMARY
       - name: Upload Ruby runtime archive to S3
+        if: steps.build.outputs.status == 'success'
         run: aws s3 sync ./output "s3://${S3_BUCKET}" ${{ case(inputs.dry_run, '--dryrun', '') }}
