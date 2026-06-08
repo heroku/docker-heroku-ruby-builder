@@ -83,9 +83,5 @@ jobs:
             --arch ${{matrix.arch}} \
             --artifact-dir ./output \
             | tee $GITHUB_STEP_SUMMARY
-      - name: Upload Ruby runtime archive to S3 dry run
-        if: ${{ inputs.dry_run }}
-        run: aws s3 sync ./output "s3://${S3_BUCKET}" --dryrun
-      - name: Upload Ruby runtime archive to S3 production
-        if: ${{ !inputs.dry_run }}
-        run: aws s3 sync ./output "s3://${S3_BUCKET}"
+      - name: Upload Ruby runtime archive to S3
+        run: aws s3 sync ./output "s3://${S3_BUCKET}" ${{ case(inputs.dry_run, '--dryrun', '') }}
