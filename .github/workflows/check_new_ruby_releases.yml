@@ -63,6 +63,8 @@ jobs:
       - name: Cargo build
         run: cargo build --locked
       - name: Check for missing JRuby versions
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           cargo run --locked --bin jruby_release_check -- \
             --minimum-version 9.4.7.0 \

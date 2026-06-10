@@ -115,17 +115,19 @@ async fn fetch_releases(url: &Url) -> Result<Vec<JRubyVersion>, Box<dyn Error>> 
 }
 
 async fn fetch_releases_inner(url: &Url) -> Result<Vec<JRubyVersion>, Box<dyn Error>> {
-    let client = reqwest::Client::builder()
+    let mut client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .user_agent("heroku-ruby-builder")
-        .build()?;
-    let body = client
-        .get(url.clone())
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
+        .build()?
+        .get(url.clone());
+
+    if let Ok(token) = std::env::var("GITHUB_TOKEN") {
+        client = client.bearer_auth(token);
+    } else if let Ok(token) = std::env::var("GH_TOKEN") {
+        client = client.bearer_auth(token);
+    }
+
+    let body = client.send().await?.error_for_status()?.text().await?;
 
     let releases: Vec<GitHubRelease> = serde_json::from_str(&body)?;
 
