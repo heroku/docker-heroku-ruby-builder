@@ -15,6 +15,10 @@ path = "src/bin/jruby_check.rs"
 name = "jruby_changelog"
 path = "src/bin/jruby_changelog.rs"
 
+[[bin]]
+name = "jruby_release_check"
+path = "src/bin/jruby_release_check.rs"
+
 [dependencies]
 bullet_stream = { workspace = true }
 chrono = { workspace = true }
@@ -30,8 +34,11 @@ lazy_static = { workspace = true }
 libherokubuildpack = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 sha2 = { workspace = true }
 shared = { workspace = true }
+tokio = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
