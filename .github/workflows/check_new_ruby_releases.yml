@@ -1,5 +1,5 @@
-name: Check for new Ruby releases
-run-name: "Check for new Ruby releases"
+name: Check for new Ruby and JRuby releases
+run-name: "Check for new Ruby and JRuby releases"
 
 on:
   schedule:
@@ -48,5 +48,39 @@ jobs:
             echo "Triggering build for Ruby $version"
             gh workflow run build_ruby.yml \
               -f ruby_version="$version" \
+              -f on_conflict=skip
+          done
+
+  check-jruby-releases:
+    runs-on: pub-hk-ubuntu-24.04-ip # `gh workflow run` needs to be in an IP allow list
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: Cargo build
+        run: cargo build --locked
+      - name: Check for missing JRuby versions
+        run: |
+          cargo run --locked --bin jruby_release_check -- \
+            --minimum-version 9.4.7.0 \
+            --output jruby_versions.json \
+            2>"$GITHUB_STEP_SUMMARY"
+      - name: Trigger builds for missing versions
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSIONS=$(jq -r '.[]' jruby_versions.json)
+          if [ -z "$VERSIONS" ]; then
+            echo "No JRuby versions to build"
+            exit 0
+          fi
+          echo "$VERSIONS" | while IFS= read -r version; do
+            echo "Triggering build for JRuby $version"
+            gh workflow run build_jruby.yml \
+              -f jruby_version="$version" \
               -f on_conflict=skip
           done
