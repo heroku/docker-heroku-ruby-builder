@@ -67,6 +67,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           cargo run --locked --bin jruby_release_check -- \
+            --gh-token "$GITHUB_TOKEN" \
             --minimum-version 9.4.7.0 \
             --output jruby_versions.json \
             2>"$GITHUB_STEP_SUMMARY"

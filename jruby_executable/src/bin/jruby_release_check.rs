@@ -22,6 +22,12 @@ static JRUBY_BASE_IMAGES: &[&str] = &["heroku-22", "heroku-24", "heroku-26"];
 #[derive(Parser, Debug)]
 #[command(about = "Check for JRuby releases missing from Heroku S3")]
 struct Args {
+    /// GitHub API token used to authenticate release lookups.
+    ///
+    /// Required. Generate one locally with: --gh-token=$(gh auth token)
+    #[arg(long = "gh-token")]
+    gh_token: Option<String>,
+
     /// Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be checked.
     #[arg(long = "minimum-version", required = true)]
     minimum_version: JRubyVersion,
@@ -29,6 +35,36 @@ struct Args {
     /// Path to write JSON output file containing versions that need builds
     #[arg(long = "output", required = true)]
     output: PathBuf,
+}
+
+/// Validated arguments: every field is guaranteed usable.
+#[derive(Debug)]
+struct ResolvedArgs {
+    gh_token: String,
+    minimum_version: JRubyVersion,
+    output: PathBuf,
+}
+
+impl TryFrom<Args> for ResolvedArgs {
+    type Error = &'static str;
+
+    fn try_from(args: Args) -> Result<Self, Self::Error> {
+        let gh_token = match args.gh_token {
+            Some(token) if !token.trim().is_empty() => token.trim().to_owned(),
+            _ => {
+                return Err(
+                    "A GitHub API token is required. The GitHub Releases API returns \
+                            HTTP 403 for unauthenticated requests once rate-limited.\n\n\
+                            Pass one explicitly:\n    --gh-token=$(gh auth token)",
+                );
+            }
+        };
+        Ok(ResolvedArgs {
+            gh_token,
+            minimum_version: args.minimum_version,
+            output: args.output,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -98,11 +134,11 @@ struct GitHubRelease {
     prerelease: bool,
 }
 
-async fn fetch_releases(url: &Url) -> Result<Vec<JRubyVersion>, Box<dyn Error>> {
+async fn fetch_releases(url: &Url, token: &str) -> Result<Vec<JRubyVersion>, Box<dyn Error>> {
     let mut attempts = 0;
     loop {
         attempts += 1;
-        match fetch_releases_inner(url).await {
+        match fetch_releases_inner(url, token).await {
             Ok(val) => return Ok(val),
             Err(error) => {
                 if attempts >= MAX_RETRY_ATTEMPTS {
@@ -114,20 +150,15 @@ async fn fetch_releases(url: &Url) -> Result<Vec<JRubyVersion>, Box<dyn Error>> 
     }
 }
 
-async fn fetch_releases_inner(url: &Url) -> Result<Vec<JRubyVersion>, Box<dyn Error>> {
-    let mut client = reqwest::Client::builder()
+async fn fetch_releases_inner(url: &Url, token: &str) -> Result<Vec<JRubyVersion>, Box<dyn Error>> {
+    let request = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .user_agent("heroku-ruby-builder")
         .build()?
-        .get(url.clone());
+        .get(url.clone())
+        .bearer_auth(token);
 
-    if let Ok(token) = std::env::var("GITHUB_TOKEN") {
-        client = client.bearer_auth(token);
-    } else if let Ok(token) = std::env::var("GH_TOKEN") {
-        client = client.bearer_auth(token);
-    }
-
-    let body = client.send().await?.error_for_status()?.text().await?;
+    let body = request.send().await?.error_for_status()?.text().await?;
 
     let releases: Vec<GitHubRelease> = serde_json::from_str(&body)?;
 
@@ -229,12 +260,12 @@ async fn check_version_on_s3(
     Ok((version, missing))
 }
 
-async fn call(args: Args) -> Result<(), Box<dyn Error>> {
+async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     print::h2("Checking for new JRuby releases");
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
-    let releases = match fetch_releases(&RELEASES_URL).await {
+    let releases = match fetch_releases(&RELEASES_URL, &args.gh_token).await {
         Ok(r) => r,
         Err(e) => {
             print::error(format!("Failed to fetch releases: {e}"));
@@ -313,7 +344,14 @@ async fn call(args: Args) -> Result<(), Box<dyn Error>> {
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-    match call(args).await {
+    let resolved: ResolvedArgs = match args.try_into() {
+        Ok(resolved) => resolved,
+        Err(message) => {
+            print::error(message);
+            std::process::exit(1);
+        }
+    };
+    match call(resolved).await {
         Ok(()) => print::bullet("Done"),
         Err(e) => {
             print::error(format!("Failed {e}"));
@@ -325,6 +363,45 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_gh_token_message_names_the_flag() {
+        let args = Args {
+            gh_token: None,
+            minimum_version: JRubyVersion::parse("9.4.7.0").unwrap(),
+            output: PathBuf::from("versions.json"),
+        };
+        let message = ResolvedArgs::try_from(args).unwrap_err();
+        assert!(
+            message.contains("--gh-token=$(gh auth token)"),
+            "got: {message}"
+        );
+    }
+
+    #[test]
+    fn empty_gh_token_message_names_the_flag() {
+        let args = Args {
+            gh_token: Some("   ".to_owned()),
+            minimum_version: JRubyVersion::parse("9.4.7.0").unwrap(),
+            output: PathBuf::from("versions.json"),
+        };
+        let message = ResolvedArgs::try_from(args).unwrap_err();
+        assert!(
+            message.contains("--gh-token=$(gh auth token)"),
+            "got: {message}"
+        );
+    }
+
+    #[test]
+    fn present_gh_token_resolves() {
+        let args = Args {
+            gh_token: Some("abc".to_owned()),
+            minimum_version: JRubyVersion::parse("9.4.7.0").unwrap(),
+            output: PathBuf::from("versions.json"),
+        };
+        let resolved = ResolvedArgs::try_from(args).unwrap();
+        assert_eq!(resolved.gh_token, "abc");
+    }
 
     #[test]
     fn test_parse_valid_version() {
