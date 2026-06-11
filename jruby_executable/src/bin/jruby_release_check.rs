@@ -281,7 +281,7 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
         args.minimum_version
     ));
 
-    print::h2("Resolving Ruby stdlib versions");
+    print::bullet("Ruby stdlib versions");
     let mut stdlib_set = JoinSet::new();
     for version in versions_to_check {
         stdlib_set.spawn(resolve_stdlib_version(version));
@@ -300,7 +300,7 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    print::h2("Checking S3 for missing builds");
+    print::bullet("Check S3 for missing binaries");
     let mut s3_set = JoinSet::new();
     for (version, stdlib) in resolved {
         s3_set.spawn(check_version_on_s3(version, stdlib));
