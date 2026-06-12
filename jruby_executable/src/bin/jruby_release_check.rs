@@ -317,6 +317,8 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
         args.minimum_version
     ));
 
+    let mut errors: Vec<String> = Vec::new();
+
     print::bullet("Ruby stdlib versions");
     let mut stdlib_set = JoinSet::new();
     for version in versions_to_check {
@@ -325,13 +327,22 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
 
     let mut resolved = Vec::new();
     while let Some(result) = stdlib_set.join_next().await {
-        match result? {
-            Ok((version, stdlib)) => {
+        match result {
+            Ok(Ok((version, stdlib))) => {
                 print::sub_bullet(format!("{version} -> Ruby stdlib {stdlib}"));
                 resolved.push((version, stdlib));
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 print::warning(format!("Error resolving stdlib version: {e}"));
+                errors.push(format!("resolving stdlib version: {e}"));
+            }
+            Err(join_err) => {
+                print::warning(format!(
+                    "Task panicked resolving stdlib version: {join_err}"
+                ));
+                errors.push(format!(
+                    "task panicked resolving stdlib version: {join_err}"
+                ));
             }
         }
     }
@@ -344,11 +355,11 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
 
     let mut versions_to_build = Vec::new();
     while let Some(result) = s3_set.join_next().await {
-        match result? {
-            Ok((version, missing)) if missing.is_empty() => {
+        match result {
+            Ok(Ok((version, missing))) if missing.is_empty() => {
                 print::sub_bullet(format!("{version}: all binaries present"));
             }
-            Ok((version, missing)) => {
+            Ok(Ok((version, missing))) => {
                 print::sub_bullet(format!(
                     "{version}: missing {} base image(s): {}",
                     missing.len(),
@@ -356,8 +367,13 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
                 ));
                 versions_to_build.push(version);
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 print::warning(format!("Error checking version: {e}"));
+                errors.push(format!("checking S3 for version: {e}"));
+            }
+            Err(join_err) => {
+                print::warning(format!("Task panicked checking version: {join_err}"));
+                errors.push(format!("task panicked checking S3 for version: {join_err}"));
             }
         }
     }
@@ -373,6 +389,14 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
         for version in &versions_to_build {
             print::sub_bullet(format!("{version}"));
         }
+    }
+
+    if !errors.is_empty() {
+        print::error(format!("{} check(s) failed", errors.len()));
+        for failure in &errors {
+            print::sub_bullet(failure);
+        }
+        return Err(format!("{} check(s) failed", errors.len()).into());
     }
     Ok(())
 }
