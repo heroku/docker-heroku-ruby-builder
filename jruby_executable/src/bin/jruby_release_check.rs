@@ -10,6 +10,7 @@ use tokio::task::JoinSet;
 use tokio::time::sleep;
 
 static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
+    // per_page=100 is the GitHub releases API maximum page size.
     Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100")
         .expect("valid releases URL constant")
 });
@@ -134,11 +135,54 @@ struct GitHubRelease {
     prerelease: bool,
 }
 
-async fn fetch_releases(url: &Url, token: &str) -> Result<Vec<JRubyVersion>, Box<dyn Error>> {
+/// Extract the `rel="next"` URL from a GitHub `link` header, if present.
+///
+/// GitHub omits the `next` entry on the last page (and omits the header entirely
+/// when all results fit on one page), so the absence of a next link is the
+/// authoritative end-of-pagination signal.
+fn github_next_link(headers: &reqwest::header::HeaderMap) -> Option<Url> {
+    let link = headers.get(reqwest::header::LINK)?.to_str().ok()?;
+    for part in link.split(',') {
+        let mut segments = part.split(';');
+        let url_segment = segments.next()?.trim();
+        if segments.any(|segment| segment.trim() == r#"rel="next""#) {
+            let raw = url_segment.trim_start_matches('<').trim_end_matches('>');
+            return Url::parse(raw).ok();
+        }
+    }
+    None
+}
+
+async fn fetch_github_releases(
+    base_url: &Url,
+    token: &str,
+) -> Result<Vec<JRubyVersion>, Box<dyn Error>> {
+    let mut versions = Vec::new();
+    let mut next = Some(base_url.clone());
+    while let Some(url) = next {
+        let (releases, next_url) = fetch_release_page(&url, token).await?;
+        versions.extend(
+            releases
+                .into_iter()
+                .filter(|r| !r.prerelease)
+                .filter_map(|r| {
+                    let tag = r.tag_name.strip_prefix('v').unwrap_or(&r.tag_name);
+                    JRubyVersion::parse(tag).ok()
+                }),
+        );
+        next = next_url;
+    }
+    Ok(versions)
+}
+
+async fn fetch_release_page(
+    url: &Url,
+    token: &str,
+) -> Result<(Vec<GitHubRelease>, Option<Url>), Box<dyn Error>> {
     let mut attempts = 0;
     loop {
         attempts += 1;
-        match fetch_releases_inner(url, token).await {
+        match fetch_release_page_inner(url, token).await {
             Ok(val) => return Ok(val),
             Err(error) => {
                 if attempts >= MAX_RETRY_ATTEMPTS {
@@ -150,7 +194,10 @@ async fn fetch_releases(url: &Url, token: &str) -> Result<Vec<JRubyVersion>, Box
     }
 }
 
-async fn fetch_releases_inner(url: &Url, token: &str) -> Result<Vec<JRubyVersion>, Box<dyn Error>> {
+async fn fetch_release_page_inner(
+    url: &Url,
+    token: &str,
+) -> Result<(Vec<GitHubRelease>, Option<Url>), Box<dyn Error>> {
     let request = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .user_agent("heroku-ruby-builder")
@@ -158,20 +205,11 @@ async fn fetch_releases_inner(url: &Url, token: &str) -> Result<Vec<JRubyVersion
         .get(url.clone())
         .bearer_auth(token);
 
-    let body = request.send().await?.error_for_status()?.text().await?;
-
+    let response = request.send().await?.error_for_status()?;
+    let next = github_next_link(response.headers());
+    let body = response.text().await?;
     let releases: Vec<GitHubRelease> = serde_json::from_str(&body)?;
-
-    let versions = releases
-        .into_iter()
-        .filter(|r| !r.prerelease)
-        .filter_map(|r| {
-            let tag = r.tag_name.strip_prefix('v').unwrap_or(&r.tag_name);
-            JRubyVersion::parse(tag).ok()
-        })
-        .collect();
-
-    Ok(versions)
+    Ok((releases, next))
 }
 
 fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec<JRubyVersion> {
@@ -265,7 +303,7 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
-    let releases = match fetch_releases(&RELEASES_URL, &args.gh_token).await {
+    let releases = match fetch_github_releases(&RELEASES_URL, &args.gh_token).await {
         Ok(r) => r,
         Err(e) => {
             print::error(format!("Failed to fetch releases: {e}"));
@@ -531,5 +569,48 @@ mod tests {
         let json = r#"{"tag_name": "9.5.0.0.pre1", "prerelease": true}"#;
         let release: GitHubRelease = serde_json::from_str(json).unwrap();
         assert!(release.prerelease);
+    }
+
+    #[test]
+    fn test_releases_url_sets_per_page() {
+        assert!(
+            RELEASES_URL.as_str().contains("per_page=100"),
+            "got: {}",
+            RELEASES_URL.as_str()
+        );
+    }
+
+    #[test]
+    fn test_github_next_link_returns_next_url() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            reqwest::header::LINK,
+            r#"<https://api.github.com/repositories/123/releases?per_page=100&page=2>; rel="next", <https://api.github.com/repositories/123/releases?per_page=100&page=5>; rel="last""#
+                .parse()
+                .unwrap(),
+        );
+        let next = github_next_link(&headers).unwrap();
+        assert_eq!(
+            next.as_str(),
+            "https://api.github.com/repositories/123/releases?per_page=100&page=2"
+        );
+    }
+
+    #[test]
+    fn test_github_next_link_last_page_returns_none() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            reqwest::header::LINK,
+            r#"<https://api.github.com/repositories/123/releases?per_page=100&page=4>; rel="prev", <https://api.github.com/repositories/123/releases?per_page=100&page=1>; rel="first""#
+                .parse()
+                .unwrap(),
+        );
+        assert!(github_next_link(&headers).is_none());
+    }
+
+    #[test]
+    fn test_github_next_link_missing_header_returns_none() {
+        let headers = reqwest::header::HeaderMap::new();
+        assert!(github_next_link(&headers).is_none());
     }
 }
