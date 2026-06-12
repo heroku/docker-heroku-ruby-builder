@@ -68,6 +68,14 @@ impl FromStr for BaseImage {
     }
 }
 
+/// Returns every known base image (one per distro, arch-independent).
+pub fn base_images() -> Vec<BaseImage> {
+    KNOWN_BASE_IMAGES
+        .iter()
+        .map(|&(name, _, _)| BaseImage::new(name).expect("known base image"))
+        .collect()
+}
+
 /// Returns all valid (BaseImage, Arch) pairs for building Ruby binaries.
 pub fn build_matrix() -> Vec<(BaseImage, Arch)> {
     let mut matrix = Vec::new();

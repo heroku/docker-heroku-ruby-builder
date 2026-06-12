@@ -4,7 +4,7 @@ use fs_err as fs;
 use jruby_executable::jruby_build_properties;
 use reqwest::Url;
 use serde::Deserialize;
-use shared::S3_BASE_URL;
+use shared::{S3_BASE_URL, base_images};
 use std::{error::Error, fmt, path::PathBuf, time::Duration};
 use tokio::task::JoinSet;
 use tokio::time::sleep;
@@ -17,8 +17,6 @@ static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
 
 const MAX_RETRY_ATTEMPTS: u8 = 3;
 const RETRY_DELAY: Duration = Duration::from_secs(1);
-
-static JRUBY_BASE_IMAGES: &[&str] = &["heroku-22", "heroku-24", "heroku-26"];
 
 #[derive(Parser, Debug)]
 #[command(about = "Check for JRuby releases missing from Heroku S3")]
@@ -222,16 +220,16 @@ fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec
 
 fn s3_urls_to_check(version: &JRubyVersion, ruby_stdlib_version: &str) -> Vec<(String, Url)> {
     let base_url = Url::parse(S3_BASE_URL).expect("valid base URL constant");
-    JRUBY_BASE_IMAGES
+    base_images()
         .iter()
         .map(|base_image| {
             let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
             let mut url = base_url.clone();
             url.path_segments_mut()
                 .expect("valid base URL")
-                .push(base_image)
+                .push(base_image.name())
                 .push(&tgz_name);
-            ((*base_image).to_string(), url)
+            (base_image.name().to_string(), url)
         })
         .collect()
 }
