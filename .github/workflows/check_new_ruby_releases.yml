@@ -35,11 +35,15 @@ jobs:
             --output versions.json \
             2>"$GITHUB_STEP_SUMMARY"
       - name: Trigger builds for missing versions
-        if: ${{ !inputs.dry_run }}
+        # Generating the versions list can partially succeed: some versions
+        # resolve while others fail. `!cancelled()` lets this step run even when
+        # the check step failed, so the versions that did succeed still get
+        # dispatched. The job's overall status stays failed so we know to look.
+        if: ${{ !cancelled() && !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSIONS=$(jq -r '.[]' versions.json)
+          VERSIONS=$(jq -r '.[]' versions.json 2>/dev/null || true)
           if [ -z "$VERSIONS" ]; then
             echo "No versions to build"
             exit 0
@@ -73,11 +77,15 @@ jobs:
             --output jruby_versions.json \
             2>"$GITHUB_STEP_SUMMARY"
       - name: Trigger builds for missing versions
-        if: ${{ !inputs.dry_run }}
+        # Generating the versions list can partially succeed: some versions
+        # resolve while others fail. `!cancelled()` lets this step run even when
+        # the check step failed, so the versions that did succeed still get
+        # dispatched. The job's overall status stays failed so we know to look.
+        if: ${{ !cancelled() && !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSIONS=$(jq -r '.[]' jruby_versions.json)
+          VERSIONS=$(jq -r '.[]' jruby_versions.json 2>/dev/null || true)
           if [ -z "$VERSIONS" ]; then
             echo "No JRuby versions to build"
             exit 0
