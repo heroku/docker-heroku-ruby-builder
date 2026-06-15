@@ -194,7 +194,36 @@ async fn fetch_release_page(
     url: &Url,
     token: &str,
 ) -> Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError> {
-    with_retries(|| fetch_release_page_inner(url, token)).await
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent("heroku-ruby-builder")
+        .build()?;
+
+    let (headers, body) = with_retries(|| async {
+        let response = client
+            .get(url.clone())
+            .bearer_auth(token)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let headers = response.headers().clone();
+        let body = response.text().await?;
+        Ok::<_, reqwest::Error>((headers, body))
+    })
+    .await?;
+
+    let next = shared::github::pagination_links(&headers)?
+        .iter()
+        .find(|link| matches!(link, shared::github::PageLink::Next(_)))
+        .map(|link| link.url().clone());
+
+    let releases =
+        serde_json::from_str(&body).map_err(|error| GithubReleaseError::ReleaseNumberParse {
+            body: body.clone(),
+            error,
+        })?;
+    Ok((releases, next))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -210,33 +239,6 @@ enum GithubReleaseError {
         body: String,
         error: serde_json::Error,
     },
-}
-
-async fn fetch_release_page_inner(
-    url: &Url,
-    token: &str,
-) -> Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError> {
-    let request = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .user_agent("heroku-ruby-builder")
-        .build()?
-        .get(url.clone())
-        .bearer_auth(token);
-
-    let response = request.send().await?.error_for_status()?;
-    let links = shared::github::pagination_links(response.headers())?;
-    let next = links
-        .iter()
-        .find(|link| matches!(link, shared::github::PageLink::Next(_)))
-        .map(|link| link.url().clone());
-
-    let body = response.text().await?;
-    let releases: Vec<GitHubRelease> =
-        serde_json::from_str(&body).map_err(|error| GithubReleaseError::ReleaseNumberParse {
-            body: body.clone(),
-            error,
-        })?;
-    Ok((releases, next))
 }
 
 fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec<JRubyVersion> {
