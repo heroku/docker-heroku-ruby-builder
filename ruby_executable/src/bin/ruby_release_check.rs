@@ -1,8 +1,8 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use reqwest::Url;
 use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3};
+use url::Url;
 use std::{
     error::Error,
     path::{Path, PathBuf},

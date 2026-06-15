@@ -42,3 +42,4 @@ tokio = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
+url = { workspace = true }

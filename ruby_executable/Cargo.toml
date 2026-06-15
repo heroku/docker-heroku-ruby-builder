@@ -23,6 +23,7 @@ shared = { workspace = true }
 tar = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
