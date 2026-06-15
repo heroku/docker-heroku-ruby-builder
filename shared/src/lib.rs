@@ -7,6 +7,13 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+mod base_image;
+mod download_ruby_version;
+pub mod github;
+mod inventory_help;
+pub mod maybe_err;
+pub mod s3;
+
 pub const MAX_RETRY_ATTEMPTS: u8 = 3;
 pub const RETRY_DELAY: Duration = Duration::from_secs(1);
 
@@ -52,13 +59,6 @@ pub mod sync {
         }
     }
 }
-
-mod base_image;
-mod download_ruby_version;
-pub mod github;
-mod inventory_help;
-pub mod maybe_err;
-pub mod s3;
 
 pub use base_image::{BaseImage, base_images, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
