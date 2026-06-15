@@ -5,7 +5,7 @@ use jruby_executable::jruby_build_properties;
 use reqwest::Url;
 use serde::Deserialize;
 use shared::{S3_BASE_URL, base_images};
-use std::{error::Error, fmt, path::PathBuf, time::Duration};
+use std::{error::Error, fmt, future::Future, path::PathBuf, time::Duration};
 use tokio::task::JoinSet;
 use tokio::time::sleep;
 
@@ -151,32 +151,79 @@ fn github_next_link(headers: &reqwest::header::HeaderMap) -> Option<Url> {
     None
 }
 
+/// The two ways fetching a single releases page can fail.
+#[derive(Debug, thiserror::Error)]
+enum FetchPageError {
+    #[error(transparent)]
+    Http(#[from] reqwest::Error),
+
+    #[error("could not parse releases response as JSON")]
+    Parse(#[from] serde_json::Error),
+}
+
+/// A page of the releases listing failed to fetch after retries.
+///
+/// Pagination cannot continue past a failed page (the `next` link lives in the
+/// failed response), so this is returned alongside whatever releases were
+/// collected from earlier pages rather than discarding them.
+#[derive(Debug, thiserror::Error)]
+#[error("failed fetching releases page {url}: {source}")]
+struct ReleasePageError {
+    url: Url,
+    source: FetchPageError,
+}
+
 async fn fetch_github_releases(
     base_url: &Url,
     token: &str,
-) -> Result<Vec<JRubyVersion>, Box<dyn Error>> {
+) -> (Vec<JRubyVersion>, Option<ReleasePageError>) {
+    paginate_releases(base_url.clone(), |url| async move {
+        fetch_release_page(&url, token).await
+    })
+    .await
+}
+
+/// Drive pagination over release pages, accumulating parsed versions.
+///
+/// `fetch` is injected so the pagination/partial-success logic can be exercised
+/// without real network access. On the first page failure the versions gathered
+/// so far are returned together with the error, and pagination stops.
+async fn paginate_releases<F, Fut>(
+    base_url: Url,
+    mut fetch: F,
+) -> (Vec<JRubyVersion>, Option<ReleasePageError>)
+where
+    F: FnMut(Url) -> Fut,
+    Fut: Future<Output = Result<(Vec<GitHubRelease>, Option<Url>), FetchPageError>>,
+{
     let mut versions = Vec::new();
-    let mut next = Some(base_url.clone());
+    let mut next = Some(base_url);
     while let Some(url) = next {
-        let (releases, next_url) = fetch_release_page(&url, token).await?;
-        versions.extend(
-            releases
-                .into_iter()
-                .filter(|r| !r.prerelease)
-                .filter_map(|r| {
-                    let tag = r.tag_name.strip_prefix('v').unwrap_or(&r.tag_name);
-                    JRubyVersion::parse(tag).ok()
-                }),
-        );
-        next = next_url;
+        match fetch(url.clone()).await {
+            Ok((releases, next_url)) => {
+                versions.extend(
+                    releases
+                        .into_iter()
+                        .filter(|r| !r.prerelease)
+                        .filter_map(|r| {
+                            let tag = r.tag_name.strip_prefix('v').unwrap_or(&r.tag_name);
+                            JRubyVersion::parse(tag).ok()
+                        }),
+                );
+                next = next_url;
+            }
+            Err(source) => {
+                return (versions, Some(ReleasePageError { url, source }));
+            }
+        }
     }
-    Ok(versions)
+    (versions, None)
 }
 
 async fn fetch_release_page(
     url: &Url,
     token: &str,
-) -> Result<(Vec<GitHubRelease>, Option<Url>), Box<dyn Error>> {
+) -> Result<(Vec<GitHubRelease>, Option<Url>), FetchPageError> {
     let mut attempts = 0;
     loop {
         attempts += 1;
@@ -195,7 +242,7 @@ async fn fetch_release_page(
 async fn fetch_release_page_inner(
     url: &Url,
     token: &str,
-) -> Result<(Vec<GitHubRelease>, Option<Url>), Box<dyn Error>> {
+) -> Result<(Vec<GitHubRelease>, Option<Url>), FetchPageError> {
     let request = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .user_agent("heroku-ruby-builder")
@@ -301,13 +348,12 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
-    let releases = match fetch_github_releases(&RELEASES_URL, &args.gh_token).await {
-        Ok(r) => r,
-        Err(e) => {
-            print::error(format!("Failed to fetch releases: {e}"));
-            std::process::exit(1);
-        }
-    };
+    let mut errors: Vec<String> = Vec::new();
+    let (releases, fetch_error) = fetch_github_releases(&RELEASES_URL, &args.gh_token).await;
+    if let Some(e) = fetch_error {
+        print::warning(format!("Failed to fetch some releases: {e}"));
+        errors.push(e.to_string());
+    }
     print::bullet(format!("Found {} non-prerelease versions", releases.len()));
 
     let versions_to_check = retain_releases_gte(&releases, &args.minimum_version);
@@ -316,8 +362,6 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
         versions_to_check.len(),
         args.minimum_version
     ));
-
-    let mut errors: Vec<String> = Vec::new();
 
     print::bullet("Ruby stdlib versions");
     let mut stdlib_set = JoinSet::new();
@@ -634,5 +678,60 @@ mod tests {
     fn test_github_next_link_missing_header_returns_none() {
         let headers = reqwest::header::HeaderMap::new();
         assert!(github_next_link(&headers).is_none());
+    }
+
+    fn release(tag: &str) -> GitHubRelease {
+        GitHubRelease {
+            tag_name: tag.to_string(),
+            prerelease: false,
+        }
+    }
+
+    fn parse_failure() -> FetchPageError {
+        serde_json::from_str::<i32>("not json").unwrap_err().into()
+    }
+
+    #[tokio::test]
+    async fn paginate_keeps_releases_collected_before_a_failed_page() {
+        let page1 =
+            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
+        let page2 =
+            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100&page=2")
+                .unwrap();
+        let expected_failed = page2.clone();
+
+        let (versions, error) = paginate_releases(page1, move |url| {
+            let page2 = page2.clone();
+            async move {
+                if url.as_str().contains("page=2") {
+                    Err(parse_failure())
+                } else {
+                    Ok((vec![release("9.4.15.0"), release("9.4.14.0")], Some(page2)))
+                }
+            }
+        })
+        .await;
+
+        let names: Vec<String> = versions.iter().map(|v| v.to_string()).collect();
+        assert_eq!(names, vec!["9.4.15.0", "9.4.14.0"]);
+        let error = error.expect("expected the failed page to be reported");
+        assert_eq!(error.url, expected_failed);
+    }
+
+    #[tokio::test]
+    async fn paginate_returns_no_error_when_all_pages_succeed() {
+        let page1 =
+            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
+
+        let (versions, error) = paginate_releases(page1, move |_url| async move {
+            Ok::<(Vec<GitHubRelease>, Option<Url>), FetchPageError>((
+                vec![release("9.4.15.0")],
+                None,
+            ))
+        })
+        .await;
+
+        assert_eq!(versions.len(), 1);
+        assert!(error.is_none());
     }
 }
