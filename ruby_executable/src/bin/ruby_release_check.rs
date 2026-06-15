@@ -2,7 +2,7 @@ use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
 use reqwest::Url;
-use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path};
+use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3};
 use std::{
     error::Error,
     path::{Path, PathBuf},
@@ -109,41 +109,13 @@ fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
         .collect()
 }
 
-async fn s3_url_exists(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let mut attempts = 0;
-    loop {
-        attempts += 1;
-        match s3_url_exists_inner(url.clone()).await {
-            Ok(val) => return Ok(val),
-            Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
-                    return Err(error);
-                }
-                sleep(RETRY_DELAY).await;
-            }
-        }
-    }
-}
-
-async fn s3_url_exists_inner(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-    let response = client.head(url.clone()).send().await?;
-    match response.status() {
-        status if status.is_success() => Ok(true),
-        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(false),
-        status => Err(format!("Unexpected status {status} checking {url}").into()),
-    }
-}
-
 async fn check_version_on_s3(
     version: RubyDownloadVersion,
 ) -> Result<(RubyDownloadVersion, Vec<String>), Box<dyn std::error::Error + Send + Sync>> {
     let mut set = JoinSet::new();
     for (label, url) in urls_to_check(&version) {
         set.spawn(async move {
-            let exists = s3_url_exists(url).await?;
+            let exists = s3::url_exists(url).await?;
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>((label, exists))
         });
     }
