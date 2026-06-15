@@ -6,7 +6,7 @@ use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use shared::{
-    BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar, s3_url_exists,
+    BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar, s3,
     sha256_from_path, tar_dir_to_file, untar_to_dir, write_job_metadata,
 };
 use std::convert::From;
@@ -87,7 +87,7 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
             };
 
             print::bullet(format!("Checking if already uploaded: {url}"));
-            if s3_url_exists(url.clone())? {
+            if s3::sync::url_exists(url.clone())? {
                 print::bullet(format!("Already exists: {url}, skipping"));
                 return Ok(BuildStatus::Skipped);
             }

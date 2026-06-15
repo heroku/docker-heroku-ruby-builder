@@ -1,7 +1,7 @@
 use fs_err::{self as fs, File, PathExt};
 use fun_run::CommandWithName;
 use libherokubuildpack::inventory::artifact::Arch;
-use reqwest::Url;
+use std::future::Future;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -10,20 +10,44 @@ use std::time::Duration;
 pub const MAX_RETRY_ATTEMPTS: u8 = 3;
 pub const RETRY_DELAY: Duration = Duration::from_secs(1);
 
-pub fn with_retries<T, E, F>(f: F) -> Result<T, E>
+pub async fn with_retries<T, E, F, Fut>(f: F) -> Result<T, E>
 where
-    F: Fn() -> Result<T, E>,
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
 {
     let mut attempts = 0;
     loop {
         attempts += 1;
-        match f() {
+        match f().await {
             Ok(val) => return Ok(val),
             Err(error) => {
                 if attempts >= MAX_RETRY_ATTEMPTS {
                     return Err(error);
                 }
-                std::thread::sleep(RETRY_DELAY);
+                tokio::time::sleep(RETRY_DELAY).await;
+            }
+        }
+    }
+}
+
+pub mod sync {
+    use super::*;
+
+    pub fn with_retries<T, E, F>(f: F) -> Result<T, E>
+    where
+        F: Fn() -> Result<T, E>,
+    {
+        let mut attempts = 0;
+        loop {
+            attempts += 1;
+            match f() {
+                Ok(val) => return Ok(val),
+                Err(error) => {
+                    if attempts >= MAX_RETRY_ATTEMPTS {
+                        return Err(error);
+                    }
+                    std::thread::sleep(RETRY_DELAY);
+                }
             }
         }
     }
@@ -166,31 +190,8 @@ pub fn validate_version_for_stack(
     Ok(())
 }
 
-/// Performs an HTTP HEAD request to check if a URL returns a successful status.
-pub fn s3_url_exists(url: Url) -> Result<bool, Error> {
-    with_retries(|| s3_url_exists_inner(url.clone()))
-}
-
-fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(Error::FailedRequest)?;
-    let response = client
-        .head(url.clone())
-        .send()
-        .map_err(Error::FailedRequest)?;
-    match response.status() {
-        status if status.is_success() => Ok(true),
-        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(false),
-        status => Err(Error::Other(format!(
-            "Unexpected status {status} checking {url}"
-        ))),
-    }
-}
-
 pub fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
-    with_retries(|| download_tar_inner(url, path))
+    sync::with_retries(|| download_tar_inner(url, path))
 }
 
 fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Error> {

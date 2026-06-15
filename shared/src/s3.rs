@@ -1,25 +1,19 @@
 use reqwest::StatusCode;
 use std::time::Duration;
-use tokio::time::sleep;
 use url::Url;
-
-const MAX_RETRY_ATTEMPTS: u8 = 3;
-const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 /// Check if a given S3 URL exists or not
 pub async fn url_exists(url: Url) -> Result<bool, Error> {
-    let mut attempts = 0;
-    loop {
-        attempts += 1;
-        match s3_url_exists_inner(url.clone()).await {
-            Ok(val) => return Ok(val),
-            Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
-                    return Err(error);
-                }
-                sleep(RETRY_DELAY).await;
-            }
-        }
+    crate::with_retries(|| s3_url_exists_inner(url.clone())).await
+}
+
+/// Blocking wrappers around the async S3 helpers for use from synchronous code.
+pub mod sync {
+    use super::*;
+
+    /// Blocking version of [`super::url_exists`].
+    pub fn url_exists(url: Url) -> Result<bool, Error> {
+        tokio::runtime::Runtime::new()?.block_on(super::url_exists(url))
     }
 }
 
@@ -27,6 +21,9 @@ pub async fn url_exists(url: Url) -> Result<bool, Error> {
 pub enum Error {
     #[error(transparent)]
     Http(#[from] reqwest::Error),
+
+    #[error("Could not start async runtime: {0}")]
+    Io(#[from] std::io::Error),
 
     #[error("Unexpected status {status} checking {url}")]
     UnexpectedStatus { url: Url, status: StatusCode },

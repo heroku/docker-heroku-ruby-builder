@@ -6,8 +6,8 @@ use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use shared::{
     BaseImage, BuildStatus, RubyDownloadVersion, S3_BASE_URL, TarDownloadPath,
-    append_filename_with, download_tar, output_ruby_tar_path, s3_url_exists, sha256_from_path,
-    source_dir, write_job_metadata,
+    append_filename_with, download_tar, output_ruby_tar_path, s3, sha256_from_path, source_dir,
+    write_job_metadata,
 };
 use std::{
     io::Write,
@@ -97,7 +97,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
             };
 
             print::bullet(format!("Checking if already uploaded: {url}"));
-            if s3_url_exists(url.clone())? {
+            if s3::sync::url_exists(url.clone())? {
                 print::bullet(format!("Already exists: {url}, skipping"));
                 return Ok(BuildStatus::Skipped);
             }
