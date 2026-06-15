@@ -107,7 +107,10 @@ pub mod sync {
 pub use base_image::{BaseImage, base_images, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
 
-pub static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
+pub static S3_BASE_URL: std::sync::LazyLock<url::Url> = std::sync::LazyLock::new(|| {
+    url::Url::parse("https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com")
+        .expect("valid S3 base URL constant")
+});
 pub use inventory_help::{
     ArtifactMetadata, artifact_is_different, artifact_same_url_different_checksum,
     atomic_inventory_update, inventory_check, sha256_from_path,

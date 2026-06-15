@@ -263,7 +263,7 @@ fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec
 }
 
 fn s3_urls_to_check(version: &JRubyVersion, ruby_stdlib_version: &str) -> Vec<(String, Url)> {
-    let base_url = Url::parse(S3_BASE_URL).expect("valid base URL constant");
+    let base_url = S3_BASE_URL.clone();
     base_images()
         .iter()
         .map(|base_image| {

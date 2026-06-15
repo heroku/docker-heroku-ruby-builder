@@ -3,7 +3,6 @@ use clap::Parser;
 use fs_err::{self as fs, PathExt};
 use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
-use reqwest::Url;
 use shared::{
     BaseImage, BuildStatus, RubyDownloadVersion, S3_BASE_URL, TarDownloadPath,
     append_filename_with, download_tar, output_ruby_tar_path, s3, sha256_from_path, source_dir,
@@ -89,7 +88,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
 
             let s3_path = expected_output.strip_prefix(volume_output_dir)?;
             let url = {
-                let mut url = Url::parse(S3_BASE_URL)?;
+                let mut url = S3_BASE_URL.clone();
                 url.path_segments_mut()
                     .expect("valid base URL")
                     .extend(s3_path.iter().map(|s| s.to_string_lossy()));

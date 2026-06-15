@@ -95,7 +95,7 @@ fn retain_releases_gte(
 
 fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
     let matrix = build_matrix();
-    let base_url = Url::parse(S3_BASE_URL).expect("valid base URL constant");
+    let base_url = S3_BASE_URL.clone();
     matrix
         .iter()
         .map(|(base_image, arch)| {
