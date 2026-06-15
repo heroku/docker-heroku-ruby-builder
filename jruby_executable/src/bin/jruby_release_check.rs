@@ -194,17 +194,15 @@ async fn fetch_release_page(
     url: &Url,
     token: &str,
 ) -> Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError> {
-    let (headers, body) = github::get_auth_with_retry(url, token).await?;
-    let next = shared::github::pagination_links(&headers)?
-        .iter()
-        .find(|link| matches!(link, shared::github::PageLink::Next(_)))
-        .map(|link| link.url().clone());
+    let response = github::get_auth_with_retry(url, token).await?;
+    let next = response.paginate_next()?;
 
-    let releases =
-        serde_json::from_str(&body).map_err(|error| GithubReleaseError::ReleaseNumberParse {
-            body: body.clone(),
+    let releases = serde_json::from_str(&response.body).map_err(|error| {
+        GithubReleaseError::ReleaseNumberParse {
+            body: response.body,
             error,
-        })?;
+        }
+    })?;
     Ok((releases, next))
 }
 

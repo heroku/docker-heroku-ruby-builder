@@ -48,15 +48,12 @@ pub enum GithubHeaderError {
 /// # use reqwest::Url;
 /// # async fn run() -> Result<(), reqwest::Error> {
 /// let url = Url::parse("https://api.github.com/repos/jruby/jruby/releases").unwrap();
-/// let (headers, body) = shared::github::get_auth_with_retry(&url, "ghp_token").await?;
-/// # let _ = (headers, body);
+/// let response = shared::github::get_auth_with_retry(&url, "ghp_token").await?;
+/// # let _ = response;
 /// # Ok(())
 /// # }
 /// ```
-pub async fn get_auth_with_retry(
-    url: &Url,
-    token: &str,
-) -> Result<(HeaderMap, String), reqwest::Error> {
+pub async fn get_auth_with_retry(url: &Url, token: &str) -> Result<GithubResponse, reqwest::Error> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .user_agent("heroku-ruby-builder")
@@ -76,7 +73,22 @@ pub async fn get_auth_with_retry(
     })
     .await?;
 
-    Ok((headers, body))
+    Ok(GithubResponse { headers, body })
+}
+
+pub struct GithubResponse {
+    pub headers: HeaderMap,
+    pub body: String,
+}
+
+impl GithubResponse {
+    pub fn paginate_next(&self) -> Result<Option<Url>, GithubHeaderError> {
+        let next = pagination_links(&self.headers)?
+            .iter()
+            .find(|link| matches!(link, PageLink::Next(_)))
+            .map(|link| link.url().clone());
+        Ok(next)
+    }
 }
 
 /// A single GitHub pagination link, identified by its `rel` value.
