@@ -17,6 +17,30 @@ pub mod s3;
 pub const MAX_RETRY_ATTEMPTS: u8 = 3;
 pub const RETRY_DELAY: Duration = Duration::from_secs(1);
 
+/// Retries an asynchronous, fallible operation until it succeeds or the attempt
+/// limit is reached.
+///
+/// The closure `f` is invoked, and its future awaited, up to
+/// [`MAX_RETRY_ATTEMPTS`] times. After each failed attempt (except the last)
+/// execution sleeps for [`RETRY_DELAY`] before trying again. On success the
+/// `Ok` value is returned immediately; if every attempt fails, the error from
+/// the final attempt is returned.
+///
+/// `f` is `Fn` (not `FnOnce`) because it may be called multiple times, so it must
+/// be able to produce a fresh future on each attempt. Note that retries are
+/// unconditional: every `Err` is treated as retryable.
+///
+/// For the blocking equivalent, see [`sync::with_retries`].
+///
+/// # Examples
+///
+/// ```no_run
+/// # async fn fetch() -> Result<u32, std::io::Error> { Ok(42) }
+/// # async fn run() -> Result<(), std::io::Error> {
+/// let value = shared::with_retries(|| fetch()).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub async fn with_retries<T, E, F, Fut>(f: F) -> Result<T, E>
 where
     F: Fn() -> Fut,
@@ -40,6 +64,26 @@ where
 pub mod sync {
     use super::*;
 
+    /// Retries a blocking, fallible operation until it succeeds or the attempt
+    /// limit is reached.
+    ///
+    /// The closure `f` is invoked up to [`MAX_RETRY_ATTEMPTS`] times. After each
+    /// failed attempt (except the last) the current thread sleeps for
+    /// [`RETRY_DELAY`] via [`std::thread::sleep`] before trying again. On success
+    /// the `Ok` value is returned immediately; if every attempt fails, the error
+    /// from the final attempt is returned.
+    ///
+    /// This is the blocking counterpart to [`super::with_retries`]; use it from
+    /// synchronous code where no async runtime is available. Retries are
+    /// unconditional: every `Err` is treated as retryable.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # fn read() -> Result<u32, std::io::Error> { Ok(42) }
+    /// let value = shared::sync::with_retries(|| read())?;
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
     pub fn with_retries<T, E, F>(f: F) -> Result<T, E>
     where
         F: Fn() -> Result<T, E>,
