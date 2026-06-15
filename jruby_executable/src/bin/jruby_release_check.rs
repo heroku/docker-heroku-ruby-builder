@@ -3,21 +3,18 @@ use clap::Parser;
 use fs_err as fs;
 use jruby_executable::jruby_build_properties;
 use serde::Deserialize;
-use url::Url;
 use shared::s3;
+use shared::with_retries;
 use shared::{S3_BASE_URL, base_images};
 use std::{error::Error, fmt, future::Future, path::PathBuf, time::Duration};
 use tokio::task::JoinSet;
-use tokio::time::sleep;
+use url::Url;
 
 static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
     // per_page=100 is the GitHub releases API maximum page size.
     Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100")
         .expect("valid releases URL constant")
 });
-
-const MAX_RETRY_ATTEMPTS: u8 = 3;
-const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 #[derive(Parser, Debug)]
 #[command(about = "Check for JRuby releases missing from Heroku S3")]
@@ -197,19 +194,7 @@ async fn fetch_release_page(
     url: &Url,
     token: &str,
 ) -> Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError> {
-    let mut attempts = 0;
-    loop {
-        attempts += 1;
-        match fetch_release_page_inner(url, token).await {
-            Ok(val) => return Ok(val),
-            Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
-                    return Err(error);
-                }
-                sleep(RETRY_DELAY).await;
-            }
-        }
-    }
+    with_retries(|| fetch_release_page_inner(url, token)).await
 }
 
 #[derive(Debug, thiserror::Error)]

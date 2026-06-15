@@ -1,24 +1,22 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3};
-use url::Url;
+use shared::{
+    RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3, with_retries,
+};
 use std::{
     error::Error,
     path::{Path, PathBuf},
     time::Duration,
 };
 use tokio::task::JoinSet;
-use tokio::time::sleep;
+use url::Url;
 use yaml_rust2::YamlLoader;
 
 static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
     Url::parse("https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml")
         .expect("valid releases URL constant")
 });
-
-const MAX_RETRY_ATTEMPTS: u8 = 3;
-const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
@@ -33,19 +31,7 @@ struct Args {
 }
 
 async fn fetch_releases(url: &Url) -> Result<Vec<RubyDownloadVersion>, Box<dyn std::error::Error>> {
-    let mut attempts = 0;
-    loop {
-        attempts += 1;
-        match fetch_releases_inner(url).await {
-            Ok(val) => return Ok(val),
-            Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
-                    return Err(error);
-                }
-                sleep(RETRY_DELAY).await;
-            }
-        }
-    }
+    with_retries(|| fetch_releases_inner(url)).await
 }
 
 async fn fetch_releases_inner(
