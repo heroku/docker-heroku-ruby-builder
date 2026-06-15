@@ -4,6 +4,7 @@ use fs_err as fs;
 use jruby_executable::jruby_build_properties;
 use reqwest::Url;
 use serde::Deserialize;
+use shared::s3::s3_url_exists;
 use shared::{S3_BASE_URL, base_images};
 use std::{error::Error, fmt, future::Future, path::PathBuf, time::Duration};
 use tokio::task::JoinSet;
@@ -275,34 +276,6 @@ fn s3_urls_to_check(version: &JRubyVersion, ruby_stdlib_version: &str) -> Vec<(S
             (base_image.name().to_string(), url)
         })
         .collect()
-}
-
-async fn s3_url_exists(url: Url) -> Result<bool, Box<dyn Error + Send + Sync>> {
-    let mut attempts = 0;
-    loop {
-        attempts += 1;
-        match s3_url_exists_inner(url.clone()).await {
-            Ok(val) => return Ok(val),
-            Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
-                    return Err(error);
-                }
-                sleep(RETRY_DELAY).await;
-            }
-        }
-    }
-}
-
-async fn s3_url_exists_inner(url: Url) -> Result<bool, Box<dyn Error + Send + Sync>> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-    let response = client.head(url.clone()).send().await?;
-    match response.status() {
-        status if status.is_success() => Ok(true),
-        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(false),
-        status => Err(format!("Unexpected status {status} checking {url}").into()),
-    }
 }
 
 async fn resolve_stdlib_version(

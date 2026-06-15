@@ -25,6 +25,7 @@ sha2 = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
+tokio = { workspace = true }
 libherokubuildpack = { workspace = true }
 fs2 = { workspace = true }
 rayon = { workspace = true }
