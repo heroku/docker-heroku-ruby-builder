@@ -3,10 +3,10 @@ use clap::Parser;
 use fs_err as fs;
 use jruby_executable::jruby_build_properties;
 use serde::Deserialize;
+use shared::github;
 use shared::s3;
-use shared::with_retries;
 use shared::{S3_BASE_URL, base_images};
-use std::{error::Error, fmt, future::Future, path::PathBuf, time::Duration};
+use std::{error::Error, fmt, future::Future, path::PathBuf};
 use tokio::task::JoinSet;
 use url::Url;
 
@@ -194,25 +194,7 @@ async fn fetch_release_page(
     url: &Url,
     token: &str,
 ) -> Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .user_agent("heroku-ruby-builder")
-        .build()?;
-
-    let (headers, body) = with_retries(|| async {
-        let response = client
-            .get(url.clone())
-            .bearer_auth(token)
-            .send()
-            .await?
-            .error_for_status()?;
-
-        let headers = response.headers().clone();
-        let body = response.text().await?;
-        Ok::<_, reqwest::Error>((headers, body))
-    })
-    .await?;
-
+    let (headers, body) = github::get_auth_with_retry(url, token).await?;
     let next = shared::github::pagination_links(&headers)?
         .iter()
         .find(|link| matches!(link, shared::github::PageLink::Next(_)))

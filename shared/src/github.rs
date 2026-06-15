@@ -1,5 +1,7 @@
+use crate::with_retries;
 use reqwest::Url;
 use reqwest::header::{HeaderMap, LINK, ToStrError};
+use std::time::Duration;
 use winnow::{
     Parser, Result,
     ascii::space0,
@@ -21,6 +23,60 @@ pub enum GithubHeaderError {
         header: String,
         source: url::ParseError,
     },
+}
+
+/// Performs an authenticated `GET` request and returns the response headers and body.
+///
+/// The request sends a `Bearer` token via the `Authorization` header and uses a
+/// 30-second timeout. The entire fetch (connection, HTTP status check, and full
+/// body download) is wrapped in [`with_retries`], so a failure while streaming
+/// the body is retried rather than only connection setup and the status line.
+///
+/// The response headers are cloned out before the body is consumed so that callers
+/// can inspect them (for example, to follow pagination via [`pagination_links`])
+/// without retrying deterministic parsing failures.
+///
+/// # Errors
+///
+/// Returns a [`reqwest::Error`] if the client cannot be built, the request fails
+/// after exhausting retries, the response status is not successful (see
+/// [`reqwest::Response::error_for_status`]), or the body cannot be read.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use reqwest::Url;
+/// # async fn run() -> Result<(), reqwest::Error> {
+/// let url = Url::parse("https://api.github.com/repos/jruby/jruby/releases").unwrap();
+/// let (headers, body) = shared::github::get_auth_with_retry(&url, "ghp_token").await?;
+/// # let _ = (headers, body);
+/// # Ok(())
+/// # }
+/// ```
+pub async fn get_auth_with_retry(
+    url: &Url,
+    token: &str,
+) -> Result<(HeaderMap, String), reqwest::Error> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent("heroku-ruby-builder")
+        .build()?;
+
+    let (headers, body) = with_retries(|| async {
+        let response = client
+            .get(url.clone())
+            .bearer_auth(token)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let headers = response.headers().clone();
+        let body = response.text().await?;
+        Ok::<_, reqwest::Error>((headers, body))
+    })
+    .await?;
+
+    Ok((headers, body))
 }
 
 /// A single GitHub pagination link, identified by its `rel` value.
