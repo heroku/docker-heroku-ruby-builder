@@ -41,9 +41,10 @@ impl PageLink {
     #[must_use]
     pub fn url(&self) -> &Url {
         match self {
-            PageLink::First(url) | PageLink::Prev(url) | PageLink::Next(url) | PageLink::Last(url) => {
-                url
-            }
+            PageLink::First(url)
+            | PageLink::Prev(url)
+            | PageLink::Next(url)
+            | PageLink::Last(url) => url,
         }
     }
 }
@@ -60,12 +61,13 @@ pub fn pagination_links(headers: &HeaderMap) -> Result<Vec<PageLink>, GithubHead
     };
     let header = value.to_str().map_err(GithubHeaderError::NonAsciiChars)?;
 
-    let entries = link_header
-        .parse(header.trim())
-        .map_err(|error| GithubHeaderError::Malformed {
-            header: header.to_owned(),
-            message: error.to_string(),
-        })?;
+    let entries =
+        link_header
+            .parse(header.trim())
+            .map_err(|error| GithubHeaderError::Malformed {
+                header: header.to_owned(),
+                message: error.to_string(),
+            })?;
 
     let mut links = Vec::new();
     for entry in entries {

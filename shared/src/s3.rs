@@ -7,7 +7,7 @@ const MAX_RETRY_ATTEMPTS: u8 = 3;
 const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 /// Check if a given S3 URL exists or not
-pub async fn s3_url_exists(url: Url) -> Result<bool, Error> {
+pub async fn url_exists(url: Url) -> Result<bool, Error> {
     let mut attempts = 0;
     loop {
         attempts += 1;

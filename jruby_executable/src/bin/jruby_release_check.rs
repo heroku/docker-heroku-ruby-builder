@@ -4,7 +4,7 @@ use fs_err as fs;
 use jruby_executable::jruby_build_properties;
 use reqwest::Url;
 use serde::Deserialize;
-use shared::s3::s3_url_exists;
+use shared::s3;
 use shared::{S3_BASE_URL, base_images};
 use std::{error::Error, fmt, future::Future, path::PathBuf, time::Duration};
 use tokio::task::JoinSet;
@@ -296,7 +296,7 @@ async fn check_version_on_s3(
     let mut set = JoinSet::new();
     for (label, url) in s3_urls_to_check(&version, &ruby_stdlib_version) {
         set.spawn(async move {
-            let exists = s3_url_exists(url).await?;
+            let exists = s3::url_exists(url).await?;
             Ok::<_, Box<dyn Error + Send + Sync>>((label, exists))
         });
     }
