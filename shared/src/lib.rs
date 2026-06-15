@@ -33,6 +33,7 @@ mod base_image;
 mod download_ruby_version;
 mod inventory_help;
 pub mod maybe_err;
+pub mod github;
 
 pub use base_image::{BaseImage, base_images, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
