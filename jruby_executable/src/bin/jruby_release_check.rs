@@ -133,34 +133,6 @@ struct GitHubRelease {
     prerelease: bool,
 }
 
-/// Extract the `rel="next"` URL from a GitHub `link` header, if present.
-///
-/// GitHub omits the `next` entry on the last page (and omits the header entirely
-/// when all results fit on one page), so the absence of a next link is the
-/// authoritative end-of-pagination signal.
-fn github_next_link(headers: &reqwest::header::HeaderMap) -> Option<Url> {
-    let link = headers.get(reqwest::header::LINK)?.to_str().ok()?;
-    for part in link.split(',') {
-        let mut segments = part.split(';');
-        let url_segment = segments.next()?.trim();
-        if segments.any(|segment| segment.trim() == r#"rel="next""#) {
-            let raw = url_segment.trim_start_matches('<').trim_end_matches('>');
-            return Url::parse(raw).ok();
-        }
-    }
-    None
-}
-
-/// The two ways fetching a single releases page can fail.
-#[derive(Debug, thiserror::Error)]
-enum FetchPageError {
-    #[error(transparent)]
-    Http(#[from] reqwest::Error),
-
-    #[error("could not parse releases response as JSON")]
-    Parse(#[from] serde_json::Error),
-}
-
 /// A page of the releases listing failed to fetch after retries.
 ///
 /// Pagination cannot continue past a failed page (the `next` link lives in the
@@ -170,7 +142,7 @@ enum FetchPageError {
 #[error("failed fetching releases page {url}: {source}")]
 struct ReleasePageError {
     url: Url,
-    source: FetchPageError,
+    source: GithubReleaseError,
 }
 
 async fn fetch_github_releases(
@@ -194,7 +166,7 @@ async fn paginate_releases<F, Fut>(
 ) -> (Vec<JRubyVersion>, Option<ReleasePageError>)
 where
     F: FnMut(Url) -> Fut,
-    Fut: Future<Output = Result<(Vec<GitHubRelease>, Option<Url>), FetchPageError>>,
+    Fut: Future<Output = Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError>>,
 {
     let mut versions = Vec::new();
     let mut next = Some(base_url);
@@ -223,7 +195,7 @@ where
 async fn fetch_release_page(
     url: &Url,
     token: &str,
-) -> Result<(Vec<GitHubRelease>, Option<Url>), FetchPageError> {
+) -> Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError> {
     let mut attempts = 0;
     loop {
         attempts += 1;
@@ -239,10 +211,25 @@ async fn fetch_release_page(
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+enum GithubReleaseError {
+    #[error(transparent)]
+    Http(#[from] reqwest::Error),
+
+    #[error("could not parse pagination {0}")]
+    Pagination(#[from] shared::github::GithubHeaderError),
+
+    #[error("could not parse releases response as JSON due to {error}. Body: {body}")]
+    ReleaseNumberParse {
+        body: String,
+        error: serde_json::Error,
+    },
+}
+
 async fn fetch_release_page_inner(
     url: &Url,
     token: &str,
-) -> Result<(Vec<GitHubRelease>, Option<Url>), FetchPageError> {
+) -> Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError> {
     let request = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .user_agent("heroku-ruby-builder")
@@ -251,9 +238,18 @@ async fn fetch_release_page_inner(
         .bearer_auth(token);
 
     let response = request.send().await?.error_for_status()?;
-    let next = github_next_link(response.headers());
+    let links = shared::github::pagination_links(response.headers())?;
+    let next = links
+        .iter()
+        .find(|link| matches!(link, shared::github::PageLink::Next(_)))
+        .map(|link| link.url().clone());
+
     let body = response.text().await?;
-    let releases: Vec<GitHubRelease> = serde_json::from_str(&body)?;
+    let releases: Vec<GitHubRelease> =
+        serde_json::from_str(&body).map_err(|error| GithubReleaseError::ReleaseNumberParse {
+            body: body.clone(),
+            error,
+        })?;
     Ok((releases, next))
 }
 
@@ -646,40 +642,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_github_next_link_returns_next_url() {
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(
-            reqwest::header::LINK,
-            r#"<https://api.github.com/repositories/123/releases?per_page=100&page=2>; rel="next", <https://api.github.com/repositories/123/releases?per_page=100&page=5>; rel="last""#
-                .parse()
-                .unwrap(),
-        );
-        let next = github_next_link(&headers).unwrap();
-        assert_eq!(
-            next.as_str(),
-            "https://api.github.com/repositories/123/releases?per_page=100&page=2"
-        );
-    }
-
-    #[test]
-    fn test_github_next_link_last_page_returns_none() {
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(
-            reqwest::header::LINK,
-            r#"<https://api.github.com/repositories/123/releases?per_page=100&page=4>; rel="prev", <https://api.github.com/repositories/123/releases?per_page=100&page=1>; rel="first""#
-                .parse()
-                .unwrap(),
-        );
-        assert!(github_next_link(&headers).is_none());
-    }
-
-    #[test]
-    fn test_github_next_link_missing_header_returns_none() {
-        let headers = reqwest::header::HeaderMap::new();
-        assert!(github_next_link(&headers).is_none());
-    }
-
     fn release(tag: &str) -> GitHubRelease {
         GitHubRelease {
             tag_name: tag.to_string(),
@@ -687,8 +649,11 @@ mod tests {
         }
     }
 
-    fn parse_failure() -> FetchPageError {
-        serde_json::from_str::<i32>("not json").unwrap_err().into()
+    fn parse_failure() -> GithubReleaseError {
+        let body = String::from("not json");
+        serde_json::from_str::<i32>(&body)
+            .map_err(|error| GithubReleaseError::ReleaseNumberParse { body, error })
+            .unwrap_err()
     }
 
     #[tokio::test]
@@ -724,7 +689,7 @@ mod tests {
             Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
 
         let (versions, error) = paginate_releases(page1, move |_url| async move {
-            Ok::<(Vec<GitHubRelease>, Option<Url>), FetchPageError>((
+            Ok::<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError>((
                 vec![release("9.4.15.0")],
                 None,
             ))
