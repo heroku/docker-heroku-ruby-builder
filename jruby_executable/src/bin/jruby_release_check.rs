@@ -4,6 +4,7 @@ use fs_err as fs;
 use jruby_executable::jruby_build_properties;
 use serde::Deserialize;
 use shared::github;
+use shared::maybe_err::{MaybeErrors, MultiErrors, OkMaybe};
 use shared::s3;
 use shared::{S3_BASE_URL, base_images};
 use std::{error::Error, fmt, future::Future, path::PathBuf};
@@ -153,6 +154,46 @@ async fn fetch_github_releases(
     .await
 }
 
+async fn paginate_releases_accumulated<F, Fut>(
+    base_url: Url,
+    mut fetch: F,
+) -> OkMaybe<Vec<JRubyVersion>, MultiErrors<ReleasePageError>>
+where
+    F: FnMut(Url) -> Fut,
+    Fut: Future<Output = Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError>>,
+{
+    let mut errors = MaybeErrors::new();
+    let mut versions = Vec::new();
+    let mut next = Some(base_url);
+
+    while let Some(url) = next {
+        match fetch(url.clone()).await {
+            Ok((releases, next_url)) => {
+                for release in releases.into_iter().filter(|r| !r.prerelease) {
+                    let tag = release.tag_name.strip_prefix('v').unwrap_or(&release.tag_name);
+                    match JRubyVersion::parse(tag) {
+                        Ok(version) => versions.push(version),
+                        Err(error) => errors.push(ReleasePageError {
+                            url: url.clone(),
+                            source: GithubReleaseError::CannotParseJrubyVersion {
+                                raw: tag.to_owned(),
+                                error,
+                            },
+                        }),
+                    }
+                }
+                next = next_url;
+            }
+            Err(source) => {
+                errors.push(ReleasePageError { url, source });
+                break;
+            }
+        }
+    }
+
+    errors.ok_maybe(versions)
+}
+
 /// Drive pagination over release pages, accumulating parsed versions.
 ///
 /// `fetch` is injected so the pagination/partial-success logic can be exercised
@@ -198,7 +239,7 @@ async fn fetch_release_page(
     let next = response.paginate_next()?;
 
     let releases = serde_json::from_str(&response.body).map_err(|error| {
-        GithubReleaseError::ReleaseNumberParse {
+        GithubReleaseError::ReleaseResponseParse {
             body: response.body,
             error,
         }
@@ -215,10 +256,13 @@ enum GithubReleaseError {
     Pagination(#[from] shared::github::GithubHeaderError),
 
     #[error("could not parse releases response as JSON due to {error}. Body: {body}")]
-    ReleaseNumberParse {
+    ReleaseResponseParse {
         body: String,
         error: serde_json::Error,
     },
+
+    #[error("could not parse JRuby version: `{raw}` due to error {error}")]
+    CannotParseJrubyVersion { raw: String, error: String },
 }
 
 fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec<JRubyVersion> {
@@ -284,7 +328,7 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
-    let mut errors: Vec<String> = Vec::new();
+    let mut errors = MaybeErrors::new();
     let (releases, fetch_error) = fetch_github_releases(&RELEASES_URL, &args.gh_token).await;
     if let Some(e) = fetch_error {
         print::warning(format!("Failed to fetch some releases: {e}"));
@@ -592,7 +636,7 @@ mod tests {
     fn parse_failure() -> GithubReleaseError {
         let body = String::from("not json");
         serde_json::from_str::<i32>(&body)
-            .map_err(|error| GithubReleaseError::ReleaseNumberParse { body, error })
+            .map_err(|error| GithubReleaseError::ReleaseResponseParse { body, error })
             .unwrap_err()
     }
 
