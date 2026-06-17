@@ -1,5 +1,8 @@
 // See `bin/*.rs` for scripts
 
+mod jruby_version;
+pub use jruby_version::JRubyVersion;
+
 /// Short: This struct parses a file based on the input jruby version to determine
 /// what Ruby version it targets.
 ///
