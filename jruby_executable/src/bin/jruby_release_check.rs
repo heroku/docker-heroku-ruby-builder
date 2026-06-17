@@ -451,8 +451,6 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     }
 
     if let Some(errors) = errors.into_option() {
-        print::error("{} error(s) during check: \n\n{}");
-
         Err(errors.to_string().into())
     } else {
         Ok(())
