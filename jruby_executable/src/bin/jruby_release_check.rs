@@ -126,9 +126,17 @@ impl std::str::FromStr for JRubyVersion {
     }
 }
 
+/// A single entry from the GitHub releases listing API.
+///
+/// Only the fields needed to discover JRuby versions are deserialized; the rest
+/// of the payload is ignored.
 #[derive(Deserialize)]
 struct GitHubRelease {
+    /// The release's git tag (e.g. `"9.4.15.0"`), optionally prefixed with `v`.
+    /// Parsed into a [`JRubyVersion`] after stripping the leading `v`.
     tag_name: String,
+    /// Whether GitHub flagged this as a prerelease. Prereleases are filtered out
+    /// so only stable versions are considered.
     prerelease: bool,
 }
 
