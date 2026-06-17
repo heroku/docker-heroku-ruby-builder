@@ -221,6 +221,13 @@ enum GithubReleaseError {
     CannotParseJrubyVersion { raw: String, error: String },
 }
 
+/// Keep only the releases at or above `minimum`, narrowing the full release
+/// listing down to the versions worth checking on S3.
+///
+/// Ordering uses [`JRubyVersion`]'s field-wise comparison (major, then minor,
+/// then patch, then extra), so `9.4.7.0` and anything newer is retained while
+/// older versions are dropped. The input slice is left untouched; matching
+/// versions are cloned into the returned vector.
 fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec<JRubyVersion> {
     releases
         .iter()
@@ -229,6 +236,15 @@ fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec
         .collect()
 }
 
+/// Build the set of S3 URLs where the prebuilt binary for `version` would live,
+/// one per supported base image.
+///
+/// Each entry pairs the base image's name (e.g. `"heroku-24"`, used as a label
+/// in output and missing-binary reports) with the URL of its
+/// `ruby-{ruby_stdlib_version}-jruby-{version}.tgz` artifact under
+/// [`S3_BASE_URL`]. `ruby_stdlib_version` is the Ruby standard-library version
+/// the JRuby release ships (see [`resolve_stdlib_version`]), which is part of the
+/// artifact's filename.
 fn s3_urls_to_check(version: &JRubyVersion, ruby_stdlib_version: &str) -> Vec<(String, Url)> {
     let base_url = S3_BASE_URL.clone();
     base_images()
@@ -245,6 +261,16 @@ fn s3_urls_to_check(version: &JRubyVersion, ruby_stdlib_version: &str) -> Vec<(S
         .collect()
 }
 
+/// Look up the Ruby standard-library version that the given JRuby `version`
+/// implements, returning it paired with the version it belongs to.
+///
+/// The lookup downloads and parses JRuby's `build.properties` (via
+/// [`jruby_build_properties`]), which is blocking work, so it runs on a
+/// `spawn_blocking` thread to avoid stalling the async runtime. `version` is
+/// threaded back out in the returned tuple so callers driving many lookups
+/// concurrently (e.g. through a [`JoinSet`]) can associate each result with its
+/// input. The doubled `?` after `.await` unwraps first the `JoinError` (task
+/// panic) and then the inner property-parsing error.
 async fn resolve_stdlib_version(
     version: JRubyVersion,
 ) -> Result<(JRubyVersion, String), Box<dyn Error + Send + Sync>> {
@@ -256,6 +282,17 @@ async fn resolve_stdlib_version(
     Ok((version, stdlib))
 }
 
+/// Check whether `version`'s prebuilt binary already exists on S3 for every
+/// supported base image, returning the labels of the base images whose binary is
+/// missing.
+///
+/// The per-base-image URLs come from [`s3_urls_to_check`]; each is probed
+/// concurrently with a HEAD-style existence check ([`s3::url_exists`]) via a
+/// [`JoinSet`]. An empty returned vector means all binaries are present (nothing
+/// to build); a non-empty vector lists exactly which base images still need a
+/// build. `version` is returned alongside the labels so concurrent callers can
+/// match each result to its input. The doubled `?` unwraps the task's
+/// `JoinError` and then the existence-check error.
 async fn check_version_on_s3(
     version: JRubyVersion,
     ruby_stdlib_version: String,
