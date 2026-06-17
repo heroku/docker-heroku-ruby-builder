@@ -481,7 +481,7 @@ mod tests {
             output: PathBuf::from("versions.json"),
         };
         let resolved = ResolvedArgs::try_from(args).unwrap();
-        assert_eq!(resolved.gh_token.as_str(), "abc");
+        assert_eq!(resolved.gh_token, "abc".into());
     }
 
     #[test]
