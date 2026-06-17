@@ -320,7 +320,7 @@ async fn check_version_on_s3(
 /// type-erased error while preserving its `source()` chain, so the integration
 /// layer can keep "which phase failed" without falling back to a bare `String`.
 #[derive(Debug, thiserror::Error)]
-#[error("{context}")]
+#[error("{context}: {source}")]
 struct StageError {
     context: String,
     #[source]
