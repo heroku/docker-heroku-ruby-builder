@@ -1,6 +1,7 @@
 use crate::with_retries;
 use reqwest::Url;
 use reqwest::header::{HeaderMap, LINK, ToStrError};
+use std::fmt;
 use std::time::Duration;
 use winnow::{
     Parser, Result,
@@ -25,6 +26,65 @@ pub enum GithubHeaderError {
     },
 }
 
+/// A GitHub API token used to authenticate requests.
+///
+/// Wrapping the raw secret in a dedicated type keeps it from being confused with
+/// the many other `&str`/`String` arguments these APIs thread around (URLs,
+/// response bodies, tags, ...), where a transposed argument would compile but
+/// send the wrong value. Its [`Debug`](fmt::Debug) impl redacts the value so the
+/// token does not leak into logs, panic messages, or the derived `Debug` output
+/// of any struct that holds one.
+///
+/// Use [`as_str`](GitHubToken::as_str) at the point of use to obtain the secret.
+///
+/// # Intentionally not implemented
+///
+/// `Display`, `ToString`, and `Deref`/`AsRef<str>` are deliberately **not**
+/// implemented, and that omission is load-bearing -- please do not add them:
+///
+/// - `Display`/`ToString` would re-leak the secret through `{}`, `format!`,
+///   `.to_string()`, and error messages -- the very paths the redacted `Debug`
+///   exists to close. Omitting `Display` also makes `.to_string()` a compile
+///   error, forcing the explicit `as_str().to_owned()`.
+/// - `Deref<Target = str>` would enable deref coercion, silently turning a
+///   `&GitHubToken` back into a `&str` anywhere one is expected and reopening
+///   the argument-confusion hole this newtype closes.
+///
+/// Every path that exposes the raw secret should be the deliberate, greppable
+/// [`as_str`](GitHubToken::as_str) call.
+#[derive(Clone, PartialEq, Eq)]
+pub struct GitHubToken(String);
+
+impl GitHubToken {
+    /// Borrow the underlying secret, e.g. to set an `Authorization` header.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<String> for GitHubToken {
+    fn from(raw: String) -> Self {
+        Self(raw)
+    }
+}
+
+impl From<&str> for GitHubToken {
+    fn from(raw: &str) -> Self {
+        Self(raw.to_owned())
+    }
+}
+
+impl fmt::Debug for GitHubToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("GitHubToken").field(&"[REDACTED]").finish()
+    }
+}
+
+// No `Display`/`ToString`/`Deref` for `GitHubToken`: those would leak or
+// implicitly coerce the secret. Hand out the value only via `as_str()`. See the
+// type's "Intentionally not implemented" docs before adding any such impl.
+
 /// Performs an authenticated `GET` request and returns the response headers and body.
 ///
 /// The request sends a `Bearer` token via the `Authorization` header and uses a
@@ -48,12 +108,16 @@ pub enum GithubHeaderError {
 /// # use reqwest::Url;
 /// # async fn run() -> Result<(), reqwest::Error> {
 /// let url = Url::parse("https://api.github.com/repos/jruby/jruby/releases").unwrap();
-/// let response = shared::github::get_auth_with_retry(&url, "ghp_token").await?;
+/// let token = shared::github::GitHubToken::from("ghp_token");
+/// let response = shared::github::get_auth_with_retry(&url, &token).await?;
 /// # let _ = response;
 /// # Ok(())
 /// # }
 /// ```
-pub async fn get_auth_with_retry(url: &Url, token: &str) -> Result<GithubResponse, reqwest::Error> {
+pub async fn get_auth_with_retry(
+    url: &Url,
+    token: &GitHubToken,
+) -> Result<GithubResponse, reqwest::Error> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .user_agent("heroku-ruby-builder")
@@ -62,7 +126,7 @@ pub async fn get_auth_with_retry(url: &Url, token: &str) -> Result<GithubRespons
     let (headers, body) = with_retries(|| async {
         let response = client
             .get(url.clone())
-            .bearer_auth(token)
+            .bearer_auth(token.as_str())
             .send()
             .await?
             .error_for_status()?;

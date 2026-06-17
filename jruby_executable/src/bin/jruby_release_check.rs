@@ -3,7 +3,7 @@ use clap::Parser;
 use fs_err as fs;
 use jruby_executable::jruby_build_properties;
 use serde::Deserialize;
-use shared::github;
+use shared::github::{self, GitHubToken};
 use shared::maybe_err::{MaybeErrors, MultiErrors, OkMaybe};
 use shared::s3;
 use shared::{S3_BASE_URL, base_images};
@@ -38,7 +38,7 @@ struct Args {
 /// Validated arguments: every field is guaranteed usable.
 #[derive(Debug)]
 struct ResolvedArgs {
-    gh_token: String,
+    gh_token: GitHubToken,
     minimum_version: JRubyVersion,
     output: PathBuf,
 }
@@ -48,7 +48,7 @@ impl TryFrom<Args> for ResolvedArgs {
 
     fn try_from(args: Args) -> Result<Self, Self::Error> {
         let gh_token = match args.gh_token {
-            Some(token) if !token.trim().is_empty() => token.trim().to_owned(),
+            Some(token) if !token.trim().is_empty() => GitHubToken::from(token.trim()),
             _ => {
                 return Err(
                     "A GitHub API token is required. The GitHub Releases API returns \
@@ -205,7 +205,7 @@ where
 
 async fn fetch_release_page(
     url: &Url,
-    token: &str,
+    token: &GitHubToken,
 ) -> Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError> {
     let response = github::get_auth_with_retry(url, token).await?;
     let next = response.paginate_next()?;
@@ -489,7 +489,7 @@ mod tests {
             output: PathBuf::from("versions.json"),
         };
         let resolved = ResolvedArgs::try_from(args).unwrap();
-        assert_eq!(resolved.gh_token, "abc");
+        assert_eq!(resolved.gh_token.as_str(), "abc");
     }
 
     #[test]
