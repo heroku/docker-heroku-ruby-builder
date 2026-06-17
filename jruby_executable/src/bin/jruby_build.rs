@@ -58,7 +58,8 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     fs::create_dir_all(volume_cache_dir)?;
     fs::create_dir_all(volume_output_dir)?;
 
-    let ruby_stdlib_version = jruby_build_properties(&version.to_string())?.ruby_stdlib_version()?;
+    let ruby_stdlib_version =
+        jruby_build_properties(&version.to_string())?.ruby_stdlib_version()?;
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
     let expected_output = volume_output_dir
         .join(base_image.to_string())
