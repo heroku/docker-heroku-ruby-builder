@@ -413,14 +413,13 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if !errors.is_empty() {
-        print::error(format!("{} check(s) failed", errors.len()));
-        for failure in &errors {
-            print::sub_bullet(failure.to_string());
-        }
-        return Err(format!("{} check(s) failed", errors.len()).into());
+    if let Some(errors) = errors.into_option() {
+        print::error("{} error(s) during check: \n\n{}");
+
+        Err(errors.to_string().into())
+    } else {
+        Ok(())
     }
-    Ok(())
 }
 
 #[tokio::main]
