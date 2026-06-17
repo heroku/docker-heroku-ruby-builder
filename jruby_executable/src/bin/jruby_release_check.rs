@@ -178,7 +178,10 @@ where
         match fetch(url.clone()).await {
             Ok((releases, next_url)) => {
                 for release in releases.into_iter().filter(|r| !r.prerelease) {
-                    let tag = release.tag_name.strip_prefix('v').unwrap_or(&release.tag_name);
+                    let tag = release
+                        .tag_name
+                        .strip_prefix('v')
+                        .unwrap_or(&release.tag_name);
                     match JRubyVersion::parse(tag) {
                         Ok(version) => versions.push(version),
                         Err(error) => errors.push(ReleasePageError {
@@ -316,7 +319,8 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     // erasure, not stringification: the boxed error still carries its source chain;
     // a `String` would throw that away. Text is produced only when we print/return.
     let mut errors: MaybeErrors<Box<dyn Error + Send + Sync>> = MaybeErrors::new();
-    let OkMaybe(releases, fetch_errors) = fetch_github_releases(&RELEASES_URL, &args.gh_token).await;
+    let OkMaybe(releases, fetch_errors) =
+        fetch_github_releases(&RELEASES_URL, &args.gh_token).await;
     if let Some(fetch_errors) = fetch_errors {
         for failure in fetch_errors {
             errors.push(Box::new(failure) as Box<dyn Error + Send + Sync>);
@@ -671,13 +675,14 @@ mod tests {
         let page1 =
             Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
 
-        let OkMaybe(versions, errors) = paginate_releases_accumulated(page1, move |_url| async move {
-            Ok::<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError>((
-                vec![release("9.4.15.0")],
-                None,
-            ))
-        })
-        .await;
+        let OkMaybe(versions, errors) =
+            paginate_releases_accumulated(page1, move |_url| async move {
+                Ok::<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError>((
+                    vec![release("9.4.15.0")],
+                    None,
+                ))
+            })
+            .await;
 
         assert_eq!(versions.len(), 1);
         assert!(errors.is_none());

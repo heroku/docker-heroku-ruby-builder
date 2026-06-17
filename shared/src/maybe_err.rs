@@ -281,7 +281,9 @@ impl<E> MaybeErrors<E> {
     /// assert_eq!(errors.len(), 2);
     /// ```
     pub fn len(&self) -> usize {
-        self.0.as_ref().map_or(0, |multi_errors| multi_errors.len().get())
+        self.0
+            .as_ref()
+            .map_or(0, |multi_errors| multi_errors.len().get())
     }
 
     /// Borrow each accumulated error in turn; yields nothing when empty.
@@ -362,7 +364,7 @@ impl<'a, E> IntoIterator for &'a MaybeErrors<E> {
 
 impl<E> Extend<E> for MaybeErrors<E> {
     /// Accumulate many errors at once. This is what makes a `MaybeErrors` a
-    /// valid [`OkMaybe::push_unwrap`] target.
+    /// valid [`OkMaybe::drain_unwrap`] target.
     ///
     /// ```
     /// use shared::maybe_err::MaybeErrors;
@@ -500,7 +502,10 @@ mod test {
     fn multi_errors_display_multiple() {
         let mut multi_errors = MultiErrors::new("first".to_string());
         multi_errors.push("second".to_string());
-        assert_eq!(multi_errors.to_string(), "2 errors:\n  1. first\n  2. second");
+        assert_eq!(
+            multi_errors.to_string(),
+            "2 errors:\n  1. first\n  2. second"
+        );
     }
 
     #[test]
@@ -568,7 +573,8 @@ mod test {
         let mut errors: MaybeErrors<String> = MaybeErrors::new();
 
         let first = OkMaybe::<i32, MultiErrors<String>>(1, None).drain_unwrap(&mut errors);
-        let second = OkMaybe(2, Some(MultiErrors::new("boom".to_string()))).drain_unwrap(&mut errors);
+        let second =
+            OkMaybe(2, Some(MultiErrors::new("boom".to_string()))).drain_unwrap(&mut errors);
 
         assert_eq!(first, 1);
         assert_eq!(second, 2);
