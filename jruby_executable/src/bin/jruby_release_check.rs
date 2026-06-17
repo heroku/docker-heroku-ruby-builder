@@ -147,8 +147,8 @@ struct ReleasePageError {
 async fn fetch_github_releases(
     base_url: &Url,
     token: &str,
-) -> (Vec<JRubyVersion>, Option<ReleasePageError>) {
-    paginate_releases(base_url.clone(), |url| async move {
+) -> OkMaybe<Vec<JRubyVersion>, MultiErrors<ReleasePageError>> {
+    paginate_releases_accumulated(base_url.clone(), |url| async move {
         fetch_release_page(&url, token).await
     })
     .await
@@ -323,16 +323,33 @@ async fn check_version_on_s3(
     Ok((version, missing))
 }
 
+/// Attaches human-facing stage context (e.g. "resolving stdlib version") to a
+/// type-erased error while preserving its `source()` chain, so the integration
+/// layer can keep "which phase failed" without falling back to a bare `String`.
+#[derive(Debug, thiserror::Error)]
+#[error("{context}")]
+struct StageError {
+    context: String,
+    #[source]
+    source: Box<dyn Error + Send + Sync>,
+}
+
 async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     print::h2("Checking for new JRuby releases");
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
-    let mut errors = MaybeErrors::new();
-    let (releases, fetch_error) = fetch_github_releases(&RELEASES_URL, &args.gh_token).await;
-    if let Some(e) = fetch_error {
-        print::warning(format!("Failed to fetch some releases: {e}"));
-        errors.push(e.to_string());
+    // Type erasure at the last responsible moment: upstream code stays strongly
+    // typed for as long as it can, and only here -- where many unrelated failures
+    // are integrated into one report -- do we collapse them to `dyn Error`. This is
+    // erasure, not stringification: the boxed error still carries its source chain;
+    // a `String` would throw that away. Text is produced only when we print/return.
+    let mut errors: MaybeErrors<Box<dyn Error + Send + Sync>> = MaybeErrors::new();
+    let OkMaybe(releases, fetch_errors) = fetch_github_releases(&RELEASES_URL, &args.gh_token).await;
+    if let Some(fetch_errors) = fetch_errors {
+        for failure in fetch_errors {
+            errors.push(Box::new(failure) as Box<dyn Error + Send + Sync>);
+        }
     }
     print::bullet(format!("Found {} non-prerelease versions", releases.len()));
 
@@ -358,15 +375,19 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
             }
             Ok(Err(e)) => {
                 print::warning(format!("Error resolving stdlib version: {e}"));
-                errors.push(format!("resolving stdlib version: {e}"));
+                errors.push(Box::new(StageError {
+                    context: "resolving stdlib version".to_string(),
+                    source: e,
+                }) as Box<dyn Error + Send + Sync>);
             }
             Err(join_err) => {
                 print::warning(format!(
                     "Task panicked resolving stdlib version: {join_err}"
                 ));
-                errors.push(format!(
-                    "task panicked resolving stdlib version: {join_err}"
-                ));
+                errors.push(Box::new(StageError {
+                    context: "task panicked resolving stdlib version".to_string(),
+                    source: Box::new(join_err),
+                }) as Box<dyn Error + Send + Sync>);
             }
         }
     }
@@ -393,11 +414,17 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
             }
             Ok(Err(e)) => {
                 print::warning(format!("Error checking version: {e}"));
-                errors.push(format!("checking S3 for version: {e}"));
+                errors.push(Box::new(StageError {
+                    context: "checking S3 for version".to_string(),
+                    source: e,
+                }) as Box<dyn Error + Send + Sync>);
             }
             Err(join_err) => {
                 print::warning(format!("Task panicked checking version: {join_err}"));
-                errors.push(format!("task panicked checking S3 for version: {join_err}"));
+                errors.push(Box::new(StageError {
+                    context: "task panicked checking S3 for version".to_string(),
+                    source: Box::new(join_err),
+                }) as Box<dyn Error + Send + Sync>);
             }
         }
     }
@@ -418,7 +445,7 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     if !errors.is_empty() {
         print::error(format!("{} check(s) failed", errors.len()));
         for failure in &errors {
-            print::sub_bullet(failure);
+            print::sub_bullet(failure.to_string());
         }
         return Err(format!("{} check(s) failed", errors.len()).into());
     }
