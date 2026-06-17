@@ -203,22 +203,6 @@ where
     errors.ok_maybe(versions)
 }
 
-async fn fetch_release_page(
-    url: &Url,
-    token: &GitHubToken,
-) -> Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError> {
-    let response = github::get_auth_with_retry(url, token).await?;
-    let next = response.paginate_next()?;
-
-    let releases = serde_json::from_str(&response.body).map_err(|error| {
-        GithubReleaseError::ReleaseResponseParse {
-            body: response.body,
-            error,
-        }
-    })?;
-    Ok((releases, next))
-}
-
 #[derive(Debug, thiserror::Error)]
 enum GithubReleaseError {
     #[error(transparent)]
@@ -320,7 +304,16 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     let gh_token = &args.gh_token;
     let OkMaybe(releases, fetch_errors) =
         paginate_releases_accumulated(RELEASES_URL.clone(), |url| async move {
-            fetch_release_page(&url, gh_token).await
+            let response = github::get_auth_with_retry(&url, gh_token).await?;
+            let next = response.paginate_next()?;
+
+            let releases = serde_json::from_str(&response.body).map_err(|error| {
+                GithubReleaseError::ReleaseResponseParse {
+                    body: response.body,
+                    error,
+                }
+            })?;
+            Ok((releases, next))
         })
         .await;
 
