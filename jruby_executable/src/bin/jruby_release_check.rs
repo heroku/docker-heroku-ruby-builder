@@ -144,16 +144,6 @@ struct ReleasePageError {
     source: GithubReleaseError,
 }
 
-async fn fetch_github_releases(
-    base_url: &Url,
-    token: &str,
-) -> OkMaybe<Vec<JRubyVersion>, MultiErrors<ReleasePageError>> {
-    paginate_releases_accumulated(base_url.clone(), |url| async move {
-        fetch_release_page(&url, token).await
-    })
-    .await
-}
-
 /// Drive pagination over release pages, accumulating parsed versions and any
 /// errors encountered along the way.
 ///
@@ -319,8 +309,13 @@ async fn call(args: ResolvedArgs) -> Result<(), Box<dyn Error>> {
     // erasure, not stringification: the boxed error still carries its source chain;
     // a `String` would throw that away. Text is produced only when we print/return.
     let mut errors: MaybeErrors<Box<dyn Error + Send + Sync>> = MaybeErrors::new();
+    let gh_token = &args.gh_token;
     let OkMaybe(releases, fetch_errors) =
-        fetch_github_releases(&RELEASES_URL, &args.gh_token).await;
+        paginate_releases_accumulated(RELEASES_URL.clone(), |url| async move {
+            fetch_release_page(&url, gh_token).await
+        })
+        .await;
+
     if let Some(fetch_errors) = fetch_errors {
         for failure in fetch_errors {
             errors.push(Box::new(failure) as Box<dyn Error + Send + Sync>);
