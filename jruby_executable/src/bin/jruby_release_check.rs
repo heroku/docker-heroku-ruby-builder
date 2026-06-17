@@ -154,6 +154,14 @@ async fn fetch_github_releases(
     .await
 }
 
+/// Drive pagination over release pages, accumulating parsed versions and any
+/// errors encountered along the way.
+///
+/// `fetch` is injected so the pagination/partial-success logic can be exercised
+/// without real network access. Versions that fail to parse are collected as
+/// errors rather than dropped, and on a page-fetch failure the versions gathered
+/// so far are returned together with the error(s) (pagination cannot continue
+/// past a failed page, since the `next` link lives in the failed response).
 async fn paginate_releases_accumulated<F, Fut>(
     base_url: Url,
     mut fetch: F,
@@ -192,43 +200,6 @@ where
     }
 
     errors.ok_maybe(versions)
-}
-
-/// Drive pagination over release pages, accumulating parsed versions.
-///
-/// `fetch` is injected so the pagination/partial-success logic can be exercised
-/// without real network access. On the first page failure the versions gathered
-/// so far are returned together with the error, and pagination stops.
-async fn paginate_releases<F, Fut>(
-    base_url: Url,
-    mut fetch: F,
-) -> (Vec<JRubyVersion>, Option<ReleasePageError>)
-where
-    F: FnMut(Url) -> Fut,
-    Fut: Future<Output = Result<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError>>,
-{
-    let mut versions = Vec::new();
-    let mut next = Some(base_url);
-    while let Some(url) = next {
-        match fetch(url.clone()).await {
-            Ok((releases, next_url)) => {
-                versions.extend(
-                    releases
-                        .into_iter()
-                        .filter(|r| !r.prerelease)
-                        .filter_map(|r| {
-                            let tag = r.tag_name.strip_prefix('v').unwrap_or(&r.tag_name);
-                            JRubyVersion::parse(tag).ok()
-                        }),
-                );
-                next = next_url;
-            }
-            Err(source) => {
-                return (versions, Some(ReleasePageError { url, source }));
-            }
-        }
-    }
-    (versions, None)
 }
 
 async fn fetch_release_page(
@@ -676,7 +647,7 @@ mod tests {
                 .unwrap();
         let expected_failed = page2.clone();
 
-        let (versions, error) = paginate_releases(page1, move |url| {
+        let OkMaybe(versions, errors) = paginate_releases_accumulated(page1, move |url| {
             let page2 = page2.clone();
             async move {
                 if url.as_str().contains("page=2") {
@@ -690,8 +661,9 @@ mod tests {
 
         let names: Vec<String> = versions.iter().map(|v| v.to_string()).collect();
         assert_eq!(names, vec!["9.4.15.0", "9.4.14.0"]);
-        let error = error.expect("expected the failed page to be reported");
-        assert_eq!(error.url, expected_failed);
+        let errors = errors.expect("expected the failed page to be reported");
+        assert_eq!(errors.len().get(), 1);
+        assert_eq!(errors.iter().next().unwrap().url, expected_failed);
     }
 
     #[tokio::test]
@@ -699,7 +671,7 @@ mod tests {
         let page1 =
             Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
 
-        let (versions, error) = paginate_releases(page1, move |_url| async move {
+        let OkMaybe(versions, errors) = paginate_releases_accumulated(page1, move |_url| async move {
             Ok::<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError>((
                 vec![release("9.4.15.0")],
                 None,
@@ -708,6 +680,34 @@ mod tests {
         .await;
 
         assert_eq!(versions.len(), 1);
-        assert!(error.is_none());
+        assert!(errors.is_none());
+    }
+
+    #[tokio::test]
+    async fn paginate_accumulates_version_parse_errors_and_keeps_collecting() {
+        let page1 =
+            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
+
+        let OkMaybe(versions, errors) =
+            paginate_releases_accumulated(page1, move |_url| async move {
+                Ok::<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError>((
+                    vec![release("9.4.15.0"), release("not-a-version")],
+                    None,
+                ))
+            })
+            .await;
+
+        let names: Vec<String> = versions.iter().map(|v| v.to_string()).collect();
+        assert_eq!(names, vec!["9.4.15.0"]);
+        let errors = errors.expect("expected the unparseable tag to be reported");
+        assert_eq!(errors.len().get(), 1);
+        assert!(
+            matches!(
+                errors.iter().next().unwrap().source,
+                GithubReleaseError::CannotParseJrubyVersion { .. }
+            ),
+            "got: {:?}",
+            errors.iter().next().unwrap()
+        );
     }
 }
