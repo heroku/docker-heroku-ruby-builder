@@ -1,7 +1,7 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use indoc::formatdoc;
-use jruby_executable::jruby_build_properties;
+use jruby_executable::{JRubyVersion, jruby_build_properties};
 use libherokubuildpack::inventory::artifact::Arch;
 use shared::{BaseImage, source_dir};
 use std::error::Error;
@@ -17,7 +17,7 @@ struct RubyArgs {
     arch: Arch,
 
     #[arg(long)]
-    version: String,
+    version: JRubyVersion,
 
     #[arg(long = "base-image")]
     base_image: BaseImage,
@@ -34,7 +34,8 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         artifact_dir,
     } = args;
 
-    let jruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
+    let jruby_stdlib_version =
+        jruby_build_properties(&version.to_string())?.ruby_stdlib_version()?;
 
     // Log progress to STDERR, print results to STDOUT directly
     let start = Instant::now();

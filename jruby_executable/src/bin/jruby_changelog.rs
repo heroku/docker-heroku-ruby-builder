@@ -3,18 +3,18 @@ use std::error::Error;
 use bullet_stream::global::print;
 use clap::Parser;
 use indoc::formatdoc;
-use jruby_executable::jruby_build_properties;
+use jruby_executable::{JRubyVersion, jruby_build_properties};
 
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(long)]
-    version: String,
+    version: JRubyVersion,
 }
 
 fn jruby_changelog(args: &Args) -> Result<(), Box<dyn Error>> {
     let Args { version } = args;
 
-    let stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
+    let stdlib_version = jruby_build_properties(&version.to_string())?.ruby_stdlib_version()?;
 
     println!("Add a changelog item: https://devcenter.heroku.com/admin/changelog_items/new");
     println!();

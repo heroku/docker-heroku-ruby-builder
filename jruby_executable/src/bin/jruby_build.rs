@@ -2,7 +2,7 @@ use bullet_stream::{global::print, style};
 use clap::Parser;
 use fs_err::{self as fs, PathExt};
 use indoc::formatdoc;
-use jruby_executable::jruby_build_properties;
+use jruby_executable::{JRubyVersion, jruby_build_properties};
 use libherokubuildpack::inventory::artifact::Arch;
 use shared::{
     BaseImage, BuildStatus, S3_BASE_URL, TarDownloadPath, append_filename_with, download_tar, s3,
@@ -22,7 +22,7 @@ enum OnConflict {
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(long)]
-    version: String,
+    version: JRubyVersion,
 
     #[arg(long)]
     base_image: BaseImage,
@@ -58,7 +58,7 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     fs::create_dir_all(volume_cache_dir)?;
     fs::create_dir_all(volume_output_dir)?;
 
-    let ruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
+    let ruby_stdlib_version = jruby_build_properties(&version.to_string())?.ruby_stdlib_version()?;
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
     let expected_output = volume_output_dir
         .join(base_image.to_string())
