@@ -1,7 +1,7 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use jruby_executable::{JRubyVersion, jruby_build_properties};
+use jruby_executable::{JRubyVersion, jruby_build_properties, jruby_version};
 use serde::Deserialize;
 use shared::github::{self, GitHubToken};
 use shared::maybe_err::{MaybeErrors, MultiErrors, OkMaybe};
@@ -121,11 +121,11 @@ where
                         .unwrap_or(&release.tag_name);
                     match JRubyVersion::parse(tag) {
                         Ok(version) => versions.push(version),
-                        Err(error) => errors.push(ReleasePageError {
+                        Err(source) => errors.push(ReleasePageError {
                             url: url.clone(),
                             source: GithubReleaseError::CannotParseJrubyVersion {
                                 raw: tag.to_owned(),
-                                error,
+                                source,
                             },
                         }),
                     }
@@ -156,8 +156,12 @@ enum GithubReleaseError {
         error: serde_json::Error,
     },
 
-    #[error("could not parse JRuby version: `{raw}` due to error {error}")]
-    CannotParseJrubyVersion { raw: String, error: String },
+    #[error("could not parse JRuby version: `{raw}`")]
+    CannotParseJrubyVersion {
+        raw: String,
+        #[source]
+        source: jruby_version::ParseError,
+    },
 }
 
 /// Keep only the releases at or above `minimum`, narrowing the full release

@@ -1,5 +1,19 @@
+//! JRuby's four-segment version scheme: `major.minor.patch.extra` (e.g. `9.4.7.0`).
+//!
+//! The first three segments roughly track semantic versioning. The fourth
+//! (`extra`) is a JRuby-specific maintenance level, bumped for JRuby-internal
+//! fixes that don't change the implemented Ruby language version. JRuby uses
+//! four segments to keep its own version distinct from the Ruby version it
+//! implements (e.g. JRuby `9.4.7.0` implements Ruby `3.1.x`).
+
 use std::fmt;
 
+/// A parsed JRuby version: four numeric segments, `major.minor.patch.extra`.
+///
+/// Ordering is field-wise (major, then minor, then patch, then extra), so
+/// `9.4.7.0 < 9.4.15.0 < 10.1.0.0`. Construct one by parsing a string via
+/// [`JRubyVersion::parse`] or [`str::parse`]; the fields are kept private so
+/// every value is guaranteed to have come through validation.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct JRubyVersion {
     major: u32,
@@ -8,32 +22,25 @@ pub struct JRubyVersion {
     extra: u32,
 }
 
+/// Error returned when a string cannot be parsed into a [`JRubyVersion`].
+#[derive(Debug, thiserror::Error)]
+pub enum ParseError {
+    #[error("expected 4 parts (major.minor.patch.extra), found {found}")]
+    WrongPartCount { found: usize },
+    #[error("invalid {component} version component `{raw}`")]
+    InvalidComponent {
+        component: &'static str,
+        raw: String,
+        #[source]
+        source: std::num::ParseIntError,
+    },
+}
+
 impl JRubyVersion {
-    pub fn parse(s: &str) -> Result<Self, String> {
-        let parts: Vec<&str> = s.split('.').collect();
-        if parts.len() != 4 {
-            return Err(format!(
-                "Invalid JRuby version '{s}': expected 4 parts (X.Y.Z.W)"
-            ));
-        }
-        let major = parts[0]
-            .parse()
-            .map_err(|_| format!("Invalid major version in '{s}'"))?;
-        let minor = parts[1]
-            .parse()
-            .map_err(|_| format!("Invalid minor version in '{s}'"))?;
-        let patch = parts[2]
-            .parse()
-            .map_err(|_| format!("Invalid patch version in '{s}'"))?;
-        let extra = parts[3]
-            .parse()
-            .map_err(|_| format!("Invalid extra version in '{s}'"))?;
-        Ok(Self {
-            major,
-            minor,
-            patch,
-            extra,
-        })
+    /// Parse a version string like `9.4.7.0`. An ergonomic alternative to
+    /// `FromStr`; delegates to it, so there is a single parsing implementation.
+    pub fn parse(s: &str) -> Result<Self, ParseError> {
+        s.parse()
     }
 }
 
@@ -54,11 +61,28 @@ impl serde::Serialize for JRubyVersion {
 }
 
 impl std::str::FromStr for JRubyVersion {
-    type Err = String;
+    type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s)
+        let parts: Vec<&str> = s.split('.').collect();
+        if parts.len() != 4 {
+            return Err(ParseError::WrongPartCount { found: parts.len() });
+        }
+        Ok(Self {
+            major: parse_component("major", parts[0])?,
+            minor: parse_component("minor", parts[1])?,
+            patch: parse_component("patch", parts[2])?,
+            extra: parse_component("extra", parts[3])?,
+        })
     }
+}
+
+fn parse_component(component: &'static str, raw: &str) -> Result<u32, ParseError> {
+    raw.parse().map_err(|source| ParseError::InvalidComponent {
+        component,
+        raw: raw.to_owned(),
+        source,
+    })
 }
 
 #[cfg(test)]
