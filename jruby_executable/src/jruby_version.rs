@@ -174,6 +174,18 @@ mod tests {
                 expected non-negative integer"},
             JRubyVersion::parse("9..1.0").unwrap_err().to_string(),
         );
+
+        // A trailing space leaves unconsumed input after the final segment, so
+        // the caret points at the space and the diagnostic reports the failed
+        // end-of-input expectation.
+        assert_eq!(
+            indoc! {"
+                9.4.7.0 
+                       ^
+                invalid JRuby version (`<major>.<minor>.<patch>.<extra>`)
+                expected end of input"},
+            JRubyVersion::parse("9.4.7.0 ").unwrap_err().to_string(),
+        );
     }
 
     #[test]
@@ -194,11 +206,13 @@ mod tests {
         let v940 = JRubyVersion::parse("9.4.0.0").unwrap();
         let v947 = JRubyVersion::parse("9.4.7.0").unwrap();
         let v9415 = JRubyVersion::parse("9.4.15.0").unwrap();
+        let v94151 = JRubyVersion::parse("9.4.15.1").unwrap();
         let v1010 = JRubyVersion::parse("10.1.0.0").unwrap();
 
         assert!(v947 > v940);
         assert!(v9415 > v947);
-        assert!(v1010 > v9415);
+        assert!(v94151 > v9415);
+        assert!(v1010 > v94151);
         assert!(v940 < v947);
         assert_eq!(v947, JRubyVersion::parse("9.4.7.0").unwrap());
     }
