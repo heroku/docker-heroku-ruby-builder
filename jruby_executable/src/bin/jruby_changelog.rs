@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, io::Write};
 
 use bullet_stream::global::print;
 use clap::Parser;
@@ -11,7 +11,10 @@ struct Args {
     version: JRubyVersion,
 }
 
-fn jruby_changelog(args: &Args) -> Result<(), Box<dyn Error>> {
+fn jruby_changelog<W>(args: &Args, mut io: W) -> Result<W, Box<dyn Error>>
+where
+    W: Write,
+{
     let Args { version } = args;
 
     let stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
@@ -29,14 +32,14 @@ fn jruby_changelog(args: &Args) -> Result<(), Box<dyn Error>> {
         The JRuby release notes can be found on the [JRuby website](https://www.jruby.org/news).
     "};
 
-    print::plain(changelog);
+    writeln!(io, "{changelog}")?;
 
-    Ok(())
+    Ok(io)
 }
 
 fn main() {
     let args = Args::parse();
-    if let Err(error) = jruby_changelog(&args) {
+    if let Err(error) = jruby_changelog(&args, std::io::stdout()) {
         print::error(formatdoc! {"
             ❌ Command failed ❌
 
