@@ -41,6 +41,8 @@ jobs:
         run: rustup update
       - name: Rust Cache
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: Cargo build
+        run: cargo build --locked
       - name: Output CHANGELOG
         run: cargo run --locked --bin jruby_changelog -- --version "${{inputs.jruby_version}}" | tee "$GITHUB_STEP_SUMMARY"
 
