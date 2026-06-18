@@ -121,12 +121,9 @@ where
                         .unwrap_or(&release.tag_name);
                     match JRubyVersion::parse(tag) {
                         Ok(version) => versions.push(version),
-                        Err(source) => errors.push(ReleasePageError {
+                        Err(error) => errors.push(ReleasePageError {
                             url: url.clone(),
-                            source: GithubReleaseError::CannotParseJrubyVersion {
-                                raw: tag.to_owned(),
-                                source,
-                            },
+                            source: GithubReleaseError::CannotParseJrubyVersion(error),
                         }),
                     }
                 }
@@ -156,12 +153,8 @@ enum GithubReleaseError {
         error: serde_json::Error,
     },
 
-    #[error("could not parse JRuby version: `{raw}`")]
-    CannotParseJrubyVersion {
-        raw: String,
-        #[source]
-        source: jruby_version::ParseError,
-    },
+    #[error(transparent)]
+    CannotParseJrubyVersion(#[from] jruby_version::ParseError),
 }
 
 /// Keep only the releases at or above `minimum`, narrowing the full release
@@ -637,7 +630,7 @@ mod tests {
         assert!(
             matches!(
                 errors.iter().next().unwrap().source,
-                GithubReleaseError::CannotParseJrubyVersion { .. }
+                GithubReleaseError::CannotParseJrubyVersion(_)
             ),
             "got: {:?}",
             errors.iter().next().unwrap()
