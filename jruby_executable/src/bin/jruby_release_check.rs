@@ -513,14 +513,23 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_strip_v_prefix() {
-        let tag = "v9.4.7.0";
-        let stripped = tag.strip_prefix('v').unwrap_or(tag);
-        assert_eq!(
-            JRubyVersion::parse(stripped).unwrap().to_string(),
-            "9.4.7.0"
-        );
+    #[tokio::test]
+    async fn paginate_strips_leading_v_from_tag() {
+        let page1 =
+            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
+
+        let OkMaybe(versions, errors) =
+            paginate_releases_accumulated(page1, move |_url| async move {
+                Ok::<(Vec<GitHubRelease>, Option<Url>), GithubReleaseError>((
+                    vec![release("v9.4.7.0")],
+                    None,
+                ))
+            })
+            .await;
+
+        let names: Vec<String> = versions.iter().map(|v| v.to_string()).collect();
+        assert_eq!(names, vec!["9.4.7.0"]);
+        assert!(errors.is_none());
     }
 
     #[test]
