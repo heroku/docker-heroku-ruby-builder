@@ -2,7 +2,7 @@ use bullet_stream::{global::print, style};
 use clap::Parser;
 use fs_err::{self as fs, PathExt};
 use indoc::formatdoc;
-use jruby_executable::jruby_build_properties;
+use jruby_executable::{JRubyVersion, jruby_build_properties};
 use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use shared::{
@@ -25,7 +25,7 @@ enum OnConflict {
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(long)]
-    version: String,
+    version: JRubyVersion,
 
     #[arg(long)]
     base_image: BaseImage,

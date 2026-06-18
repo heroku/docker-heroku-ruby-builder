@@ -90,11 +90,11 @@ impl BuildProperties {
     }
 }
 
-pub fn jruby_build_properties(jruby_version: &str) -> Result<BuildProperties, Error> {
+pub fn jruby_build_properties(jruby_version: &JRubyVersion) -> Result<BuildProperties, Error> {
     shared::with_retries(|| jruby_build_properties_inner(jruby_version))
 }
 
-fn jruby_build_properties_inner(jruby_version: &str) -> Result<BuildProperties, Error> {
+fn jruby_build_properties_inner(jruby_version: &JRubyVersion) -> Result<BuildProperties, Error> {
     let url = format!(
         "https://raw.githubusercontent.com/jruby/jruby/{jruby_version}/default.build.properties",
     );
