@@ -1,24 +1,22 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use reqwest::Url;
-use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path};
+use shared::{
+    RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3, with_retries,
+};
 use std::{
     error::Error,
     path::{Path, PathBuf},
     time::Duration,
 };
 use tokio::task::JoinSet;
-use tokio::time::sleep;
+use url::Url;
 use yaml_rust2::YamlLoader;
 
 static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
     Url::parse("https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml")
         .expect("valid releases URL constant")
 });
-
-const MAX_RETRY_ATTEMPTS: u8 = 3;
-const RETRY_DELAY: Duration = Duration::from_secs(1);
 
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
@@ -33,19 +31,7 @@ struct Args {
 }
 
 async fn fetch_releases(url: &Url) -> Result<Vec<RubyDownloadVersion>, Box<dyn std::error::Error>> {
-    let mut attempts = 0;
-    loop {
-        attempts += 1;
-        match fetch_releases_inner(url).await {
-            Ok(val) => return Ok(val),
-            Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
-                    return Err(error);
-                }
-                sleep(RETRY_DELAY).await;
-            }
-        }
-    }
+    with_retries(|| fetch_releases_inner(url)).await
 }
 
 async fn fetch_releases_inner(
@@ -95,7 +81,7 @@ fn retain_releases_gte(
 
 fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
     let matrix = build_matrix();
-    let base_url = Url::parse(S3_BASE_URL).expect("valid base URL constant");
+    let base_url = S3_BASE_URL.clone();
     matrix
         .iter()
         .map(|(base_image, arch)| {
@@ -109,41 +95,13 @@ fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
         .collect()
 }
 
-async fn s3_url_exists(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let mut attempts = 0;
-    loop {
-        attempts += 1;
-        match s3_url_exists_inner(url.clone()).await {
-            Ok(val) => return Ok(val),
-            Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
-                    return Err(error);
-                }
-                sleep(RETRY_DELAY).await;
-            }
-        }
-    }
-}
-
-async fn s3_url_exists_inner(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-    let response = client.head(url.clone()).send().await?;
-    match response.status() {
-        status if status.is_success() => Ok(true),
-        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(false),
-        status => Err(format!("Unexpected status {status} checking {url}").into()),
-    }
-}
-
 async fn check_version_on_s3(
     version: RubyDownloadVersion,
 ) -> Result<(RubyDownloadVersion, Vec<String>), Box<dyn std::error::Error + Send + Sync>> {
     let mut set = JoinSet::new();
     for (label, url) in urls_to_check(&version) {
         set.spawn(async move {
-            let exists = s3_url_exists(url).await?;
+            let exists = s3::url_exists(url).await?;
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>((label, exists))
         });
     }
@@ -185,13 +143,14 @@ async fn call(args: Args) -> Result<(), Box<dyn Error>> {
         set.spawn(check_version_on_s3(version));
     }
 
+    let mut errors: Vec<String> = Vec::new();
     let mut versions_to_build = Vec::new();
     while let Some(result) = set.join_next().await {
-        match result? {
-            Ok((version, missing)) if missing.is_empty() => {
+        match result {
+            Ok(Ok((version, missing))) if missing.is_empty() => {
                 print::sub_bullet(format!("{version}: all binaries present"));
             }
-            Ok((version, missing)) => {
+            Ok(Ok((version, missing))) => {
                 print::sub_bullet(format!(
                     "{version}: missing {} combo(s): {}",
                     missing.len(),
@@ -199,8 +158,13 @@ async fn call(args: Args) -> Result<(), Box<dyn Error>> {
                 ));
                 versions_to_build.push(version);
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 print::warning(format!("Error checking version: {e}"));
+                errors.push(format!("checking S3 for version: {e}"));
+            }
+            Err(join_err) => {
+                print::warning(format!("Task panicked checking version: {join_err}"));
+                errors.push(format!("task panicked checking S3 for version: {join_err}"));
             }
         }
     }
@@ -216,6 +180,14 @@ async fn call(args: Args) -> Result<(), Box<dyn Error>> {
         for version in &versions_to_build {
             print::sub_bullet(format!("{version}"));
         }
+    }
+
+    if !errors.is_empty() {
+        print::error(format!("{} check(s) failed", errors.len()));
+        for failure in &errors {
+            print::sub_bullet(failure);
+        }
+        return Err(format!("{} check(s) failed", errors.len()).into());
     }
     Ok(())
 }

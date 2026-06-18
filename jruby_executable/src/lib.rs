@@ -91,7 +91,7 @@ impl BuildProperties {
 }
 
 pub fn jruby_build_properties(jruby_version: &JRubyVersion) -> Result<BuildProperties, Error> {
-    shared::with_retries(|| jruby_build_properties_inner(jruby_version))
+    shared::sync::with_retries(|| jruby_build_properties_inner(jruby_version))
 }
 
 fn jruby_build_properties_inner(jruby_version: &JRubyVersion) -> Result<BuildProperties, Error> {

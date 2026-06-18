@@ -1,43 +1,116 @@
 use fs_err::{self as fs, File, PathExt};
 use fun_run::CommandWithName;
 use libherokubuildpack::inventory::artifact::Arch;
-use reqwest::Url;
+use std::future::Future;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+mod base_image;
+mod download_ruby_version;
+pub mod github;
+mod inventory_help;
+pub mod maybe_err;
+pub mod s3;
+
 pub const MAX_RETRY_ATTEMPTS: u8 = 3;
 pub const RETRY_DELAY: Duration = Duration::from_secs(1);
 
-pub fn with_retries<T, E, F>(f: F) -> Result<T, E>
+/// Retries an asynchronous, fallible operation until it succeeds or the attempt
+/// limit is reached.
+///
+/// The closure `f` is invoked, and its future awaited, up to
+/// [`MAX_RETRY_ATTEMPTS`] times. After each failed attempt (except the last)
+/// execution sleeps for [`RETRY_DELAY`] before trying again. On success the
+/// `Ok` value is returned immediately; if every attempt fails, the error from
+/// the final attempt is returned.
+///
+/// `f` is `Fn` (not `FnOnce`) because it may be called multiple times, so it must
+/// be able to produce a fresh future on each attempt. Note that retries are
+/// unconditional: every `Err` is treated as retryable.
+///
+/// For the blocking equivalent, see [`sync::with_retries`].
+///
+/// # Examples
+///
+/// ```no_run
+/// # async fn fetch() -> Result<u32, std::io::Error> { Ok(42) }
+/// # async fn run() -> Result<(), std::io::Error> {
+/// let value = shared::with_retries(|| fetch()).await?;
+/// # Ok(())
+/// # }
+/// ```
+pub async fn with_retries<T, E, F, Fut>(f: F) -> Result<T, E>
 where
-    F: Fn() -> Result<T, E>,
+    F: Fn() -> Fut,
+    Fut: Future<Output = Result<T, E>>,
 {
     let mut attempts = 0;
     loop {
         attempts += 1;
-        match f() {
+        match f().await {
             Ok(val) => return Ok(val),
             Err(error) => {
                 if attempts >= MAX_RETRY_ATTEMPTS {
                     return Err(error);
                 }
-                std::thread::sleep(RETRY_DELAY);
+                tokio::time::sleep(RETRY_DELAY).await;
             }
         }
     }
 }
 
-mod base_image;
-mod download_ruby_version;
-mod inventory_help;
-pub mod maybe_err;
+pub mod sync {
+    use super::*;
 
-pub use base_image::{BaseImage, build_matrix};
+    /// Retries a blocking, fallible operation until it succeeds or the attempt
+    /// limit is reached.
+    ///
+    /// The closure `f` is invoked up to [`MAX_RETRY_ATTEMPTS`] times. After each
+    /// failed attempt (except the last) the current thread sleeps for
+    /// [`RETRY_DELAY`] via [`std::thread::sleep`] before trying again. On success
+    /// the `Ok` value is returned immediately; if every attempt fails, the error
+    /// from the final attempt is returned.
+    ///
+    /// This is the blocking counterpart to [`super::with_retries`]; use it from
+    /// synchronous code where no async runtime is available. Retries are
+    /// unconditional: every `Err` is treated as retryable.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # fn read() -> Result<u32, std::io::Error> { Ok(42) }
+    /// let value = shared::sync::with_retries(|| read())?;
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
+    pub fn with_retries<T, E, F>(f: F) -> Result<T, E>
+    where
+        F: Fn() -> Result<T, E>,
+    {
+        let mut attempts = 0;
+        loop {
+            attempts += 1;
+            match f() {
+                Ok(val) => return Ok(val),
+                Err(error) => {
+                    if attempts >= MAX_RETRY_ATTEMPTS {
+                        return Err(error);
+                    }
+                    std::thread::sleep(RETRY_DELAY);
+                }
+            }
+        }
+    }
+}
+
+pub use base_image::{BaseImage, base_images, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
 
-pub static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
+pub static S3_BASE_URL: std::sync::LazyLock<url::Url> = std::sync::LazyLock::new(|| {
+    url::Url::parse("https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com")
+        .expect("valid S3 base URL constant")
+});
 pub use inventory_help::{
     ArtifactMetadata, artifact_is_different, artifact_same_url_different_checksum,
     atomic_inventory_update, inventory_check, sha256_from_path,
@@ -164,31 +237,8 @@ pub fn validate_version_for_stack(
     Ok(())
 }
 
-/// Performs an HTTP HEAD request to check if a URL returns a successful status.
-pub fn s3_url_exists(url: Url) -> Result<bool, Error> {
-    with_retries(|| s3_url_exists_inner(url.clone()))
-}
-
-fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(Error::FailedRequest)?;
-    let response = client
-        .head(url.clone())
-        .send()
-        .map_err(Error::FailedRequest)?;
-    match response.status() {
-        status if status.is_success() => Ok(true),
-        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(false),
-        status => Err(Error::Other(format!(
-            "Unexpected status {status} checking {url}"
-        ))),
-    }
-}
-
 pub fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
-    with_retries(|| download_tar_inner(url, path))
+    sync::with_retries(|| download_tar_inner(url, path))
 }
 
 fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
