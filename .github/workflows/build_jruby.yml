@@ -44,7 +44,13 @@ jobs:
       - name: Cargo build
         run: cargo build --locked
       - name: Output CHANGELOG
-        run: cargo run --locked --bin jruby_changelog -- --version "${{inputs.jruby_version}}" | tee "$GITHUB_STEP_SUMMARY"
+        run: |
+            set -euo pipefail
+            {
+              echo '````'
+              cargo run --locked --bin jruby_changelog -- --version "${{inputs.jruby_version}}"
+              echo '````'
+            } | tee -a "$GITHUB_STEP_SUMMARY"
 
   build-and-upload:
     runs-on: pub-hk-ubuntu-24.04-xlarge
