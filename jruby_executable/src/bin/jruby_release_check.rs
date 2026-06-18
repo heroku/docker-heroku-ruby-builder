@@ -184,6 +184,14 @@ fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec
 /// [`S3_BASE_URL`]. `ruby_stdlib_version` is the Ruby standard-library version
 /// the JRuby release ships (see [`resolve_stdlib_version`]), which is part of the
 /// artifact's filename.
+///
+/// Iteration is over the *current* [`base_images()`] set, not whichever stacks
+/// existed when a given JRuby version was first released. When a new stack is
+/// added, every previously-released version will report it as missing on the
+/// next run, which is the signal `jruby_build` needs to backfill builds for
+/// that stack. Only the canonical `{base_image}/{tgz}` path is probed;
+/// `jruby_build` also writes per-arch copies in the same upload, so the
+/// canonical path's presence implies the per-arch copies are present too.
 fn s3_urls_to_check(version: &JRubyVersion, ruby_stdlib_version: &str) -> Vec<(String, Url)> {
     let base_url = S3_BASE_URL.clone();
     base_images()
