@@ -16,9 +16,6 @@ fn jruby_changelog(args: &Args) -> Result<(), Box<dyn Error>> {
 
     let stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
 
-    println!("Add a changelog item: https://devcenter.heroku.com/admin/changelog_items/new");
-    println!();
-
     let changelog = formatdoc! {"
         ## JRuby version {version} is now available
 
