@@ -30,8 +30,11 @@ lazy_static = { workspace = true }
 libherokubuildpack = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 sha2 = { workspace = true }
 shared = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
+winnow = { workspace = true }
