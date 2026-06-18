@@ -25,10 +25,11 @@ pub struct JRubyVersion {
 /// Error returned when a string cannot be parsed into a [`JRubyVersion`].
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
-    #[error("expected 4 parts (major.minor.patch.extra), found {found}")]
-    WrongPartCount { found: usize },
-    #[error("invalid {component} version component `{raw}`")]
+    #[error("invalid JRuby version `{input}`: expected 4 parts (major.minor.patch.extra), found {found}")]
+    WrongPartCount { input: String, found: usize },
+    #[error("invalid JRuby version `{input}`: {component} component `{raw}` is not a number: {source}")]
     InvalidComponent {
+        input: String,
         component: &'static str,
         raw: String,
         #[source]
@@ -66,19 +67,23 @@ impl std::str::FromStr for JRubyVersion {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<&str> = s.split('.').collect();
         if parts.len() != 4 {
-            return Err(ParseError::WrongPartCount { found: parts.len() });
+            return Err(ParseError::WrongPartCount {
+                input: s.to_owned(),
+                found: parts.len(),
+            });
         }
         Ok(Self {
-            major: parse_component("major", parts[0])?,
-            minor: parse_component("minor", parts[1])?,
-            patch: parse_component("patch", parts[2])?,
-            extra: parse_component("extra", parts[3])?,
+            major: parse_component(s, "major", parts[0])?,
+            minor: parse_component(s, "minor", parts[1])?,
+            patch: parse_component(s, "patch", parts[2])?,
+            extra: parse_component(s, "extra", parts[3])?,
         })
     }
 }
 
-fn parse_component(component: &'static str, raw: &str) -> Result<u32, ParseError> {
+fn parse_component(input: &str, component: &'static str, raw: &str) -> Result<u32, ParseError> {
     raw.parse().map_err(|source| ParseError::InvalidComponent {
+        input: input.to_owned(),
         component,
         raw: raw.to_owned(),
         source,
@@ -106,6 +111,23 @@ mod tests {
         assert!(JRubyVersion::parse("").is_err());
         assert!(JRubyVersion::parse("9.4.7.0.1").is_err());
         assert!(JRubyVersion::parse("a.b.c.d").is_err());
+    }
+
+    #[test]
+    fn test_parse_errors_show_input_and_source() {
+        let wrong_parts = JRubyVersion::parse("9.4.7").unwrap_err().to_string();
+        assert!(wrong_parts.contains("9.4.7"), "got: {wrong_parts}");
+        assert!(wrong_parts.contains("found 3"), "got: {wrong_parts}");
+
+        let bad_component = JRubyVersion::parse("9.4.x.0").unwrap_err().to_string();
+        assert!(bad_component.contains("9.4.x.0"), "got: {bad_component}");
+        assert!(bad_component.contains("patch"), "got: {bad_component}");
+        assert!(bad_component.contains('x'), "got: {bad_component}");
+        // The wrapped ParseIntError message is surfaced, not just chained.
+        assert!(
+            bad_component.contains("invalid digit"),
+            "got: {bad_component}"
+        );
     }
 
     #[test]
