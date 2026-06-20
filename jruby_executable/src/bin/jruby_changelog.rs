@@ -3,12 +3,12 @@ use std::error::Error;
 use bullet_stream::global::print;
 use clap::Parser;
 use indoc::formatdoc;
-use jruby_executable::jruby_build_properties;
+use jruby_executable::{JRubyVersion, jruby_build_properties};
 
 #[derive(Parser, Debug)]
 struct Args {
     #[arg(long)]
-    version: String,
+    version: JRubyVersion,
 }
 
 fn jruby_changelog(args: &Args) -> Result<(), Box<dyn Error>> {
