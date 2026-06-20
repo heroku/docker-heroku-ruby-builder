@@ -47,6 +47,7 @@ jobs:
         run: |
             set -euo pipefail
             {
+              # 4 backticks so the inner ```ruby fences in the changelog render literally
               echo '````'
               cargo run --locked --bin ruby_changelog -- --version "${{inputs.ruby_version}}"
               echo '````'
