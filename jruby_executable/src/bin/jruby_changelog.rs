@@ -23,7 +23,7 @@ where
 }
 
 fn render_jruby_changelog<W>(
-    version: &str,
+    version: &JRubyVersion,
     stdlib_version: &str,
     mut io: W,
 ) -> Result<W, Box<dyn Error>>
@@ -70,7 +70,9 @@ mod test {
     fn regular_release() {
         let mut io = Vec::new();
 
-        let output = render_jruby_changelog("9.4.7.0", "3.1.4", &mut io).unwrap();
+        let output =
+            render_jruby_changelog(&JRubyVersion::parse("9.4.7.0").unwrap(), "3.1.4", &mut io)
+                .unwrap();
         let actual = String::from_utf8_lossy(output);
         let expected = formatdoc! {"
                 ## JRuby version 9.4.7.0 is now available
