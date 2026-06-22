@@ -17,13 +17,6 @@ where
 {
     let Args { version } = args;
 
-    writeln!(
-        io,
-        "Add a changelog item: https://devcenter.heroku.com/admin/changelog_items/new"
-    )?;
-
-    writeln!(io)?;
-
     let gemfile_format = version.bundler_format();
 
     let changelog = formatdoc! {"
@@ -81,8 +74,6 @@ mod test {
         let output = ruby_changelog(&args, &mut io).unwrap();
         let actual = String::from_utf8_lossy(output);
         let expected = formatdoc! {"
-                Add a changelog item: https://devcenter.heroku.com/admin/changelog_items/new
-
                 ## Ruby version 3.3.2 is now available
 
                 [Ruby v3.3.2](/articles/ruby-support#ruby-versions) is now available on Heroku. To run \
@@ -106,8 +97,6 @@ mod test {
         let output = ruby_changelog(&args, &mut io).unwrap();
         let actual = String::from_utf8_lossy(output);
         let expected = formatdoc! {"
-                Add a changelog item: https://devcenter.heroku.com/admin/changelog_items/new
-
                 ## Ruby version 3.1.0-rc1 is now available
 
                 [Ruby v3.1.0-rc1](/articles/ruby-support#ruby-versions) is now available on Heroku. To run \
