@@ -8,7 +8,11 @@ use std::process::Command;
 use std::time::Duration;
 
 pub const MAX_RETRY_ATTEMPTS: u8 = 3;
+#[cfg(not(test))]
 pub const RETRY_DELAY: Duration = Duration::from_secs(1);
+// Avoid real sleeps in unit tests; retry logic is still exercised, just without wall-clock delay.
+#[cfg(test)]
+pub const RETRY_DELAY: Duration = Duration::from_millis(0);
 
 pub fn with_retries<T, E, F>(f: F) -> Result<T, E>
 where

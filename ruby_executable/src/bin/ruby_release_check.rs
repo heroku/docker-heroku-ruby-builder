@@ -18,7 +18,11 @@ static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
 });
 
 const MAX_RETRY_ATTEMPTS: u8 = 3;
-const RETRY_DELAY: Duration = Duration::from_secs(1);
+#[cfg(not(test))]
+pub const RETRY_DELAY: Duration = Duration::from_secs(1);
+// Avoid real sleeps in unit tests; retry logic is still exercised, just without wall-clock delay.
+#[cfg(test)]
+pub const RETRY_DELAY: Duration = Duration::from_millis(0);
 
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
