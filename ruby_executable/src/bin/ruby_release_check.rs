@@ -369,6 +369,6 @@ mod tests {
         let min = RubyDownloadVersion::new("3.2.0").unwrap();
         let filtered = retain_releases_gte(&releases, &min);
         let names: Vec<String> = filtered.iter().map(|v| v.to_string()).collect();
-        assert_eq!(names, vec!["3.4.1", "3.3.7", "3.2.0"]);
+        assert_eq!(vec!["3.4.1", "3.3.7", "3.2.0"], names);
     }
 }
