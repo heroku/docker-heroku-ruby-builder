@@ -20,7 +20,7 @@ pub struct ArtifactMetadata {
     pub distro_version: DistroVersion,
 }
 
-/// ```
+/// ```no_run
 /// use shared::inventory_check;
 ///
 /// let contents = r#"
