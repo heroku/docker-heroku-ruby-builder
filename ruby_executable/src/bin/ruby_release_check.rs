@@ -292,6 +292,32 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::assert_matches;
+
+    #[test]
+    fn ruby_lang_parsing_returns_partial_result_on_parse_failure() {
+        let body = indoc::indoc! {"
+            - version: 4.0.5
+            - version: 4.doesnotparse.5
+        "}
+        .to_string();
+
+        let mut errors = MaybeErrors::<RubyLangEntryError>::new();
+        assert_eq!(
+            vec![String::from("4.0.5")],
+            ruby_lang_versions(body)
+                .drain_unwrap(&mut errors)
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+        );
+
+        assert_eq!(1, errors.len());
+        assert_matches!(
+            errors.into_iter().next().unwrap(),
+            RubyLangEntryError::CannotParse(_)
+        );
+    }
 
     #[test]
     fn test_version_gte() {
