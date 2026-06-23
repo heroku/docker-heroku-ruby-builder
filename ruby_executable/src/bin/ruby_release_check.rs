@@ -212,22 +212,18 @@ async fn check_version_on_s3(
     Ok((version, missing))
 }
 
-async fn call(args: Args) -> Result<(), Box<dyn Error>> {
+async fn call(args: Args) -> OkMaybe<(), NonEmptyErrors<Box<dyn Error>>> {
     print::h2("Checking for new Ruby releases");
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
+    let mut errors: MaybeErrors<Box<dyn Error>> = MaybeErrors::new();
+
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
     let releases = match fetch_ruby_lang_body(&RELEASES_URL).await {
-        Ok(body) => match ruby_lang_versions(body).to_result() {
-            Ok(r) => r,
-            Err(e) => {
-                print::error(format!("Failed to parse releases: {e}"));
-                std::process::exit(1);
-            }
-        },
+        Ok(body) => ruby_lang_versions(body).drain_unwrap(&mut errors),
         Err(e) => {
-            print::error(format!("Failed to fetch releases: {e}"));
-            std::process::exit(1);
+            errors.push(e.into());
+            Vec::new()
         }
     };
     print::bullet(format!("Found {} total releases", releases.len()));
@@ -246,46 +242,48 @@ async fn call(args: Args) -> Result<(), Box<dyn Error>> {
 
     let mut versions_to_build = Vec::new();
     while let Some(result) = set.join_next().await {
-        match result? {
-            Ok((version, missing)) if missing.is_empty() => {
-                print::sub_bullet(format!("{version}: all binaries present"));
+        match result.map_err(|e| e.into()) {
+            Ok(Ok((version, missing))) => {
+                if missing.is_empty() {
+                    print::sub_bullet(format!("{version}: all binaries present"));
+                } else {
+                    print::sub_bullet(format!(
+                        "{version}: missing {} combo(s): {}",
+                        missing.len(),
+                        missing.join(", ")
+                    ));
+                    versions_to_build.push(version);
+                }
             }
-            Ok((version, missing)) => {
-                print::sub_bullet(format!(
-                    "{version}: missing {} combo(s): {}",
-                    missing.len(),
-                    missing.join(", ")
-                ));
-                versions_to_build.push(version);
-            }
-            Err(e) => {
-                print::warning(format!("Error checking version: {e}"));
-            }
+            Err(e) | Ok(Err(e)) => errors.push(e),
         }
     }
 
-    fs::write(
-        &args.output,
-        &serde_json::to_string_pretty(&versions_to_build)?,
-    )?;
+    if let Err(error) = serde_json::to_string_pretty(&versions_to_build)
+        .map_err(|e| e.into())
+        .and_then(|json| fs::write(&args.output, &json).map_err(|e| Box::new(e) as Box<dyn Error>))
+    {
+        errors.push(error)
+    };
+
     if versions_to_build.is_empty() {
-        print::bullet("All checked versions are present on S3");
+        print::bullet("No versions to build found");
     } else {
         print::h2("Versions needing builds");
         for version in &versions_to_build {
             print::sub_bullet(format!("{version}"));
         }
     }
-    Ok(())
+    errors.ok_maybe(())
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
     match call(args).await {
-        Ok(_) => print::bullet("Done"),
-        Err(e) => {
-            print::error(format!("Failed {e}"));
+        OkMaybe(_, None) => print::bullet("Done"),
+        OkMaybe(_, Some(errors)) => {
+            print::error(format!("Failed {errors}"));
             std::process::exit(1);
         }
     }
