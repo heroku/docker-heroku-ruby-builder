@@ -11,13 +11,15 @@ struct Args {
     version: JRubyVersion,
 }
 
-fn jruby_changelog<W>(args: &Args, io: W) -> Result<W, Box<dyn Error>>
+async fn jruby_changelog<W>(args: &Args, io: W) -> Result<W, Box<dyn Error>>
 where
     W: Write,
 {
     let Args { version } = args;
 
-    let stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
+    let stdlib_version = jruby_build_properties(version)
+        .await?
+        .ruby_stdlib_version()?;
 
     render_jruby_changelog(version, &stdlib_version, io)
 }
@@ -48,9 +50,10 @@ where
     Ok(io)
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
-    if let Err(error) = jruby_changelog(&args, std::io::stdout()) {
+    if let Err(error) = jruby_changelog(&args, std::io::stdout()).await {
         print::error(formatdoc! {"
             ❌ Command failed ❌
 

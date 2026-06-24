@@ -43,7 +43,7 @@ struct Args {
     job_metadata: Option<PathBuf>,
 }
 
-fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
+async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     let Args {
         version,
         base_image,
@@ -61,7 +61,9 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     fs::create_dir_all(volume_cache_dir)?;
     fs::create_dir_all(volume_output_dir)?;
 
-    let ruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
+    let ruby_stdlib_version = jruby_build_properties(version)
+        .await?
+        .ruby_stdlib_version()?;
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
     let expected_output = volume_output_dir
         .join(base_image.to_string())
@@ -87,7 +89,7 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
             };
 
             print::bullet(format!("Checking if already uploaded: {url}"));
-            if s3_url_exists(url.clone())? {
+            if s3_url_exists(url.clone()).await? {
                 print::bullet(format!("Already exists: {url}, skipping"));
                 return Ok(BuildStatus::Skipped);
             }
@@ -115,7 +117,7 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
         print::sub_bullet(format!("From {}", style::url(&url)));
 
         let timer = print::sub_start_timer("Downloading");
-        download_tar(&url, &download_path)?;
+        download_tar(&url, &download_path).await?;
         timer.done();
     }
 
@@ -183,10 +185,11 @@ fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     Ok(BuildStatus::Success)
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
     let metadata = args.job_metadata.as_deref();
-    match jruby_build(&args) {
+    match jruby_build(&args).await {
         Ok(status) => {
             if let Err(e) = write_job_metadata(metadata, "status", status.as_str()) {
                 print::error(format!("Failed to write job metadata: {e}"));

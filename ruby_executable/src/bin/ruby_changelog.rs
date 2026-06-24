@@ -48,7 +48,8 @@ where
     Ok(io)
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
     if let Err(error) = ruby_changelog(&args, std::io::stdout()) {
         print::error(formatdoc! {"

@@ -83,7 +83,8 @@ fn ruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = RubyArgs::parse();
     if let Err(error) = ruby_check(&args) {
         print::error(formatdoc! {"
