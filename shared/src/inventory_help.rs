@@ -54,9 +54,8 @@ pub async fn inventory_check(contents: &str) -> Result<(), Error> {
                 .await
                 .map_err(|e| format!("Error {e}"))?;
 
-            let checksum_path = path.clone();
             let checksum_string = tokio::task::spawn_blocking(move || {
-                sha256_from_path(&checksum_path).map_err(|e| format!("Error {e}"))
+                sha256_from_path(&path.clone()).map_err(|e| format!("Error {e}"))
             })
             .await
             .map_err(|e| format!("Error {e}"))??;
