@@ -320,6 +320,43 @@ mod tests {
     }
 
     #[test]
+    fn parse_flat_yaml_errors_on_unparseable_yaml() {
+        let body = String::from("cannot_parse: 'unterminated_string");
+        assert_matches!(parse_flat_yaml(body), Err(FlatYamlError::NotYaml(_, _)));
+    }
+
+    #[test]
+    fn parse_flat_yaml_errors_when_top_level_not_vec() {
+        let body = String::from("version: 4.0.5");
+        assert_matches!(parse_flat_yaml(body), Err(FlatYamlError::FirstNotVec(_, _)));
+    }
+
+    #[test]
+    fn ruby_lang_versions_errors_on_missing_version_field() {
+        let body = indoc::indoc! {"
+            - name: ruby
+            - version: 4.0.5
+        "}
+        .to_string();
+
+        let mut errors = MaybeErrors::<RubyLangEntryError>::new();
+        assert_eq!(
+            vec![String::from("4.0.5")],
+            ruby_lang_versions(body)
+                .drain_unwrap(&mut errors)
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+        );
+
+        assert_eq!(1, errors.len());
+        assert_matches!(
+            errors.into_iter().next().unwrap(),
+            RubyLangEntryError::MissingVersion(_)
+        );
+    }
+
+    #[test]
     fn test_version_gte() {
         let min = RubyDownloadVersion::new("3.2.0").unwrap();
         assert!(version_gte(
