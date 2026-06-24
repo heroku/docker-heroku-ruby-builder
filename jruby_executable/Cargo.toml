@@ -37,6 +37,7 @@ shared = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
 winnow = { workspace = true }
 
 [dev-dependencies]
