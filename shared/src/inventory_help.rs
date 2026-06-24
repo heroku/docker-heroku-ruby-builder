@@ -56,7 +56,7 @@ pub async fn inventory_check(contents: &str) -> Result<(), Error> {
 
             // Computing a file Hash is CPU bound <https://docs.rs/tokio/latest/tokio/index.html#cpu-bound-tasks-and-blocking-code>
             let checksum_string: String = tokio::task::spawn_blocking(move || {
-                sha256_from_path(&path.clone()).map_err(|e| format!("Error {e}"))
+                sha256_from_path(&path).map_err(|e| format!("Error {e}"))
             })
             .await
             .map_err(|e| format!("Error {e}"))??;
