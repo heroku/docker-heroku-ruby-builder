@@ -3,7 +3,7 @@ use clap::Parser;
 use fs_err as fs;
 use reqwest::{Client, Url};
 use shared::maybe_err::{MaybeErrors, NonEmptyErrors, OkMaybe};
-use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path};
+use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3_url_exists};
 use std::{
     error::Error,
     path::{Path, PathBuf},
@@ -140,22 +140,6 @@ fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
             (format!("{base_image}/{arch}"), url)
         })
         .collect()
-}
-
-async fn s3_url_exists(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    shared::with_retries(|| s3_url_exists_inner(url.clone())).await
-}
-
-async fn s3_url_exists_inner(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-    let response = client.head(url.clone()).send().await?;
-    match response.status() {
-        status if status.is_success() => Ok(true),
-        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(false),
-        status => Err(format!("Unexpected status {status} checking {url}").into()),
-    }
 }
 
 async fn check_version_on_s3(
