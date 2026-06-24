@@ -14,20 +14,21 @@ pub const RETRY_DELAY: Duration = Duration::from_secs(1);
 #[cfg(test)]
 pub const RETRY_DELAY: Duration = Duration::from_millis(0);
 
-pub fn with_retries<T, E, F>(f: F) -> Result<T, E>
+pub async fn with_retries<T, E, F, Fut>(f: F) -> Result<T, E>
 where
-    F: Fn() -> Result<T, E>,
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T, E>>,
 {
     let mut attempts = 0;
     loop {
         attempts += 1;
-        match f() {
+        match f().await {
             Ok(val) => return Ok(val),
             Err(error) => {
                 if attempts >= MAX_RETRY_ATTEMPTS {
                     return Err(error);
                 }
-                std::thread::sleep(RETRY_DELAY);
+                tokio::time::sleep(RETRY_DELAY).await;
             }
         }
     }
@@ -169,18 +170,19 @@ pub fn validate_version_for_stack(
 }
 
 /// Performs an HTTP HEAD request to check if a URL returns a successful status.
-pub fn s3_url_exists(url: Url) -> Result<bool, Error> {
-    with_retries(|| s3_url_exists_inner(url.clone()))
+pub async fn s3_url_exists(url: Url) -> Result<bool, Error> {
+    with_retries(|| s3_url_exists_inner(url.clone())).await
 }
 
-fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
-    let client = reqwest::blocking::Client::builder()
+async fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
+    let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
         .map_err(Error::FailedRequest)?;
     let response = client
         .head(url.clone())
         .send()
+        .await
         .map_err(Error::FailedRequest)?;
     match response.status() {
         status if status.is_success() => Ok(true),
@@ -191,23 +193,39 @@ fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
     }
 }
 
-pub fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
-    with_retries(|| download_tar_inner(url, path))
+pub async fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
+    with_retries(|| download_tar_inner(url, path)).await
 }
 
-fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
-    let mut dest = fs::File::create(path.as_ref()).map_err(Error::FsError)?;
-    let client = reqwest::blocking::Client::builder()
+async fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
+    use tokio::io::AsyncWriteExt;
+
+    let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(300))
         .build()
         .map_err(Error::FailedRequest)?;
-    let mut response = client.get(url).send().map_err(Error::FailedRequest)?;
-    std::io::copy(&mut response, &mut dest).map_err(|err| Error::UrlToFileError {
-        url: url.to_string(),
-        file: path.as_ref().to_path_buf(),
-        source: err,
-    })?;
-    response.error_for_status().map_err(Error::FailedRequest)?;
+    let mut response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(Error::FailedRequest)?
+        .error_for_status()
+        .map_err(Error::FailedRequest)?;
+
+    // fs_err::tokio keeps the path-annotated error messages the codebase relies on.
+    let mut dest = fs_err::tokio::File::create(path.as_ref())
+        .await
+        .map_err(Error::FsError)?;
+    while let Some(chunk) = response.chunk().await.map_err(Error::FailedRequest)? {
+        dest.write_all(&chunk)
+            .await
+            .map_err(|err| Error::UrlToFileError {
+                url: url.to_string(),
+                file: path.as_ref().to_path_buf(),
+                source: err,
+            })?;
+    }
+    dest.flush().await.map_err(Error::FsError)?;
     Ok(())
 }
 
@@ -368,8 +386,8 @@ mod test {
         );
     }
 
-    #[test]
-    fn test_download_tar() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_download_tar() {
         let server = Server::http("127.0.0.1:0").unwrap();
         let addr = format!("http://{}", server.server_addr());
 
@@ -381,7 +399,7 @@ mod test {
         let dir = tempdir().unwrap();
         let tar_path = TarDownloadPath(dir.path().join("file.tar"));
 
-        download_tar(&addr, &tar_path).unwrap();
+        download_tar(&addr, &tar_path).await.unwrap();
 
         let mut file = fs::File::open(tar_path.as_ref()).unwrap();
         let mut contents = String::new();
@@ -390,8 +408,8 @@ mod test {
         assert_eq!(contents, "Hello, world!");
     }
 
-    #[test]
-    fn test_download_tar_404() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_download_tar_404() {
         let server = Server::http("127.0.0.1:0").unwrap();
         let addr = format!("http://{}", server.server_addr());
 
@@ -403,7 +421,7 @@ mod test {
         let dir = tempdir().unwrap();
         let tar_path = TarDownloadPath(dir.path().join("file.tar"));
 
-        let result = download_tar(&addr, &tar_path);
+        let result = download_tar(&addr, &tar_path).await;
 
         assert!(result.is_err());
     }
