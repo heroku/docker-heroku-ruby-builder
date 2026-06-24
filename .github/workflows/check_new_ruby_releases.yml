@@ -33,9 +33,13 @@ jobs:
           cargo run --locked --bin ruby_release_check -- \
             --minimum-version 3.2.1 \
             --output versions.json \
-            2>"$GITHUB_STEP_SUMMARY"
+            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Trigger builds for missing versions
-        if: ${{ !inputs.dry_run }}
+        # Generating the versions list can partially succeed: some versions
+        # resolve while others fail. `!cancelled()` lets this step run even when
+        # the check step failed, so the versions that did succeed still get
+        # dispatched. The job's overall status stays failed so we know to look.
+        if: ${{ !cancelled() && !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

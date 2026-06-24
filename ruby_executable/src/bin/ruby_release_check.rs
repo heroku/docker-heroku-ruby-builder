@@ -1,7 +1,8 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use reqwest::Url;
+use reqwest::{Client, Url};
+use shared::maybe_err::{MaybeErrors, NonEmptyErrors, OkMaybe};
 use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path};
 use std::{
     error::Error,
@@ -10,7 +11,7 @@ use std::{
 };
 use tokio::task::JoinSet;
 use tokio::time::sleep;
-use yaml_rust2::YamlLoader;
+use yaml_rust2::{ScanError, Yaml, YamlLoader};
 
 static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
     Url::parse("https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml")
@@ -36,11 +37,25 @@ struct Args {
     output: PathBuf,
 }
 
-async fn fetch_releases(url: &Url) -> Result<Vec<RubyDownloadVersion>, Box<dyn std::error::Error>> {
+async fn get_body(client: &Client, url: Url) -> Result<String, reqwest::Error> {
+    client
+        .get(url)
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await
+}
+
+async fn fetch_ruby_lang_body(url: &Url) -> Result<String, reqwest::Error> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?;
+
     let mut attempts = 0;
     loop {
         attempts += 1;
-        match fetch_releases_inner(url).await {
+        match get_body(&client, url.clone()).await {
             Ok(val) => return Ok(val),
             Err(error) => {
                 if attempts >= MAX_RETRY_ATTEMPTS {
@@ -52,32 +67,66 @@ async fn fetch_releases(url: &Url) -> Result<Vec<RubyDownloadVersion>, Box<dyn s
     }
 }
 
-async fn fetch_releases_inner(
-    url: &Url,
-) -> Result<Vec<RubyDownloadVersion>, Box<dyn std::error::Error>> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-    let body = client
-        .get(url.clone())
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
+#[derive(Debug, thiserror::Error)]
+enum FlatYamlError {
+    #[error("Cannot parse yaml due to error {1} from input:\n{0}")]
+    NotYaml(String, ScanError),
+    #[error("Expected first yaml element to be a vec but it was not: {1:?} from input:\n{0}")]
+    FirstNotVec(String, Vec<Yaml>),
+}
 
-    let docs = YamlLoader::load_from_str(&body)?;
-    let releases = docs[0]
-        .as_vec()
-        .unwrap_or(&Vec::new())
-        .iter()
-        .filter_map(|entry| {
-            entry["version"]
-                .as_str()
-                .and_then(|v| RubyDownloadVersion::new(v).ok())
+#[derive(Debug, thiserror::Error)]
+enum RubyLangEntryError {
+    #[error(transparent)]
+    DocError(#[from] FlatYamlError),
+
+    #[error("expected yaml to have a `version` field but it did not: {0:?}")]
+    MissingVersion(Yaml),
+
+    #[error(transparent)]
+    CannotParse(#[from] shared::Error),
+}
+
+/// Parse output from <https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml>
+fn parse_flat_yaml(body: String) -> Result<Vec<Yaml>, FlatYamlError> {
+    YamlLoader::load_from_str(&body)
+        .map_err(|error| FlatYamlError::NotYaml(body.clone(), error))
+        .and_then(|docs| {
+            docs.first()
+                .and_then(|doc| doc.as_vec())
+                .cloned()
+                .ok_or(FlatYamlError::FirstNotVec(body.clone(), docs.clone()))
         })
-        .collect();
-    Ok(releases)
+}
+
+/// Parses output from Ruby Lang into Ruby Versions
+///
+/// Fault tolerant parse result of <https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml>
+fn ruby_lang_versions(
+    body: String,
+) -> OkMaybe<Vec<RubyDownloadVersion>, NonEmptyErrors<RubyLangEntryError>> {
+    let mut errors = MaybeErrors::new();
+    let mut releases = Vec::new();
+
+    match parse_flat_yaml(body) {
+        Ok(entries) => {
+            for entry in entries {
+                match entry["version"]
+                    .as_str()
+                    .ok_or_else(|| RubyLangEntryError::MissingVersion(entry.clone()))
+                    .and_then(|v| {
+                        RubyDownloadVersion::new(v).map_err(RubyLangEntryError::CannotParse)
+                    }) {
+                    Ok(v) => releases.push(v),
+                    Err(error) => errors.push(error),
+                }
+            }
+        }
+        Err(error) => {
+            errors.push(error.into());
+        }
+    }
+    errors.ok_maybe(releases)
 }
 
 fn version_gte(version: &RubyDownloadVersion, minimum: &RubyDownloadVersion) -> bool {
@@ -163,16 +212,18 @@ async fn check_version_on_s3(
     Ok((version, missing))
 }
 
-async fn call(args: Args) -> Result<(), Box<dyn Error>> {
+async fn call(args: Args) -> OkMaybe<(), NonEmptyErrors<Box<dyn Error>>> {
     print::h2("Checking for new Ruby releases");
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
+    let mut errors: MaybeErrors<Box<dyn Error>> = MaybeErrors::new();
+
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
-    let releases = match fetch_releases(&RELEASES_URL).await {
-        Ok(r) => r,
+    let releases = match fetch_ruby_lang_body(&RELEASES_URL).await {
+        Ok(body) => ruby_lang_versions(body).drain_unwrap(&mut errors),
         Err(e) => {
-            print::error(format!("Failed to fetch releases: {e}"));
-            std::process::exit(1);
+            errors.push(e.into());
+            Vec::new()
         }
     };
     print::bullet(format!("Found {} total releases", releases.len()));
@@ -191,46 +242,48 @@ async fn call(args: Args) -> Result<(), Box<dyn Error>> {
 
     let mut versions_to_build = Vec::new();
     while let Some(result) = set.join_next().await {
-        match result? {
-            Ok((version, missing)) if missing.is_empty() => {
-                print::sub_bullet(format!("{version}: all binaries present"));
+        match result.map_err(|e| e.into()) {
+            Ok(Ok((version, missing))) => {
+                if missing.is_empty() {
+                    print::sub_bullet(format!("{version}: all binaries present"));
+                } else {
+                    print::sub_bullet(format!(
+                        "{version}: missing {} combo(s): {}",
+                        missing.len(),
+                        missing.join(", ")
+                    ));
+                    versions_to_build.push(version);
+                }
             }
-            Ok((version, missing)) => {
-                print::sub_bullet(format!(
-                    "{version}: missing {} combo(s): {}",
-                    missing.len(),
-                    missing.join(", ")
-                ));
-                versions_to_build.push(version);
-            }
-            Err(e) => {
-                print::warning(format!("Error checking version: {e}"));
-            }
+            Err(e) | Ok(Err(e)) => errors.push(e),
         }
     }
 
-    fs::write(
-        &args.output,
-        &serde_json::to_string_pretty(&versions_to_build)?,
-    )?;
+    if let Err(error) = serde_json::to_string_pretty(&versions_to_build)
+        .map_err(|e| e.into())
+        .and_then(|json| fs::write(&args.output, &json).map_err(|e| Box::new(e) as Box<dyn Error>))
+    {
+        errors.push(error)
+    };
+
     if versions_to_build.is_empty() {
-        print::bullet("All checked versions are present on S3");
+        print::bullet("No versions to build found");
     } else {
         print::h2("Versions needing builds");
         for version in &versions_to_build {
             print::sub_bullet(format!("{version}"));
         }
     }
-    Ok(())
+    errors.ok_maybe(())
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
     match call(args).await {
-        Ok(_) => print::bullet("Done"),
-        Err(e) => {
-            print::error(format!("Failed {e}"));
+        OkMaybe(_, None) => print::bullet("Done"),
+        OkMaybe(_, Some(errors)) => {
+            print::error(format!("Failed {errors}"));
             std::process::exit(1);
         }
     }
@@ -239,6 +292,69 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::assert_matches;
+
+    #[test]
+    fn ruby_lang_parsing_returns_partial_result_on_parse_failure() {
+        let body = indoc::indoc! {"
+            - version: 4.0.5
+            - version: 4.doesnotparse.5
+        "}
+        .to_string();
+
+        let mut errors = MaybeErrors::<RubyLangEntryError>::new();
+        assert_eq!(
+            vec![String::from("4.0.5")],
+            ruby_lang_versions(body)
+                .drain_unwrap(&mut errors)
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+        );
+
+        assert_eq!(1, errors.len());
+        assert_matches!(
+            errors.into_iter().next().unwrap(),
+            RubyLangEntryError::CannotParse(_)
+        );
+    }
+
+    #[test]
+    fn parse_flat_yaml_errors_on_unparseable_yaml() {
+        let body = String::from("cannot_parse: 'unterminated_string");
+        assert_matches!(parse_flat_yaml(body), Err(FlatYamlError::NotYaml(_, _)));
+    }
+
+    #[test]
+    fn parse_flat_yaml_errors_when_top_level_not_vec() {
+        let body = String::from("version: 4.0.5");
+        assert_matches!(parse_flat_yaml(body), Err(FlatYamlError::FirstNotVec(_, _)));
+    }
+
+    #[test]
+    fn ruby_lang_versions_errors_on_missing_version_field() {
+        let body = indoc::indoc! {"
+            - name: ruby
+            - version: 4.0.5
+        "}
+        .to_string();
+
+        let mut errors = MaybeErrors::<RubyLangEntryError>::new();
+        assert_eq!(
+            vec![String::from("4.0.5")],
+            ruby_lang_versions(body)
+                .drain_unwrap(&mut errors)
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+        );
+
+        assert_eq!(1, errors.len());
+        assert_matches!(
+            errors.into_iter().next().unwrap(),
+            RubyLangEntryError::MissingVersion(_)
+        );
+    }
 
     #[test]
     fn test_version_gte() {
@@ -290,6 +406,6 @@ mod tests {
         let min = RubyDownloadVersion::new("3.2.0").unwrap();
         let filtered = retain_releases_gte(&releases, &min);
         let names: Vec<String> = filtered.iter().map(|v| v.to_string()).collect();
-        assert_eq!(names, vec!["3.4.1", "3.3.7", "3.2.0"]);
+        assert_eq!(vec!["3.4.1", "3.3.7", "3.2.0"], names);
     }
 }
