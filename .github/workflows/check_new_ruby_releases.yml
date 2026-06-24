@@ -33,7 +33,7 @@ jobs:
           cargo run --locked --bin ruby_release_check -- \
             --minimum-version 3.2.1 \
             --output versions.json \
-            2>"$GITHUB_STEP_SUMMARY"
+            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Trigger builds for missing versions
         # Generating the versions list can partially succeed: some versions
         # resolve while others fail. `!cancelled()` lets this step run even when
