@@ -43,7 +43,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSIONS=$(jq -r '.[]' versions.json 2>/dev/null || true)
+          VERSIONS=$(jq -r '.[]' versions.json)
           if [ -z "$VERSIONS" ]; then
             echo "No versions to build"
             exit 0
