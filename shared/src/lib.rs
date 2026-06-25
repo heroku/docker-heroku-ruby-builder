@@ -311,6 +311,7 @@ mod test {
     use super::*;
     use std::io::Read;
     use std::str::FromStr;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
     use tempfile::tempdir;
     use tiny_http::{Response, Server};
@@ -384,6 +385,51 @@ mod test {
             PathBuf::from("/tmp/heroku-24/amd64/ruby-2.7.3.tgz"),
             tar_path
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_with_retries_succeeds_first_attempt() {
+        let attempts = AtomicUsize::new(0);
+        let result: Result<&str, &str> = with_retries(|| {
+            attempts.fetch_add(1, Ordering::SeqCst);
+            async { Ok("ok") }
+        })
+        .await;
+
+        assert_eq!(result, Ok("ok"));
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_with_retries_succeeds_after_transient_failures() {
+        let attempts = AtomicUsize::new(0);
+        let result: Result<&str, &str> = with_retries(|| {
+            let attempt = attempts.fetch_add(1, Ordering::SeqCst) + 1;
+            async move {
+                if attempt < MAX_RETRY_ATTEMPTS as usize {
+                    Err("transient")
+                } else {
+                    Ok("ok")
+                }
+            }
+        })
+        .await;
+
+        assert_eq!(result, Ok("ok"));
+        assert_eq!(attempts.load(Ordering::SeqCst), MAX_RETRY_ATTEMPTS as usize);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_with_retries_gives_up_after_max_attempts() {
+        let attempts = AtomicUsize::new(0);
+        let result: Result<&str, &str> = with_retries(|| {
+            attempts.fetch_add(1, Ordering::SeqCst);
+            async { Err("always fails") }
+        })
+        .await;
+
+        assert_eq!(result, Err("always fails"));
+        assert_eq!(attempts.load(Ordering::SeqCst), MAX_RETRY_ATTEMPTS as usize);
     }
 
     #[tokio::test(flavor = "multi_thread")]
