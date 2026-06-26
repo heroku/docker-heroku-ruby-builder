@@ -10,15 +10,16 @@ struct Args {
     path: PathBuf,
 }
 
-fn check(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+async fn check(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let contents = fs::read_to_string(path)?;
-    inventory_check(&contents)?;
+    inventory_check(&contents).await?;
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse();
-    if let Err(error) = check(&args.path) {
+    if let Err(error) = check(&args.path).await {
         print::error(formatdoc! {"
             ❌ Command failed ❌
 

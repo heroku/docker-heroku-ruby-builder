@@ -6,10 +6,8 @@ use fs2::FileExt;
 use gem_version::GemVersion;
 use libherokubuildpack::inventory::checksum::Checksum;
 use libherokubuildpack::inventory::{self, Inventory};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use std::borrow::Borrow;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
@@ -35,9 +33,9 @@ pub struct ArtifactMetadata {
 /// timestamp = "2024-07-24T16:17:35.341413Z"
 /// distro_version = "24.04"
 /// "#;
-/// inventory_check(contents).unwrap();
+/// tokio::runtime::Runtime::new().unwrap().block_on(inventory_check(contents)).unwrap();
 /// ```
-pub fn inventory_check(contents: &str) -> Result<(), Error> {
+pub async fn inventory_check(contents: &str) -> Result<(), Error> {
     if contents.trim().is_empty() {
         return Ok(());
     }
@@ -46,50 +44,53 @@ pub fn inventory_check(contents: &str) -> Result<(), Error> {
         .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
         .map_err(|e| Error::Other(format!("Could not parse inventory. Error: {e}")))?;
 
-    let results = inventory
-        .artifacts
-        .par_iter()
-        .map(|artifact| {
-            let temp = tempfile::tempdir().expect("Tempdir");
-            let dir = temp.path();
-            let path = dir.join("file.tar");
+    let mut set = tokio::task::JoinSet::new();
+    for artifact in inventory.artifacts {
+        set.spawn(async move {
+            let temp = tempfile::tempdir().map_err(|e| format!("Error {e}"))?;
+            let path = temp.path().join("file.tar");
 
             download_tar(&artifact.url, &TarDownloadPath(path.clone()))
-                .map_err(|e| format!("Error {e}"))
-                .and_then(|_| {
-                    sha256_from_path(&path)
-                        .map_err(|e| format!("Error {e}"))
-                        .and_then(|checksum_string| {
-                            format!("sha256:{checksum_string}")
-                                .parse()
-                                .map_err(|e| format!("Error {e}"))
-                        })
-                })
-                .and_then(|checksum: Checksum<Sha256>| {
-                    if checksum == artifact.checksum {
-                        Ok(())
-                    } else {
-                        Err(format!(
-                            "Checksum mismatch for {url} expected {expected} got {actual}",
-                            url = artifact.url,
-                            expected = hex::encode(&artifact.checksum.value),
-                            actual = hex::encode(&checksum.value)
-                        ))
-                    }
-                })
-        })
-        .collect::<Vec<Result<(), String>>>();
+                .await
+                .map_err(|e| format!("Error {e}"))?;
 
-    if results.iter().any(|r| r.is_err()) {
-        Err(Error::Other(
-            results
-                .iter()
-                .map(|r| r.as_ref().unwrap_err().borrow())
-                .collect::<Vec<&str>>()
-                .join("\n"),
-        ))
-    } else {
+            // Computing a file Hash is CPU bound <https://docs.rs/tokio/latest/tokio/index.html#cpu-bound-tasks-and-blocking-code>
+            let checksum_string: String = tokio::task::spawn_blocking(move || {
+                sha256_from_path(&path).map_err(|e| format!("Error {e}"))
+            })
+            .await
+            .map_err(|e| format!("Error {e}"))??;
+
+            let checksum: Checksum<Sha256> = format!("sha256:{checksum_string}")
+                .parse()
+                .map_err(|e| format!("Error {e}"))?;
+
+            if checksum == artifact.checksum {
+                Ok::<(), String>(())
+            } else {
+                Err(format!(
+                    "Checksum mismatch for {url} expected {expected} got {actual}",
+                    url = artifact.url,
+                    expected = hex::encode(&artifact.checksum.value),
+                    actual = hex::encode(&checksum.value)
+                ))
+            }
+        });
+    }
+
+    let mut errors = Vec::new();
+    while let Some(joined) = set.join_next().await {
+        match joined {
+            Ok(Ok(())) => {}
+            Ok(Err(message)) => errors.push(message),
+            Err(join_error) => errors.push(format!("Error {join_error}")),
+        }
+    }
+
+    if errors.is_empty() {
         Ok(())
+    } else {
+        Err(Error::Other(errors.join("\n")))
     }
 }
 

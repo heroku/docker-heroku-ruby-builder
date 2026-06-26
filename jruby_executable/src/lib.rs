@@ -90,25 +90,34 @@ impl BuildProperties {
     }
 }
 
-pub fn jruby_build_properties(jruby_version: &JRubyVersion) -> Result<BuildProperties, Error> {
-    shared::with_retries(|| jruby_build_properties_inner(jruby_version))
+pub async fn jruby_build_properties(
+    jruby_version: &JRubyVersion,
+) -> Result<BuildProperties, Error> {
+    shared::with_retries(|| jruby_build_properties_inner(jruby_version)).await
 }
 
-fn jruby_build_properties_inner(jruby_version: &JRubyVersion) -> Result<BuildProperties, Error> {
+async fn jruby_build_properties_inner(
+    jruby_version: &JRubyVersion,
+) -> Result<BuildProperties, Error> {
     let url = format!(
         "https://raw.githubusercontent.com/jruby/jruby/{jruby_version}/default.build.properties",
     );
 
-    let client = reqwest::blocking::Client::builder()
+    let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(Error::FailedRequest)?;
-    let response = client.get(&url).send().map_err(Error::FailedRequest)?;
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(Error::FailedRequest)?;
 
     let body = response
         .error_for_status()
         .map_err(Error::FailedRequest)?
         .text()
+        .await
         .map_err(Error::FailedRequest)?;
 
     Ok(BuildProperties {

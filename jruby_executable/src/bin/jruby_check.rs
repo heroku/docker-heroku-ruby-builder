@@ -26,7 +26,7 @@ struct RubyArgs {
     artifact_dir: PathBuf,
 }
 
-fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
+async fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     let RubyArgs {
         arch,
         version,
@@ -34,7 +34,9 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         artifact_dir,
     } = args;
 
-    let jruby_stdlib_version = jruby_build_properties(version)?.ruby_stdlib_version()?;
+    let jruby_stdlib_version = jruby_build_properties(version)
+        .await?
+        .ruby_stdlib_version()?;
 
     // Log progress to STDERR, print results to STDOUT directly
     let start = Instant::now();
@@ -116,9 +118,10 @@ fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = RubyArgs::parse();
-    if let Err(error) = jruby_check(&args) {
+    if let Err(error) = jruby_check(&args).await {
         print::error(formatdoc! {"
             ❌ Command failed ❌
 

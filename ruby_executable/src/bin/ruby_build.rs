@@ -56,7 +56,7 @@ fn ruby_dockerfile_path() -> PathBuf {
         .join("Dockerfile")
 }
 
-fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>> {
+async fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>> {
     let RubyArgs {
         arch,
         version,
@@ -97,7 +97,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
             };
 
             print::bullet(format!("Checking if already uploaded: {url}"));
-            if s3_url_exists(url.clone())? {
+            if s3_url_exists(url.clone()).await? {
                 print::bullet(format!("Already exists: {url}, skipping"));
                 return Ok(BuildStatus::Skipped);
             }
@@ -138,7 +138,7 @@ fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::Error>
             "Downloading {version} to {}",
             download_tar_path.as_ref().display()
         ));
-        download_tar(&version.download_url(), &download_tar_path)?;
+        download_tar(&version.download_url(), &download_tar_path).await?;
     };
 
     print::bullet("Make Ruby");
@@ -189,10 +189,11 @@ fn cp_file_sha_seven_same_dir(path: &Path) -> Result<PathBuf, Box<dyn std::error
     Ok(sha_seven_path)
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = RubyArgs::parse();
     let metadata = args.job_metadata.as_deref();
-    match ruby_build(&args) {
+    match ruby_build(&args).await {
         Ok(status) => {
             if let Err(e) = write_job_metadata(metadata, "status", status.as_str()) {
                 print::error(format!("Failed to write job metadata: {e}"));

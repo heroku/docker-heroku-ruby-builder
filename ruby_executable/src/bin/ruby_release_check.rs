@@ -3,27 +3,19 @@ use clap::Parser;
 use fs_err as fs;
 use reqwest::{Client, Url};
 use shared::maybe_err::{MaybeErrors, NonEmptyErrors, OkMaybe};
-use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path};
+use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3_url_exists};
 use std::{
     error::Error,
     path::{Path, PathBuf},
     time::Duration,
 };
 use tokio::task::JoinSet;
-use tokio::time::sleep;
 use yaml_rust2::{ScanError, Yaml, YamlLoader};
 
 static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
     Url::parse("https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml")
         .expect("valid releases URL constant")
 });
-
-const MAX_RETRY_ATTEMPTS: u8 = 3;
-#[cfg(not(test))]
-pub const RETRY_DELAY: Duration = Duration::from_secs(1);
-// Avoid real sleeps in unit tests; retry logic is still exercised, just without wall-clock delay.
-#[cfg(test)]
-pub const RETRY_DELAY: Duration = Duration::from_millis(0);
 
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
@@ -52,19 +44,7 @@ async fn fetch_ruby_lang_body(url: &Url) -> Result<String, reqwest::Error> {
         .timeout(Duration::from_secs(30))
         .build()?;
 
-    let mut attempts = 0;
-    loop {
-        attempts += 1;
-        match get_body(&client, url.clone()).await {
-            Ok(val) => return Ok(val),
-            Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
-                    return Err(error);
-                }
-                sleep(RETRY_DELAY).await;
-            }
-        }
-    }
+    shared::with_retries(|| get_body(&client, url.clone())).await
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -160,34 +140,6 @@ fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
             (format!("{base_image}/{arch}"), url)
         })
         .collect()
-}
-
-async fn s3_url_exists(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let mut attempts = 0;
-    loop {
-        attempts += 1;
-        match s3_url_exists_inner(url.clone()).await {
-            Ok(val) => return Ok(val),
-            Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
-                    return Err(error);
-                }
-                sleep(RETRY_DELAY).await;
-            }
-        }
-    }
-}
-
-async fn s3_url_exists_inner(url: Url) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-    let response = client.head(url.clone()).send().await?;
-    match response.status() {
-        status if status.is_success() => Ok(true),
-        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(false),
-        status => Err(format!("Unexpected status {status} checking {url}").into()),
-    }
 }
 
 async fn check_version_on_s3(
