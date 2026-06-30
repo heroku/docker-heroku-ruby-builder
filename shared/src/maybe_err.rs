@@ -7,24 +7,60 @@
 //! An example would be parsing multiple versions from a file. If one version is unparseable, the program
 //! might still want to continue execution on the ones that were valid rather than returning early.
 //! The structures in this module make such deferred error decision making easier.
+//!
+//! See [`ResultVec`] for the main accumulator type.
 
-/// Extension methods for any iterator of `Result<T, E>` that help accumulate errors instead
-/// of failing on the first one.
+/// Return multiple errors and/or results
 ///
-/// This covers the same ground as itertools' `partition_result`, but without pulling in the
-/// itertools dependency and without the type annotations its iterator-based API requires.
-/// Bring this trait into scope and the methods become available on anything that iterates over
-/// `Result<T, E>` (any [`IntoIterator`]) — [`Vec`], arrays, iterator adaptors, and so on.
+/// Sugared version of `Vec<Result<T, E>>` allowing accumulation of errors:
 ///
 /// ```
-/// use shared::maybe_err::ResultIterExt;
+/// use shared::maybe_err::ResultVec;
 ///
-/// let results = vec![Ok(1), Err("bad"), Ok(2), Err("worse")];
-/// let (oks, errs) = results.partition_result_vec();
-/// assert_eq!(oks, vec![1, 2]);
-/// assert_eq!(errs, vec!["bad", "worse"]);
+/// // Parse every entry, keeping the good values *and* the failures instead of
+/// // bailing on the first unparseable one. The function return type drives the
+/// // `collect`, so no turbofish is needed.
+/// fn parse_versions(raw: &[&str]) -> ResultVec<u32, String> {
+///     raw.iter()
+///         .map(|s| s.parse::<u32>().map_err(|e| format!("{s:?}: {e}")))
+///         .collect()
+/// }
+///
+/// let parsed = parse_versions(&["1", "nope", "3"]);
+///
+/// // Drain the errors into a sink and keep going with the successes.
+/// let mut errors: Vec<String> = Vec::new();
+/// let versions = parsed.unwrap_drain_errs(&mut errors);
+///
+/// assert_eq!(versions, vec![1, 3]);
+/// assert_eq!(errors, vec![r#""nope": invalid digit found in string"#.to_string()]);
 /// ```
-pub trait ResultIterExt<T, E>: IntoIterator<Item = Result<T, E>> + Sized {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResultVec<T, E> {
+    inner: Vec<Result<T, E>>,
+}
+
+impl<T, E> ResultVec<T, E> {
+    /// Return the inner vec
+    ///
+    /// ```
+    /// use shared::maybe_err::ResultVec;
+    ///
+    /// fn call(input: ResultVec<i32, String>) {
+    ///     for item in input.into_inner().into_iter() {
+    ///         eprintln!("Got {:?}", item);
+    ///     }
+    /// }
+    /// ```
+    pub fn into_inner(self) -> Vec<Result<T, E>> {
+        self.inner
+    }
+
+    /// Iterate over the results by reference, without consuming the `ResultVec`.
+    pub fn iter(&self) -> std::slice::Iter<'_, Result<T, E>> {
+        self.inner.iter()
+    }
+
     /// Return the `Ok` values, draining the errors into the provided sink.
     ///
     /// Errors are converted via [`Into`] as they are moved into `errors`, so the sink can
@@ -32,131 +68,102 @@ pub trait ResultIterExt<T, E>: IntoIterator<Item = Result<T, E>> + Sized {
     /// keep going with the successful values while accumulating failures somewhere else.
     ///
     /// ```
-    /// use shared::maybe_err::ResultIterExt;
+    /// use shared::maybe_err::ResultVec;
     ///
-    /// let results = vec![Ok(1), Err("bad"), Ok(2), Err("worse")];
+    /// let results = vec![Ok(1), Err("bad"), Ok(2), Err("worse")]
+    ///     .into_iter()
+    ///     .collect::<ResultVec<_, _>>();
     ///
     /// let mut errors: Vec<String> = Vec::new();
-    /// let oks = results.unwrap_drain(&mut errors);
+    /// let oks = results.unwrap_drain_errs(&mut errors);
     ///
     /// assert_eq!(oks, vec![1, 2]);
     /// assert_eq!(errors, vec!["bad".to_string(), "worse".to_string()]);
     /// ```
+    ///
+    /// Named after the [`Result::unwrap_or`] / [`Result::unwrap_or_else`] family: `unwrap` returns
+    /// the success values (`Vec<T>`) and the suffix names the error strategy — draining each `Err`
+    /// into `sink` rather than substituting a fallback value.
     #[must_use]
-    fn unwrap_drain<X, Item>(self, errors: &mut X) -> Vec<T>
+    pub fn unwrap_drain_errs<X, Item>(self, sink: &mut X) -> Vec<T>
     where
         X: Extend<Item>,
         E: Into<Item>,
     {
-        let (oks, errs) = self.partition_result_vec();
-        errors.extend(errs.into_iter().map(Into::into));
+        let mut oks = Vec::with_capacity(self.inner.len());
+
+        for item in self.inner {
+            match item {
+                Ok(ok) => oks.push(ok),
+                Err(err) => sink.extend(std::iter::once(err.into())),
+            }
+        }
 
         oks
     }
+}
 
-    /// Split the results into successes and errors, preserving order within each group.
-    ///
-    /// This mirrors itertools' `partition_result`: every `Ok` value lands in the first
-    /// `Vec` and every `Err` value in the second, so you can accumulate all failures
-    /// instead of bailing on the first one.
-    ///
-    /// This is a convenience wrapper over [`partition_result_iter`](Self::partition_result_iter) that fixes
-    /// both output collections to `Vec`, so (unlike itertools) you don't need any type
-    /// annotations and don't pull in an extra dependency.
-    ///
-    /// ```
-    /// use shared::maybe_err::ResultIterExt;
-    ///
-    /// let results = vec![Ok(1), Err("bad"), Ok(2), Err("worse")];
-    /// let (oks, errs) = results.partition_result_vec();
-    /// assert_eq!(oks, vec![1, 2]);
-    /// assert_eq!(errs, vec!["bad", "worse"]);
-    /// ```
-    #[must_use]
-    fn partition_result_vec(self) -> (Vec<T>, Vec<E>) {
-        self.partition_result_iter()
-    }
-
-    /// Split the results into successes and errors, collecting each side into a caller-chosen
-    /// collection.
-    ///
-    /// This behaves exactly like itertools' `partition_result`: it is generic over the output
-    /// collections, so you pick what each side collects into (and, like itertools, you'll
-    /// usually need a type annotation to drive that choice). For the common case where both
-    /// sides are `Vec`, reach for [`partition_result_vec`](Self::partition_result_vec) instead
-    /// which doesn't need type annotations.
-    ///
-    /// ```
-    /// use shared::maybe_err::ResultIterExt;
-    /// use std::collections::VecDeque;
-    ///
-    /// let results = vec![Ok(1), Err("bad"), Ok(2), Err("worse")];
-    /// let (oks, errs): (Vec<_>, VecDeque<_>) = results.partition_result_iter();
-    /// assert_eq!(oks, vec![1, 2]);
-    /// assert_eq!(errs, VecDeque::from(vec!["bad", "worse"]));
-    /// ```
-    #[must_use]
-    fn partition_result_iter<A, B>(self) -> (A, B)
-    where
-        A: Default + Extend<T>,
-        B: Default + Extend<E>,
-    {
-        let mut oks = A::default();
-        let mut errs = B::default();
-        for result in self {
-            match result {
-                Ok(value) => oks.extend(std::iter::once(value)),
-                Err(err) => errs.extend(std::iter::once(err)),
-            }
+impl<T, E> FromIterator<Result<T, E>> for ResultVec<T, E> {
+    fn from_iter<I: IntoIterator<Item = Result<T, E>>>(iter: I) -> Self {
+        Self {
+            inner: iter.into_iter().collect(),
         }
-        (oks, errs)
     }
 }
 
-impl<T, E, I> ResultIterExt<T, E> for I where I: IntoIterator<Item = Result<T, E>> {}
+impl<T, E> IntoIterator for ResultVec<T, E> {
+    type Item = Result<T, E>;
+
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
+    }
+}
+
+impl<'a, T, E> IntoIterator for &'a ResultVec<T, E> {
+    type Item = &'a Result<T, E>;
+
+    type IntoIter = std::slice::Iter<'a, Result<T, E>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.iter()
+    }
+}
+
+impl<T, E> From<Vec<Result<T, E>>> for ResultVec<T, E> {
+    fn from(inner: Vec<Result<T, E>>) -> Self {
+        Self { inner }
+    }
+}
 
 #[cfg(test)]
 mod test {
     use super::*;
-
     #[test]
-    fn partition_result_vec_splits_oks_and_errs_in_order() {
-        let results = vec![Ok(1), Err("bad"), Ok(2), Err("worse"), Ok(3)];
-        let (oks, errs) = results.partition_result_vec();
-        assert_eq!(oks, vec![1, 2, 3]);
-        assert_eq!(errs, vec!["bad", "worse"]);
-    }
-
-    #[test]
-    fn unwrap_drain_returns_oks_and_fills_error_sink() {
-        let results = vec![Ok(1), Err("bad"), Ok(2), Err("worse"), Ok(3)];
-
+    fn unwrap_drain_errs_returns_oks_in_order_and_fills_sink() {
+        let results = vec![Ok(1), Err("bad"), Ok(2), Err("worse"), Ok(3)]
+            .into_iter()
+            .collect::<ResultVec<_, _>>();
         let mut errors: Vec<String> = Vec::new();
-        let oks = results.unwrap_drain(&mut errors);
-
+        let oks = results.unwrap_drain_errs(&mut errors);
         assert_eq!(oks, vec![1, 2, 3]);
         assert_eq!(errors, vec!["bad".to_string(), "worse".to_string()]);
     }
 
     #[test]
-    fn partition_result_vec_handles_empty() {
-        let results: Vec<Result<i32, &str>> = vec![];
-        let (oks, errs) = results.partition_result_vec();
+    fn unwrap_drain_errs_handles_empty() {
+        let results: ResultVec<i32, &str> = Vec::new().into();
+        let mut errors: Vec<String> = Vec::new();
+        let oks = results.unwrap_drain_errs(&mut errors);
         assert!(oks.is_empty());
-        assert!(errs.is_empty());
+        assert!(errors.is_empty());
     }
 
     #[test]
-    fn partition_result_vec_works_on_any_into_iterator() {
-        let results: [Result<i32, &str>; 3] = [Ok(1), Err("bad"), Ok(2)];
-        let (oks, errs) = results.partition_result_vec();
-        assert_eq!(oks, vec![1, 2]);
-        assert_eq!(errs, vec!["bad"]);
-
-        let (oks, errs) = (1..=4)
-            .map(|n| if n % 2 == 0 { Ok(n) } else { Err(n) })
-            .partition_result_vec();
-        assert_eq!(oks, vec![2, 4]);
-        assert_eq!(errs, vec![1, 3]);
+    fn from_vec_and_into_inner_round_trip() {
+        let original: Vec<Result<i32, &str>> = vec![Ok(1), Err("bad"), Ok(2)];
+        let round_tripped = ResultVec::from(original.clone()).into_inner();
+        assert_eq!(round_tripped, original);
     }
 }
