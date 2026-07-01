@@ -2,7 +2,7 @@ use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
 use reqwest::{Client, Url};
-use shared::maybe_err::{MaybeErrors, NonEmptyErrors, OkMaybe};
+use shared::maybe_err::ResultVec;
 use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3_url_exists};
 use std::{
     error::Error,
@@ -82,31 +82,22 @@ fn parse_flat_yaml(body: String) -> Result<Vec<Yaml>, FlatYamlError> {
 /// Parses output from Ruby Lang into Ruby Versions
 ///
 /// Fault tolerant parse result of <https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml>
-fn ruby_lang_versions(
-    body: String,
-) -> OkMaybe<Vec<RubyDownloadVersion>, NonEmptyErrors<RubyLangEntryError>> {
-    let mut errors = MaybeErrors::new();
-    let mut releases = Vec::new();
-
+fn ruby_lang_versions(body: String) -> ResultVec<RubyDownloadVersion, RubyLangEntryError> {
     match parse_flat_yaml(body) {
-        Ok(entries) => {
-            for entry in entries {
-                match entry["version"]
+        Ok(entries) => entries
+            .into_iter()
+            .map(|entry| {
+                entry["version"]
                     .as_str()
                     .ok_or_else(|| RubyLangEntryError::MissingVersion(entry.clone()))
                     .and_then(|v| {
                         RubyDownloadVersion::new(v).map_err(RubyLangEntryError::CannotParse)
-                    }) {
-                    Ok(v) => releases.push(v),
-                    Err(error) => errors.push(error),
-                }
-            }
-        }
-        Err(error) => {
-            errors.push(error.into());
-        }
+                    })
+            })
+            .collect(),
+        Err(error) => vec![Err(error.into())],
     }
-    errors.ok_maybe(releases)
+    .into()
 }
 
 fn version_gte(version: &RubyDownloadVersion, minimum: &RubyDownloadVersion) -> bool {
@@ -164,15 +155,14 @@ async fn check_version_on_s3(
     Ok((version, missing))
 }
 
-async fn call(args: Args) -> OkMaybe<(), NonEmptyErrors<Box<dyn Error>>> {
+async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
     print::h2("Checking for new Ruby releases");
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
-    let mut errors: MaybeErrors<Box<dyn Error>> = MaybeErrors::new();
-
+    let mut errors: Vec<Box<dyn Error>> = Vec::new();
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
     let releases = match fetch_ruby_lang_body(&RELEASES_URL).await {
-        Ok(body) => ruby_lang_versions(body).drain_unwrap(&mut errors),
+        Ok(body) => ruby_lang_versions(body).unwrap_drain_errs(&mut errors),
         Err(e) => {
             errors.push(e.into());
             Vec::new()
@@ -226,18 +216,28 @@ async fn call(args: Args) -> OkMaybe<(), NonEmptyErrors<Box<dyn Error>>> {
             print::sub_bullet(format!("{version}"));
         }
     }
-    errors.ok_maybe(())
+    errors.into_iter().map(Result::Err).collect()
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-    match call(args).await {
-        OkMaybe(_, None) => print::bullet("Done"),
-        OkMaybe(_, Some(errors)) => {
-            print::error(format!("Failed {errors}"));
-            std::process::exit(1);
-        }
+    let errors: Vec<_> = call(args)
+        .await
+        .into_iter()
+        .filter_map(Result::err)
+        .collect();
+
+    if errors.is_empty() {
+        print::bullet("done");
+    } else {
+        let errors = errors
+            .into_iter()
+            .map(|error| format!("- {error}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        print::error(format!("Failed\n\n{errors}"));
+        std::process::exit(1);
     }
 }
 
@@ -254,14 +254,11 @@ mod tests {
         "}
         .to_string();
 
-        let mut errors = MaybeErrors::<RubyLangEntryError>::new();
+        let mut errors = Vec::new();
+        let versions = ruby_lang_versions(body).unwrap_drain_errs(&mut errors);
         assert_eq!(
             vec![String::from("4.0.5")],
-            ruby_lang_versions(body)
-                .drain_unwrap(&mut errors)
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<_>>()
+            versions.iter().map(|v| v.to_string()).collect::<Vec<_>>()
         );
 
         assert_eq!(1, errors.len());
@@ -291,14 +288,11 @@ mod tests {
         "}
         .to_string();
 
-        let mut errors = MaybeErrors::<RubyLangEntryError>::new();
+        let mut errors = Vec::new();
+        let versions = ruby_lang_versions(body).unwrap_drain_errs(&mut errors);
         assert_eq!(
             vec![String::from("4.0.5")],
-            ruby_lang_versions(body)
-                .drain_unwrap(&mut errors)
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<_>>()
+            versions.iter().map(|v| v.to_string()).collect::<Vec<_>>()
         );
 
         assert_eq!(1, errors.len());
