@@ -1737,6 +1737,7 @@ dependencies = [
  "tiny_http",
  "tokio",
  "toml",
+ "url",
  "winnow",
 ]
 
