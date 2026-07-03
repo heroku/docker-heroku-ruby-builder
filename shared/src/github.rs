@@ -312,6 +312,16 @@ mod tests {
     }
 
     #[test]
+    fn debug_redacts_token_secret() {
+        let token = GitHubToken::try_from("supersecret").unwrap();
+        let debug = format!("{token:?}");
+        assert!(
+            !debug.contains("supersecret"),
+            "GitHubToken Debug output leaked the secret: {debug}"
+        );
+    }
+
+    #[test]
     fn finds_next_among_multiple_entries() {
         let header = r#"<https://api.github.com/repos/jruby/jruby/releases?per_page=100&page=2>; rel="next", <https://api.github.com/repos/jruby/jruby/releases?per_page=100&page=5>; rel="last""#;
         let next = next_from_link(header);
