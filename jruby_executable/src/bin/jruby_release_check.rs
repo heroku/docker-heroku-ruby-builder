@@ -201,6 +201,14 @@ async fn resolve_stdlib_version(
     Ok((version, stdlib))
 }
 
+/// Contains list of found and missing binaries on S3 for given JRuby version
+struct JRubyBinaries {
+    version: JRubyVersion,
+    #[allow(dead_code)]
+    present: Vec<(BaseImage, Arch)>,
+    missing: Vec<(BaseImage, Arch)>,
+}
+
 /// Check whether `version`'s prebuilt binary already exists on S3 for every
 /// supported base image, returning the labels of the base images whose binary is
 /// missing.
@@ -215,7 +223,7 @@ async fn resolve_stdlib_version(
 async fn check_version_on_s3(
     version: JRubyVersion,
     ruby_stdlib_version: String,
-) -> Result<(JRubyVersion, Vec<(BaseImage, Arch)>), Box<dyn Error + Send + Sync>> {
+) -> Result<JRubyBinaries, Box<dyn Error + Send + Sync>> {
     let mut set = JoinSet::new();
     for (url, image, arch) in s3_urls_to_check(&version, &ruby_stdlib_version) {
         set.spawn(async move {
@@ -225,14 +233,21 @@ async fn check_version_on_s3(
     }
 
     let mut missing = Vec::new();
+    let mut present = Vec::new();
     while let Some(result) = set.join_next().await {
         let (exists, image, arch) = result??;
-        if !exists {
+        if exists {
+            present.push((image, arch))
+        } else {
             missing.push((image, arch));
         }
     }
 
-    Ok((version, missing))
+    Ok(JRubyBinaries {
+        version,
+        present,
+        missing,
+    })
 }
 
 /// Attaches human-facing stage context (e.g. "resolving stdlib version") to a
@@ -323,12 +338,20 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
     let mut versions_to_build = Vec::new();
     while let Some(result) = s3_set.join_next().await {
         match result {
-            Ok(Ok((version, missing))) if missing.is_empty() => {
+            Ok(Ok(JRubyBinaries {
+                version,
+                present: _,
+                missing,
+            })) if missing.is_empty() => {
                 if errors.is_empty() {
                     print::sub_bullet(format!("{version}: all binaries present"));
                 }
             }
-            Ok(Ok((version, missing))) => {
+            Ok(Ok(JRubyBinaries {
+                version,
+                present: _,
+                missing,
+            })) => {
                 print::sub_bullet(format!(
                     "{version}: missing {} base image(s): {}",
                     missing.len(),
