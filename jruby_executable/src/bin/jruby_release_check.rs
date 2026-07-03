@@ -149,20 +149,7 @@ fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec
         .collect()
 }
 
-/// Build the set of S3 URLs where the prebuilt binary for `version` would live,
-/// one per supported (base image, arch) pair.
-///
-/// Each entry is a `(Url, BaseImage, Arch)` tuple: the URL of the
-/// `ruby-{ruby_stdlib_version}-jruby-{version}.tgz` artifact under
-/// [`S3_BASE_URL`], plus the base image and arch it belongs to (carried along
-/// so callers can label output and missing-binary reports). `ruby_stdlib_version`
-/// is the Ruby standard-library version the JRuby release ships (see
-/// [`resolve_stdlib_version`]), which is part of the artifact's filename.
-///
-/// Iteration is over the *current* [`build_matrix`] set. When a new stack is
-/// added, every previously-released version will report it as missing on the
-/// next run, which is the signal `cargo run --bin jruby_build` needs to backfill builds for
-/// that stack.
+/// Build the set of S3 URLs where the prebuilt binary for `version` would live
 fn s3_urls_to_check(
     version: &JRubyVersion,
     ruby_stdlib_version: &str,
