@@ -73,6 +73,11 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     // Continue uploading to the root, (no arch) but introduce per-arch check so
     // if one arch is missing a binary it (and only it) will be produced in the
     // output.
+    //
+    // WARNING: Because this task is triggerd by release_jruby_check.rs, and that
+    // logic checks architectures, bu the logic here doesn't (yet). So there's
+    // a possibility for an infinte loop. However  every release >= 9.4.7.0 (the
+    // scheduled minimum) already has its per-arch objects.
     match on_conflict {
         OnConflict::Skip => {
             if expected_output.fs_err_try_exists()? {

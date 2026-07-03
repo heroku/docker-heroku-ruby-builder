@@ -150,14 +150,14 @@ fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec
 }
 
 /// Build the set of S3 URLs where the prebuilt binary for `version` would live,
-/// one per supported base image.
+/// one per supported (base image, arch) pair.
 ///
-/// Each entry pairs the base image's name (e.g. `"heroku-24"`, used as a label
-/// in output and missing-binary reports) with the URL of its
+/// Each entry is a `(Url, BaseImage, Arch)` tuple: the URL of the
 /// `ruby-{ruby_stdlib_version}-jruby-{version}.tgz` artifact under
-/// [`S3_BASE_URL`]. `ruby_stdlib_version` is the Ruby standard-library version
-/// the JRuby release ships (see [`resolve_stdlib_version`]), which is part of the
-/// artifact's filename.
+/// [`S3_BASE_URL`], plus the base image and arch it belongs to (carried along
+/// so callers can label output and missing-binary reports). `ruby_stdlib_version`
+/// is the Ruby standard-library version the JRuby release ships (see
+/// [`resolve_stdlib_version`]), which is part of the artifact's filename.
 ///
 /// Iteration is over the *current* [`build_matrix`] set. When a new stack is
 /// added, every previously-released version will report it as missing on the
@@ -187,12 +187,10 @@ fn s3_urls_to_check(
 /// implements, returning it paired with the version it belongs to.
 ///
 /// The lookup downloads and parses JRuby's `build.properties` (via
-/// [`jruby_build_properties`]), which is blocking work, so it runs on a
-/// `spawn_blocking` thread to avoid stalling the async runtime. `version` is
+/// [`jruby_build_properties`], which performs async HTTP I/O). `version` is
 /// threaded back out in the returned tuple so callers driving many lookups
 /// concurrently (e.g. through a [`JoinSet`]) can associate each result with its
-/// input. The doubled `?` after `.await` unwraps first the `JoinError` (task
-/// panic) and then the inner property-parsing error.
+/// input.
 async fn resolve_stdlib_version(
     version: JRubyVersion,
 ) -> Result<(JRubyVersion, String), Box<dyn Error + Send + Sync>> {
