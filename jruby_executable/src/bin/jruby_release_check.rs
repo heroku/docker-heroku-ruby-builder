@@ -185,12 +185,6 @@ fn s3_urls_to_check(
 
 /// Look up the Ruby standard-library version that the given JRuby `version`
 /// implements, returning it paired with the version it belongs to.
-///
-/// The lookup downloads and parses JRuby's `build.properties` (via
-/// [`jruby_build_properties`], which performs async HTTP I/O). `version` is
-/// threaded back out in the returned tuple so callers driving many lookups
-/// concurrently (e.g. through a [`JoinSet`]) can associate each result with its
-/// input.
 async fn resolve_stdlib_version(
     version: JRubyVersion,
 ) -> Result<(JRubyVersion, String), Box<dyn Error + Send + Sync>> {
