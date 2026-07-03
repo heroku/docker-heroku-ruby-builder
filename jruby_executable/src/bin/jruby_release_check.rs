@@ -188,8 +188,7 @@ fn s3_urls_to_check(
 async fn resolve_stdlib_version(
     version: JRubyVersion,
 ) -> Result<(JRubyVersion, String), Box<dyn Error + Send + Sync>> {
-    let lookup_version = version.clone();
-    let stdlib = jruby_build_properties(&lookup_version)
+    let stdlib = jruby_build_properties(&version)
         .await
         .and_then(|props| props.ruby_stdlib_version())?;
     Ok((version, stdlib))
