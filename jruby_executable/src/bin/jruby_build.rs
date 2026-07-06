@@ -69,6 +69,15 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
         .join(base_image.to_string())
         .join(&tgz_name);
 
+    // TODO: Right now if a new architecture is released, this won't build it.
+    // Continue uploading to the root, (no arch) but introduce per-arch check so
+    // if one arch is missing a binary it (and only it) will be produced in the
+    // output.
+    //
+    // WARNING: Because this task is triggerd by release_jruby_check.rs, and that
+    // logic checks architectures, bu the logic here doesn't (yet). So there's
+    // a possibility for an infinte loop. However  every release >= 9.4.7.0 (the
+    // scheduled minimum) already has its per-arch objects.
     match on_conflict {
         OnConflict::Skip => {
             if expected_output.fs_err_try_exists()? {
@@ -170,6 +179,8 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     fs::copy(tar_file.path(), &sha_seven_path)?;
 
     // Can be removed once manifest file support is fully rolled out
+    // because jruby is architecture independent. However the
+    // current lookup code in the buildpack is not.
     for cpu_arch in [Arch::Amd64, Arch::Arm64] {
         let dir = volume_output_dir
             .join(base_image.to_string())

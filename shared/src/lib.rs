@@ -36,6 +36,7 @@ where
 
 mod base_image;
 mod download_ruby_version;
+pub mod github;
 mod inventory_help;
 pub mod maybe_err;
 

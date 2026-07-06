@@ -30,6 +30,7 @@ fs2 = { workspace = true }
 hex = { workspace = true }
 gem_version = { workspace = true }
 tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 indoc = "2"

@@ -1059,6 +1059,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "url",
  "winnow",
 ]
 
@@ -1737,6 +1738,7 @@ dependencies = [
  "tiny_http",
  "tokio",
  "toml",
+ "url",
  "winnow",
 ]
 
