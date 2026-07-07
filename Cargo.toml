@@ -8,7 +8,7 @@ members = [
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.96"
 
 [workspace.dependencies]
 bullet_stream = "0.11"
