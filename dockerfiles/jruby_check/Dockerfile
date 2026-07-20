@@ -6,6 +6,6 @@ USER root
 
 # hadolint ignore=DL3008
 RUN apt-get update -y \
-    && apt-get install -y default-jre default-jdk \
+    && apt-get install -y --no-install-recommends default-jre default-jdk \
     && rm -rf /var/lib/apt/lists/*
 USER heroku
