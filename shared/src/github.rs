@@ -41,19 +41,29 @@ use winnow::{
 #[derive(Clone, PartialEq, Eq)]
 pub struct GitHubToken(String);
 
+#[derive(Debug, PartialEq, thiserror::Error)]
+pub enum TokenError {
+    #[error("github token cannot be empty")]
+    CannotBeEmpty,
+}
+
 impl GitHubToken {
     /// Borrow the underlying secret, e.g. to set an `Authorization` header.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
 
-    pub fn try_from(input: &str) -> Option<Self> {
-        let token = input.trim();
+impl TryFrom<&str> for GitHubToken {
+    type Error = TokenError;
+
+    fn try_from(value: &str) -> std::prelude::v1::Result<Self, Self::Error> {
+        let token = value.trim();
         if token.is_empty() {
-            None
+            Err(TokenError::CannotBeEmpty)
         } else {
-            Some(GitHubToken(token.to_owned()))
+            Ok(GitHubToken(token.to_owned()))
         }
     }
 }
@@ -292,6 +302,7 @@ fn token<'a>(input: &mut &'a str) -> Result<&'a str> {
 mod tests {
     use super::*;
     use reqwest::header::HeaderValue;
+    use std::assert_matches;
 
     fn headers_with_link(value: &str) -> HeaderMap {
         let mut headers = HeaderMap::new();
@@ -309,6 +320,12 @@ mod tests {
 
     fn next_from_link(value: &str) -> Option<Url> {
         next_from_headers(headers_with_link(value))
+    }
+
+    #[test]
+    fn token_rejects_empty_strings() {
+        assert_matches!(GitHubToken::try_from(""), Err(TokenError::CannotBeEmpty));
+        assert_matches!(GitHubToken::try_from("   "), Err(TokenError::CannotBeEmpty));
     }
 
     #[test]
