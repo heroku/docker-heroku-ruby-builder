@@ -7,7 +7,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 USER root
 
 # hadolint ignore=DL3008
-RUN apt-get update -y && apt-get install -y libreadline-dev ruby
+RUN apt-get update -y \
+    && apt-get install -y libreadline-dev ruby \
+    && rm -rf /var/lib/apt/lists/*
 USER heroku
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y

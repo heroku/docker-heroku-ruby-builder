@@ -5,5 +5,7 @@ FROM heroku/heroku:${STACK_VERSION}-build
 USER root
 
 # hadolint ignore=DL3008
-RUN apt-get update -y; apt-get install default-jre default-jdk -y
+RUN apt-get update -y \
+    && apt-get install -y default-jre default-jdk \
+    && rm -rf /var/lib/apt/lists/*
 USER heroku
