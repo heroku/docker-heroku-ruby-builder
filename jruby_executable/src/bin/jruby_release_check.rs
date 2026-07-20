@@ -190,16 +190,7 @@ struct JRubyBinaries {
 }
 
 /// Check whether `version`'s prebuilt binary already exists on S3 for every
-/// supported base image, returning the labels of the base images whose binary is
-/// missing.
-///
-/// The per-base-image URLs come from [`s3_urls_to_check`]; each is probed
-/// concurrently with a HEAD-style existence check ([`s3_url_exists`]) via a
-/// [`JoinSet`]. An empty returned vector means all binaries are present (nothing
-/// to build); a non-empty vector lists exactly which base images still need a
-/// build. `version` is returned alongside the labels so concurrent callers can
-/// match each result to its input. The doubled `?` unwraps the task's
-/// `JoinError` and then the existence-check error.
+/// supported base image and supported architecture
 async fn check_version_on_s3(
     version: JRubyVersion,
     ruby_stdlib_version: String,
