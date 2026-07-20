@@ -5,6 +5,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Only apt needs root: installing system packages writes to root-owned paths
 USER root
+
+# hadolint ignore=DL3008
 RUN apt-get update -y && apt-get install -y libreadline-dev ruby
 USER heroku
 
