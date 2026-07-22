@@ -13,6 +13,17 @@ jobs:
       - name: Run ShellCheck
         run: shellcheck *.sh -x
 
+  dockerfile_lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Run hadolint
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        with:
+          recursive: true
+          dockerfile: Dockerfile
+
   lint:
     runs-on: ubuntu-24.04
     steps:

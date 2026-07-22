@@ -21,9 +21,12 @@ set -o xtrace
 mkdir -p "$(dirname "$OUT_TAR")"
 
 # Docker issue with permissions
-# The container runs as root, so directories it creates are root-owned.
-# The host process needs write access to both the arch dir and its parent
-# (for legacy non-arch copies on heroku-22).
+#
+# These dirs are created by the container (whatever `USER` the Dockerfile sets).
+# The host process later copies files in as a different uid.
+# - On macOS this works because Docker Desktop remaps mount ownership to the host user.
+# - On linux this does not work because bind mounts share ownership by raw uid, so
+#   a container-owned dir isn't writable by the host's uid.
 chmod a+w "$(dirname "$OUT_TAR")"
 chmod a+w "$(dirname "$(dirname "$OUT_TAR")")"
 mkdir -p /tmp/source
