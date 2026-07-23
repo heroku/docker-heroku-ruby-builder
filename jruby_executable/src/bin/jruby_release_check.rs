@@ -31,7 +31,7 @@ struct Args {
     ///
     /// Required. Generate one locally with: `--gh-token=$(gh auth token)`
     #[arg(long = "gh-token", value_parser = |s: &str| -> Result<GitHubToken, String> {
-        GitHubToken::try_from(s).map_err(|error| format!("{error}. Sugestion: generate one locally with: `--gh-token=$(gh auth token)`"))
+        GitHubToken::try_from(s).map_err(|error| format!("{error}. Suggestion: generate one locally with: `--gh-token=$(gh auth token)`"))
     })]
     gh_token: GitHubToken,
 
