@@ -74,9 +74,9 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     // if one arch is missing a binary it (and only it) will be produced in the
     // output.
     //
-    // WARNING: Because this task is triggerd by release_jruby_check.rs, and that
-    // logic checks architectures, bu the logic here doesn't (yet). So there's
-    // a possibility for an infinte loop. However  every release >= 9.4.7.0 (the
+    // WARNING: Because this task is triggered by jruby_release_check.rs, and that
+    // logic checks architectures, but the logic here doesn't (yet). So there's
+    // a possibility for an infinite loop. However every release >= 9.4.7.0 (the
     // scheduled minimum) already has its per-arch objects.
     match on_conflict {
         OnConflict::Skip => {
