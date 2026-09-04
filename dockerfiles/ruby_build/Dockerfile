@@ -6,7 +6,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # This is a throwaway build image, not a runtime image. It intentionally stays
 # root: the build writes into a host-owned bind mount (needs root on Linux) and
 # rustup/cargo must be installed for the same user that runs the build.
-# hadolint ignore=DL3002
+# hadolint ignore=DL3002,DL3066
 USER root
 
 # hadolint ignore=DL3008
