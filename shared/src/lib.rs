@@ -35,6 +35,7 @@ where
 }
 
 mod base_image;
+pub mod devcenter;
 mod download_ruby_version;
 pub mod github;
 mod inventory_help;

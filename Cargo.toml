@@ -28,7 +28,7 @@ libherokubuildpack = { version = "0.31.0", default-features = false, features = 
 winnow = "1.0"
 pretty_assertions = "1"
 regex = "1"
-reqwest = { version = "0.13" }
+reqwest = { version = "0.13", features = ["json"] }
 serde = {version = "1", features = ["derive"] }
 sha2 = "0.11"
 shared = { path = "shared" }
