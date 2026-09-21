@@ -21,6 +21,11 @@ on:
           type: boolean
           default: false
           required: false
+      publish_changelog:
+          description: "Publish the Dev Center changelog after builds (when disabled, no entry is created)"
+          type: boolean
+          default: false
+          required: false
 
 permissions:
   contents: read
@@ -49,7 +54,7 @@ jobs:
             {
               # 4 backticks so the inner ```ruby fences in the changelog render literally
               echo '````'
-              cargo run --locked --bin jruby_changelog -- --version "${{inputs.jruby_version}}"
+              cargo run --locked --bin jruby_changelog -- print --version "${{inputs.jruby_version}}"
               echo '````'
             } | tee -a "$GITHUB_STEP_SUMMARY"
 
@@ -90,6 +95,28 @@ jobs:
       - name: Upload JRuby runtime archive to S3
         if: steps.build.outputs.status == 'success'
         run: aws s3 sync ./output "s3://${S3_BUCKET}" ${{ case(inputs.dry_run, '--dryrun', '') }}
+
+  create-changelog:
+    needs: build-and-upload
+    if: ${{ success() && !inputs.dry_run && inputs.publish_changelog }}
+    runs-on: ubuntu-24.04
+    env:
+      HEROKU_DEVCENTER_API_TOKEN: ${{ secrets.HEROKU_DEVCENTER_API_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Cargo build
+        run: cargo build --locked
+      - name: Create Dev Center changelog
+        run: |
+          set -euo pipefail
+          cargo run --locked --bin jruby_changelog -- devcenter \
+            --version ${{inputs.jruby_version}} \
+            --status published
 
   # # TODO: Pass data from prior jobs to generate one single inventory file
   # #       before generating a PR.
