@@ -164,10 +164,12 @@ impl ExistingChangelogItem {
         self.published_at.is_some()
     }
 
-    /// Whether this entry has the same title, content, and publish state as `item`.
+    /// Whether this entry is the same announcement as `item`: the same title
+    /// (ignoring surrounding whitespace) in the same publish state. Content is
+    /// deliberately excluded so a regenerated body cannot slip a second
+    /// customer-visible entry past the duplicate guard.
     fn matches(&self, item: &NewChangelogItem) -> bool {
-        self.title == item.title
-            && self.content == item.content
+        self.title.trim() == item.title.trim()
             && self.is_published() == (item.status == Status::Published)
     }
 
@@ -285,8 +287,8 @@ fn client() -> reqwest::Client {
 /// Transient failures are retried.
 ///
 /// A **publish** (`NewChangelogItem.status == Status::Published`) first scans entries created within
-/// the last [`DUPLICATE_WINDOW_DAYS`] for one matching `item`'s title, content,
-/// and publish state:
+/// the last [`DUPLICATE_WINDOW_DAYS`] for one matching `item`'s title (ignoring
+/// surrounding whitespace) and publish state:
 ///
 /// - If a pre-existing match is found, returns
 ///   [`AlreadyPublished`](CreateOutcome::AlreadyPublished) **without creating
@@ -1039,5 +1041,79 @@ mod test {
         }
         let requests = requests.lock().unwrap();
         assert!(requests.iter().any(|request| request.method == "POST"));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publish_refuses_a_duplicate_title_with_different_content() {
+        let (addr, requests) = spawn_router(|method, _url| {
+            if method == "GET" {
+                (
+                    200,
+                    r#"{"results":[{"id":5,"title":"Ruby 3.4.1","content":"stored body","created_at":"2026-09-20T00:00:00Z","published_at":"2026-09-20T00:00:00Z"}],"next_page":null}"#
+                        .to_string(),
+                )
+            } else {
+                (
+                    201,
+                    r#"{"id":100,"published_at":"2026-09-20T12:30:00Z"}"#.to_string(),
+                )
+            }
+        });
+
+        let outcome = publish_guarding_duplicates_since(
+            &addr,
+            &token(),
+            &publish("Ruby 3.4.1", "regenerated body"),
+            at("2026-09-20T12:00:00Z"),
+        )
+        .await
+        .unwrap();
+
+        match outcome {
+            CreateOutcome::AlreadyPublished(existing) => assert_eq!(existing.id, 5),
+            other => panic!("expected AlreadyPublished, got {other:?}"),
+        }
+        let requests = requests.lock().unwrap();
+        assert!(
+            requests.iter().all(|request| request.method == "GET"),
+            "a published entry with the same title is a duplicate even if the body differs"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publish_refuses_a_duplicate_title_differing_only_by_whitespace() {
+        let (addr, requests) = spawn_router(|method, _url| {
+            if method == "GET" {
+                (
+                    200,
+                    r#"{"results":[{"id":6,"title":"  Ruby 3.4.1\n","content":"body","created_at":"2026-09-20T00:00:00Z","published_at":"2026-09-20T00:00:00Z"}],"next_page":null}"#
+                        .to_string(),
+                )
+            } else {
+                (
+                    201,
+                    r#"{"id":101,"published_at":"2026-09-20T12:30:00Z"}"#.to_string(),
+                )
+            }
+        });
+
+        let outcome = publish_guarding_duplicates_since(
+            &addr,
+            &token(),
+            &publish("Ruby 3.4.1", "body"),
+            at("2026-09-20T12:00:00Z"),
+        )
+        .await
+        .unwrap();
+
+        match outcome {
+            CreateOutcome::AlreadyPublished(existing) => assert_eq!(existing.id, 6),
+            other => panic!("expected AlreadyPublished, got {other:?}"),
+        }
+        let requests = requests.lock().unwrap();
+        assert!(
+            requests.iter().all(|request| request.method == "GET"),
+            "titles differing only by surrounding whitespace are the same announcement"
+        );
     }
 }
