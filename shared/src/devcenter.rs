@@ -128,7 +128,7 @@ pub struct CreatedChangelogItem {
     pub id: u64,
     /// Timestamp the item was published, or `None` when it was created as a draft.
     #[serde(default)]
-    pub published_at: Option<String>,
+    pub published_at: Option<DateTime<Utc>>,
 }
 
 impl CreatedChangelogItem {
@@ -178,7 +178,7 @@ impl ExistingChangelogItem {
     fn into_created(self) -> CreatedChangelogItem {
         CreatedChangelogItem {
             id: self.id,
-            published_at: self.published_at.map(|at| at.to_rfc3339()),
+            published_at: self.published_at,
         }
     }
 }
@@ -679,6 +679,20 @@ mod test {
         assert!(created.is_published());
         let requests = requests.lock().unwrap();
         assert!(requests[0].body.contains("\"published\":\"true\""));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn created_response_rejects_a_blank_published_at() {
+        // The API sends `null` or a real timestamp; a blank string is malformed
+        // and must not be read as "published".
+        let (addr, _requests) =
+            spawn_router(|_method, _url| (201, r#"{"id":1,"published_at":""}"#.to_string()));
+
+        let error = post_changelog_item(&addr, &token(), &publish("T", "C"))
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, DevCenterError::Transport(_)));
     }
 
     #[tokio::test(flavor = "multi_thread")]
