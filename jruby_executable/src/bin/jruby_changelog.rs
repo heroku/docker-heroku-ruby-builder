@@ -4,10 +4,7 @@ use bullet_stream::global::print;
 use clap::{Args, Parser, Subcommand};
 use indoc::formatdoc;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
-use shared::devcenter::{
-    CreateOutcome, DEVCENTER_HOST, DUPLICATE_WINDOW_DAYS, DevCenterToken, NewChangelogItem, Status,
-    create_changelog_item,
-};
+use shared::devcenter::{NewChangelogItem, Status, create_and_report};
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -87,48 +84,12 @@ async fn create(args: &DevcenterArgs) -> Result<(), Box<dyn Error>> {
         .await?
         .ruby_stdlib_version()?;
     let ChangelogParts { title, content } = jruby_changelog_parts(&args.version, &stdlib_version);
-    let item = NewChangelogItem {
+    create_and_report(&NewChangelogItem {
         title,
         content,
         status: args.status.clone(),
-    };
-
-    let token = DevCenterToken::try_from(
-        std::env::var("HEROKU_DEVCENTER_API_TOKEN")
-            .map_err(|error| format!("HEROKU_DEVCENTER_API_TOKEN is required {error:?}"))?
-            .as_str(),
-    )?;
-
-    match create_changelog_item(&DEVCENTER_HOST, &token, &item).await? {
-        CreateOutcome::Created(created) => {
-            println!(
-                "Created changelog item id={id} ({state})",
-                id = created.id,
-                state = if created.is_published() {
-                    "published"
-                } else {
-                    "draft"
-                },
-            );
-            Ok(())
-        }
-        CreateOutcome::AlreadyPublished(existing) => {
-            let id = existing.id;
-            let title = existing.title;
-            let published_at = existing
-                .published_at
-                .map_or_else(|| "unknown".to_string(), |at| at.to_rfc3339());
-            Err(formatdoc! {"
-                Refusing to publish a duplicate changelog entry.
-
-                A matching entry was already published within the last {DUPLICATE_WINDOW_DAYS} days:
-                  id:           {id}
-                  title:        {title}
-                  published_at: {published_at}
-            "}
-            .into())
-        }
-    }
+    })
+    .await
 }
 
 #[tokio::main]

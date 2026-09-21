@@ -15,6 +15,7 @@
 use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, with_retries};
 use chrono::{DateTime, TimeDelta, Utc};
 use clap::ValueEnum;
+use indoc::formatdoc;
 use reqwest::{StatusCode, Url};
 use std::fmt;
 use std::time::Duration;
@@ -337,6 +338,63 @@ pub async fn create_changelog_item(
         // show up to customers, but will create real database entries.
         let created = with_retries(|| post_changelog_item(host, token, item)).await?;
         Ok(CreateOutcome::Created(created))
+    }
+}
+
+/// Create `item` against [`DEVCENTER_HOST`] using the token from the
+/// `HEROKU_DEVCENTER_API_TOKEN` environment variable, printing a summary of the
+/// outcome to stdout.
+///
+/// A newly created entry and a skipped duplicate (a matching entry already
+/// published within [`DUPLICATE_WINDOW_DAYS`]) are both reported to stdout and
+/// treated as success.
+///
+/// # Errors
+///
+/// Returns an error when `HEROKU_DEVCENTER_API_TOKEN` is unset, when its value
+/// is not a usable token, or when the Dev Center API call fails.
+pub async fn create_and_report(item: &NewChangelogItem) -> Result<(), Box<dyn std::error::Error>> {
+    let token = DevCenterToken::try_from(
+        std::env::var_os("HEROKU_DEVCENTER_API_TOKEN")
+            .ok_or_else(|| String::from("HEROKU_DEVCENTER_API_TOKEN is not set"))
+            .and_then(|value| {
+                value
+                    .into_string()
+                    .map_err(|_| String::from("HEROKU_DEVCENTER_API_TOKEN is not valid UTF-8"))
+            })?
+            .as_str(),
+    )?;
+
+    match create_changelog_item(&DEVCENTER_HOST, &token, item).await? {
+        CreateOutcome::Created(created) => {
+            println!(
+                "Created changelog item id={id} ({state})",
+                id = created.id,
+                state = if created.is_published() {
+                    "published"
+                } else {
+                    "draft"
+                },
+            );
+            Ok(())
+        }
+        CreateOutcome::AlreadyPublished(existing) => {
+            let id = existing.id;
+            let title = existing.title;
+            let published_at = existing
+                .published_at
+                .map_or_else(|| "unknown".to_string(), |at| at.to_rfc3339());
+            print!(
+                "{}",
+                formatdoc! {"
+                    A matching changelog entry was already published within the last {DUPLICATE_WINDOW_DAYS} days; nothing to do.
+                      id:           {id}
+                      title:        {title}
+                      published_at: {published_at}
+                "}
+            );
+            Ok(())
+        }
     }
 }
 
