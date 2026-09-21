@@ -10,7 +10,7 @@
 //! [`create_changelog_item`] is the only way to create an entry; the underlying
 //! POST is private so a caller cannot bypass the duplicate guard. Creating an
 //! entry is not idempotent, so publishing is protected against duplicates:
-//! before each POST it scans recent entries (see [`publish_guarding_duplicates_since`]).
+//! before each POST it scans recent entries for a matching published entry.
 
 use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, with_retries};
 use chrono::{DateTime, TimeDelta, Utc};
