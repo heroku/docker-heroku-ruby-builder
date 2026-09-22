@@ -16,7 +16,6 @@
 use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, with_retries, with_retries_if};
 use chrono::{DateTime, TimeDelta, Utc};
 use clap::ValueEnum;
-use indoc::formatdoc;
 use reqwest::{StatusCode, Url};
 use std::fmt;
 use std::time::Duration;
@@ -376,16 +375,15 @@ fn token_from_env(
 /// Create `item` against [`DEVCENTER_HOST`] using the token from the
 /// `HEROKU_DEVCENTER_API_TOKEN` environment variable, reporting the outcome.
 ///
-/// A newly created entry is printed to stdout as success. A skipped duplicate --
-/// a matching published entry created within the last [`DUPLICATE_WINDOW_DAYS`]
-/// days -- is treated as an error, because an entry that already exists is
-/// unexpected (for example, two builds racing to publish the same version).
+/// A newly created entry is printed to stdout as success. A matching published
+/// entry created within the last [`DUPLICATE_WINDOW_DAYS`] days is also success:
+/// publishing is idempotent, so a re-run that finds its earlier changelog leaves
+/// it untouched rather than failing.
 ///
 /// # Errors
 ///
 /// Returns an error when `HEROKU_DEVCENTER_API_TOKEN` is unset, when its value
-/// is not a usable token, when the Dev Center API call fails, or when publishing
-/// is skipped because a matching entry was already published.
+/// is not a usable token, or when the Dev Center API call fails.
 pub async fn create_and_report(item: &NewChangelogItem) -> Result<(), Box<dyn std::error::Error>> {
     let token = token_from_env(std::env::var_os("HEROKU_DEVCENTER_API_TOKEN"))?;
 
@@ -394,10 +392,11 @@ pub async fn create_and_report(item: &NewChangelogItem) -> Result<(), Box<dyn st
 
 /// Turn a [`CreateOutcome`] into a process result.
 ///
-/// A newly created entry is printed and treated as success. An
-/// [`AlreadyPublished`](CreateOutcome::AlreadyPublished) match returns an error:
-/// an entry that already exists is unexpected (for example, two builds racing to
-/// publish the same version) and should fail the run rather than pass silently.
+/// Both variants are success. A newly created entry is printed; an
+/// [`AlreadyPublished`](CreateOutcome::AlreadyPublished) match means a matching
+/// entry already exists, so publishing is an idempotent no-op -- a re-run of a
+/// build for an already-announced version finds its earlier changelog and leaves
+/// it untouched.
 fn report_outcome(outcome: CreateOutcome) -> Result<(), Box<dyn std::error::Error>> {
     match outcome {
         CreateOutcome::Created(created) => {
@@ -413,18 +412,12 @@ fn report_outcome(outcome: CreateOutcome) -> Result<(), Box<dyn std::error::Erro
             Ok(())
         }
         CreateOutcome::AlreadyPublished(existing) => {
-            let id = existing.id;
-            let title = existing.title;
-            let published_at = existing
-                .published_at
-                .map_or_else(|| "unknown".to_string(), |at| at.to_rfc3339());
-            Err(formatdoc! {"
-                A matching published changelog entry was created in the last {DUPLICATE_WINDOW_DAYS} days, so nothing was created. An existing publish is unexpected here (for example, two builds racing to publish the same version) and likely needs manual review.
-                  id:           {id}
-                  title:        {title}
-                  published_at: {published_at}
-            "}
-            .into())
+            println!(
+                "Matching changelog item already published id={id} ({title:?}); nothing to create",
+                id = existing.id,
+                title = existing.title,
+            );
+            Ok(())
         }
     }
 }
@@ -1411,7 +1404,7 @@ mod test {
     }
 
     #[test]
-    fn already_published_is_reported_as_an_error() {
+    fn already_published_is_reported_as_success() {
         let outcome = CreateOutcome::AlreadyPublished(ExistingChangelogItem {
             id: 5,
             title: "Ruby 3.4.1".to_string(),
@@ -1421,8 +1414,8 @@ mod test {
         });
 
         assert!(
-            report_outcome(outcome).is_err(),
-            "an already-published match is unexpected (e.g. a race) and must surface a non-zero exit"
+            report_outcome(outcome).is_ok(),
+            "finding a matching publish is the idempotent outcome of a re-run, not a failure"
         );
     }
 
