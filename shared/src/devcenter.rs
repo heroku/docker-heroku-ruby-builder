@@ -342,17 +342,18 @@ pub async fn create_changelog_item(
 }
 
 /// Create `item` against [`DEVCENTER_HOST`] using the token from the
-/// `HEROKU_DEVCENTER_API_TOKEN` environment variable, printing a summary of the
-/// outcome to stdout.
+/// `HEROKU_DEVCENTER_API_TOKEN` environment variable, reporting the outcome.
 ///
-/// A newly created entry and a skipped duplicate (a matching entry already
-/// published within [`DUPLICATE_WINDOW_DAYS`]) are both reported to stdout and
-/// treated as success.
+/// A newly created entry is printed to stdout as success. A skipped duplicate --
+/// a matching published entry created within the last [`DUPLICATE_WINDOW_DAYS`]
+/// days -- is treated as an error, because an entry that already exists is
+/// unexpected (for example, two builds racing to publish the same version).
 ///
 /// # Errors
 ///
 /// Returns an error when `HEROKU_DEVCENTER_API_TOKEN` is unset, when its value
-/// is not a usable token, or when the Dev Center API call fails.
+/// is not a usable token, when the Dev Center API call fails, or when publishing
+/// is skipped because a matching entry was already published.
 pub async fn create_and_report(item: &NewChangelogItem) -> Result<(), Box<dyn std::error::Error>> {
     let token = DevCenterToken::try_from(
         std::env::var_os("HEROKU_DEVCENTER_API_TOKEN")
@@ -365,7 +366,17 @@ pub async fn create_and_report(item: &NewChangelogItem) -> Result<(), Box<dyn st
             .as_str(),
     )?;
 
-    match create_changelog_item(&DEVCENTER_HOST, &token, item).await? {
+    report_outcome(create_changelog_item(&DEVCENTER_HOST, &token, item).await?)
+}
+
+/// Turn a [`CreateOutcome`] into a process result.
+///
+/// A newly created entry is printed and treated as success. An
+/// [`AlreadyPublished`](CreateOutcome::AlreadyPublished) match returns an error:
+/// an entry that already exists is unexpected (for example, two builds racing to
+/// publish the same version) and should fail the run rather than pass silently.
+fn report_outcome(outcome: CreateOutcome) -> Result<(), Box<dyn std::error::Error>> {
+    match outcome {
         CreateOutcome::Created(created) => {
             println!(
                 "Created changelog item id={id} ({state})",
@@ -384,16 +395,13 @@ pub async fn create_and_report(item: &NewChangelogItem) -> Result<(), Box<dyn st
             let published_at = existing
                 .published_at
                 .map_or_else(|| "unknown".to_string(), |at| at.to_rfc3339());
-            print!(
-                "{}",
-                formatdoc! {"
-                    A matching changelog entry was already published within the last {DUPLICATE_WINDOW_DAYS} days; nothing to do.
-                      id:           {id}
-                      title:        {title}
-                      published_at: {published_at}
-                "}
-            );
-            Ok(())
+            Err(formatdoc! {"
+                A matching published changelog entry was created in the last {DUPLICATE_WINDOW_DAYS} days, so nothing was created. An existing publish is unexpected here (for example, two builds racing to publish the same version) and likely needs manual review.
+                  id:           {id}
+                  title:        {title}
+                  published_at: {published_at}
+            "}
+            .into())
         }
     }
 }
@@ -1187,5 +1195,31 @@ mod test {
             requests.iter().all(|request| request.method == "GET"),
             "titles differing only by surrounding whitespace are the same announcement"
         );
+    }
+
+    #[test]
+    fn already_published_is_reported_as_an_error() {
+        let outcome = CreateOutcome::AlreadyPublished(ExistingChangelogItem {
+            id: 5,
+            title: "Ruby 3.4.1".to_string(),
+            content: "body".to_string(),
+            created_at: at("2026-09-20T00:00:00Z"),
+            published_at: Some(at("2026-09-20T00:00:00Z")),
+        });
+
+        assert!(
+            report_outcome(outcome).is_err(),
+            "an already-published match is unexpected (e.g. a race) and must surface a non-zero exit"
+        );
+    }
+
+    #[test]
+    fn a_created_entry_is_reported_as_success() {
+        let outcome = CreateOutcome::Created(CreatedChangelogItem {
+            id: 100,
+            published_at: Some(at("2026-09-21T00:00:00Z")),
+        });
+
+        assert!(report_outcome(outcome).is_ok());
     }
 }
