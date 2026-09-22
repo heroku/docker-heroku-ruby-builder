@@ -424,7 +424,11 @@ fn report_outcome(outcome: CreateOutcome) -> Result<(), Box<dyn std::error::Erro
 
 /// Fetch changelog entries created at or after `created_after`, newest first.
 ///
-/// Each page request is retried on failure.
+/// The listing's own order is not trusted: every page is filtered by
+/// `created_at` and the collected entries are sorted, so a reordered or pinned
+/// entry cannot hide an in-window match behind an older one. Paging continues
+/// until a page yields no in-window entry (or the listing ends). Each page
+/// request is retried on failure.
 ///
 /// # Errors
 ///
@@ -441,20 +445,22 @@ pub async fn scan_recent_changelog_items(
         let ChangelogItemsPage { results, next_page } =
             with_retries(|| list_changelog_items_page(host, token, page, MAX_PER_PAGE)).await?;
 
-        let mut reached_window_end = false;
-        for item in results {
-            if item.created_at < created_after {
-                reached_window_end = true;
-                break;
-            }
-            items.push(item);
-        }
+        let kept_before = items.len();
+        items.extend(
+            results
+                .into_iter()
+                .filter(|item| item.created_at >= created_after),
+        );
+        let page_had_in_window = items.len() > kept_before;
 
         match next_page {
-            Some(next) if !reached_window_end => page = next,
-            _ => return Ok(items),
+            Some(next) if page_had_in_window => page = next,
+            _ => break,
         }
     }
+
+    items.sort_by_key(|item| std::cmp::Reverse(item.created_at));
+    Ok(items)
 }
 
 /// Publish `item`, guarding against duplicates relative to `started_at`.
@@ -519,9 +525,9 @@ async fn error_body(response: reqwest::Response) -> String {
 
 /// Fetch a single page of the changelog listing endpoint.
 ///
-/// Entries are ordered newest first (`created_at` descending), across pages as
-/// well as within one: every entry on a later page is older than every entry on
-/// an earlier one.
+/// The endpoint tends to return entries newest first (`created_at` descending),
+/// but the private API does not guarantee that order, so callers must not rely
+/// on it. [`scan_recent_changelog_items`] filters and sorts defensively instead.
 async fn list_changelog_items_page(
     host: &Url,
     token: &DevCenterToken,
@@ -924,7 +930,7 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn scan_stops_at_window_boundary_without_fetching_next_page() {
+    async fn scan_pages_past_a_stale_entry_and_stops_on_a_fully_stale_page() {
         let (addr, requests) = spawn_router(|_method, url| {
             if url.contains("?page=1") {
                 (
@@ -935,8 +941,16 @@ mod test {
                     ],"next_page":2}"#
                         .to_string(),
                 )
+            } else if url.contains("?page=2") {
+                (
+                    200,
+                    r#"{"results":[
+                        {"id":3,"title":"older","content":"o","created_at":"2026-08-01T00:00:00Z","published_at":"2026-08-01T00:00:00Z"}
+                    ],"next_page":3}"#
+                        .to_string(),
+                )
             } else {
-                (500, "should not fetch page 2".to_string())
+                (500, "should not fetch page 3".to_string())
             }
         });
 
@@ -949,7 +963,11 @@ mod test {
             vec![1]
         );
         let requests = requests.lock().unwrap();
-        assert_eq!(requests.len(), 1, "must stop before fetching page 2");
+        assert_eq!(
+            requests.len(),
+            2,
+            "a stale entry on page 1 must not stop the scan; a fully stale page 2 must"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1124,6 +1142,56 @@ mod test {
         assert!(
             requests.iter().all(|request| request.method == "GET"),
             "a publish from months ago is still a duplicate within the support window"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publish_finds_a_duplicate_on_a_later_page_despite_an_earlier_stale_entry() {
+        // The private listing is not guaranteed strictly newest-first. A stale
+        // entry on an earlier page must not end the scan, or a pre-existing
+        // duplicate on a later page is missed and a second entry gets published.
+        let (addr, requests) = spawn_router(|method, url| {
+            if method != "GET" {
+                return (
+                    201,
+                    r#"{"id":99,"published_at":"2026-09-20T12:30:00Z"}"#.to_string(),
+                );
+            }
+            if url.contains("?page=1") {
+                (
+                    200,
+                    r#"{"results":[
+                        {"id":1,"title":"Unrelated","content":"body","created_at":"2026-09-20T00:00:00Z","published_at":"2026-09-20T00:00:00Z"},
+                        {"id":2,"title":"ancient","content":"body","created_at":"2019-01-01T00:00:00Z","published_at":"2019-01-01T00:00:00Z"}
+                    ],"next_page":2}"#
+                        .to_string(),
+                )
+            } else {
+                (
+                    200,
+                    r#"{"results":[{"id":3,"title":"Ruby 3.4.1","content":"body","created_at":"2026-09-19T00:00:00Z","published_at":"2026-09-19T00:00:00Z"}],"next_page":null}"#
+                        .to_string(),
+                )
+            }
+        });
+
+        let outcome = publish_guarding_duplicates_since(
+            &addr,
+            &token(),
+            &publish("Ruby 3.4.1", "body"),
+            at("2026-09-20T12:00:00Z"),
+        )
+        .await
+        .unwrap();
+
+        match outcome {
+            CreateOutcome::AlreadyPublished(existing) => assert_eq!(existing.id, 3),
+            other => panic!("expected AlreadyPublished from a later page, got {other:?}"),
+        }
+        let requests = requests.lock().unwrap();
+        assert!(
+            requests.iter().all(|request| request.method == "GET"),
+            "a duplicate on a later page must be found before POSTing"
         );
     }
 
