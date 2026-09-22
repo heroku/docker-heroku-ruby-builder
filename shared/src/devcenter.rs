@@ -28,9 +28,13 @@ pub static DEVCENTER_HOST: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|
 });
 
 /// How far back [`create_changelog_item`] looks for a duplicate when publishing.
-/// The scan filters on `created_at`, so an entry created earlier than this is not
-/// considered a duplicate even if it was published more recently.
-pub const DUPLICATE_WINDOW_DAYS: i64 = 7;
+///
+/// Scoped to exceed the Ruby support window (the most recent three versions,
+/// roughly three years) with a margin, so re-running a build for any version
+/// still in support finds its earlier changelog and refuses to publish a
+/// duplicate. The scan filters on `created_at`, so an entry created earlier than
+/// this is not considered a duplicate even if it was published more recently.
+pub const DUPLICATE_WINDOW_DAYS: i64 = 365 * 4;
 
 /// The largest page the Dev Center private API will serve (`per_page`), used to
 /// scan recent entries in as few requests as possible.
@@ -1088,6 +1092,45 @@ mod test {
         assert!(
             requests.iter().all(|request| request.method == "GET"),
             "must not POST when a duplicate already exists"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publish_refuses_a_duplicate_published_months_ago() {
+        // A prior publish far outside a one-week window but well within the
+        // multi-year support window must still be recognized as a duplicate.
+        let (addr, requests) = spawn_router(|method, _url| {
+            if method == "GET" {
+                (
+                    200,
+                    r#"{"results":[{"id":42,"title":"Ruby 3.4.1","content":"body","created_at":"2026-01-01T00:00:00Z","published_at":"2026-01-01T00:00:00Z"}],"next_page":null}"#
+                        .to_string(),
+                )
+            } else {
+                (
+                    201,
+                    r#"{"id":99,"published_at":"2026-09-20T12:30:00Z"}"#.to_string(),
+                )
+            }
+        });
+
+        let outcome = publish_guarding_duplicates_since(
+            &addr,
+            &token(),
+            &publish("Ruby 3.4.1", "body"),
+            at("2026-09-20T12:00:00Z"),
+        )
+        .await
+        .unwrap();
+
+        match outcome {
+            CreateOutcome::AlreadyPublished(existing) => assert_eq!(existing.id, 42),
+            other => panic!("expected AlreadyPublished, got {other:?}"),
+        }
+        let requests = requests.lock().unwrap();
+        assert!(
+            requests.iter().all(|request| request.method == "GET"),
+            "a publish from months ago is still a duplicate within the support window"
         );
     }
 
