@@ -357,6 +357,18 @@ pub async fn create_changelog_item(
     }
 }
 
+/// Parse `HEROKU_DEVCENTER_API_TOKEN`'s raw value, distinguishing unset,
+/// non-UTF-8, and empty/whitespace-only values in the error message.
+fn token_from_env(
+    value: Option<std::ffi::OsString>,
+) -> Result<DevCenterToken, Box<dyn std::error::Error>> {
+    let value = value.ok_or_else(|| String::from("HEROKU_DEVCENTER_API_TOKEN is not set"))?;
+    let value = value
+        .into_string()
+        .map_err(|_| String::from("HEROKU_DEVCENTER_API_TOKEN is not valid UTF-8"))?;
+    Ok(DevCenterToken::try_from(value.as_str())?)
+}
+
 /// Create `item` against [`DEVCENTER_HOST`] using the token from the
 /// `HEROKU_DEVCENTER_API_TOKEN` environment variable, reporting the outcome.
 ///
@@ -371,16 +383,7 @@ pub async fn create_changelog_item(
 /// is not a usable token, when the Dev Center API call fails, or when publishing
 /// is skipped because a matching entry was already published.
 pub async fn create_and_report(item: &NewChangelogItem) -> Result<(), Box<dyn std::error::Error>> {
-    let token = DevCenterToken::try_from(
-        std::env::var_os("HEROKU_DEVCENTER_API_TOKEN")
-            .ok_or_else(|| String::from("HEROKU_DEVCENTER_API_TOKEN is not set"))
-            .and_then(|value| {
-                value
-                    .into_string()
-                    .map_err(|_| String::from("HEROKU_DEVCENTER_API_TOKEN is not valid UTF-8"))
-            })?
-            .as_str(),
-    )?;
+    let token = token_from_env(std::env::var_os("HEROKU_DEVCENTER_API_TOKEN"))?;
 
     report_outcome(create_changelog_item(&DEVCENTER_HOST, &token, item).await?)
 }
@@ -714,6 +717,57 @@ mod test {
             DevCenterToken::try_from("   "),
             Err(TokenError::CannotBeEmpty)
         ));
+    }
+
+    #[test]
+    fn token_from_env_errors_when_unset() {
+        let error = token_from_env(None).unwrap_err();
+        assert!(error.to_string().contains("is not set"));
+    }
+
+    #[test]
+    fn token_from_env_rejects_empty_or_whitespace() {
+        for value in ["", "   "] {
+            let error = token_from_env(Some(std::ffi::OsString::from(value))).unwrap_err();
+            assert!(
+                error.to_string().contains("cannot be empty"),
+                "value {value:?} produced: {error}"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn token_from_env_errors_on_non_utf8() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let value = std::ffi::OsString::from_vec(vec![0xff, 0xff]);
+        let error = token_from_env(Some(value)).unwrap_err();
+        assert!(error.to_string().contains("not valid UTF-8"));
+    }
+
+    #[test]
+    fn token_from_env_accepts_a_valid_value() {
+        let token = token_from_env(Some(std::ffi::OsString::from("secret-token"))).unwrap();
+        assert_eq!(token.as_str(), "secret-token");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn token_from_env_failure_modes_are_distinguishable() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let unset = token_from_env(None).unwrap_err().to_string();
+        let empty = token_from_env(Some(std::ffi::OsString::from("   ")))
+            .unwrap_err()
+            .to_string();
+        let non_utf8 = token_from_env(Some(std::ffi::OsString::from_vec(vec![0xff, 0xff])))
+            .unwrap_err()
+            .to_string();
+
+        assert_ne!(unset, empty);
+        assert_ne!(unset, non_utf8);
+        assert_ne!(empty, non_utf8);
     }
 
     #[test]
