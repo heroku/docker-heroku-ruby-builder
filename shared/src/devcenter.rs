@@ -13,7 +13,7 @@
 //! publishing is protected against duplicates: before each POST it scans recent
 //! entries for a matching published entry.
 
-use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, with_retries};
+use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, with_retries, with_retries_if};
 use chrono::{DateTime, TimeDelta, Utc};
 use clap::ValueEnum;
 use indoc::formatdoc;
@@ -286,7 +286,7 @@ fn client() -> reqwest::Client {
 ///
 /// A **draft** (`NewChangelogItem.status == Status::Draft`) is always created (duplicate
 /// drafts are harmless), which doubles as a check that the API and token work.
-/// Transient failures are retried.
+/// Only transient failures are retried.
 ///
 /// A **publish** (`NewChangelogItem.status == Status::Published`) first scans entries created within
 /// the last [`DUPLICATE_WINDOW_DAYS`] for one matching `item`'s title (ignoring
@@ -337,7 +337,10 @@ pub async fn create_changelog_item(
     } else {
         // Allow duplicate draft posts for testing against the live server. They do not
         // show up to customers, but will create real database entries.
-        let created = with_retries(|| post_changelog_item(host, token, item)).await?;
+        let created = with_retries_if(DevCenterError::is_retryable, || {
+            post_changelog_item(host, token, item)
+        })
+        .await?;
         Ok(CreateOutcome::Created(created))
     }
 }
@@ -901,6 +904,28 @@ mod test {
         let requests = requests.lock().unwrap();
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0].method, "POST");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn draft_does_not_retry_a_non_retryable_error() {
+        let post_calls = Arc::new(AtomicUsize::new(0));
+        let post_counter = Arc::clone(&post_calls);
+
+        let (addr, _requests) = spawn_router(move |_method, _url| {
+            post_counter.fetch_add(1, Ordering::SeqCst);
+            (401, r#"{"error":"Access denied"}"#.to_string())
+        });
+
+        let error = create_changelog_item(&addr, &token(), &draft("t", "c"))
+            .await
+            .unwrap_err();
+
+        assert!(matches!(error, DevCenterError::AccessDenied));
+        assert_eq!(
+            post_calls.load(Ordering::SeqCst),
+            1,
+            "a non-retryable error must not be retried"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
