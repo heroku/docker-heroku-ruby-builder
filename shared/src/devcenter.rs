@@ -237,6 +237,16 @@ pub enum DevCenterError {
         /// The raw response body.
         body: String,
     },
+
+    /// A publish POST was accepted but Dev Center left the entry an unpublished
+    /// draft, so the publish did not take effect and the entry is not visible.
+    #[error(
+        "Dev Center accepted the publish but left changelog item {id} an unpublished draft; the publish did not take effect."
+    )]
+    PublishedAsDraft {
+        /// The id of the created-but-unpublished entry.
+        id: u64,
+    },
 }
 
 impl DevCenterError {
@@ -246,7 +256,9 @@ impl DevCenterError {
         match self {
             DevCenterError::Transport(_) | DevCenterError::RateLimited => true,
             DevCenterError::Unexpected { status, .. } => status.is_server_error(),
-            DevCenterError::AccessDenied | DevCenterError::Validation { .. } => false,
+            DevCenterError::AccessDenied
+            | DevCenterError::Validation { .. }
+            | DevCenterError::PublishedAsDraft { .. } => false,
         }
     }
 }
@@ -486,6 +498,11 @@ async fn publish_guarding_duplicates_since(
         }
 
         match post_changelog_item(host, token, item).await {
+            // A publish that comes back unpublished is an invisible draft, not a
+            // success; retrying would POST a duplicate, so fail hard instead.
+            Ok(created) if !created.is_published() => {
+                return Err(DevCenterError::PublishedAsDraft { id: created.id });
+            }
             Ok(created) => return Ok(CreateOutcome::Created(created)),
             Err(error) if attempts < MAX_RETRY_ATTEMPTS && error.is_retryable() => {
                 posted = true;
@@ -956,6 +973,30 @@ mod test {
         let requests = requests.lock().unwrap();
         assert_eq!(requests[0].method, "GET");
         assert!(requests.iter().any(|request| request.method == "POST"));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publish_errors_when_the_api_returns_an_unpublished_entry() {
+        // The POST is accepted (201) but the entry comes back unpublished, so the
+        // publish silently did not take effect.
+        let (addr, _requests) = spawn_router(|method, _url| match method {
+            "GET" => (200, r#"{"results":[],"next_page":null}"#.to_string()),
+            _ => (201, r#"{"id":55,"published_at":null}"#.to_string()),
+        });
+
+        let error = publish_guarding_duplicates_since(
+            &addr,
+            &token(),
+            &publish("Ruby 3.4.1", "body"),
+            at("2026-09-20T12:00:00Z"),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(
+            matches!(error, DevCenterError::PublishedAsDraft { id: 55 }),
+            "an accepted-but-unpublished publish must be a hard error, got {error:?}"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
