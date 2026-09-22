@@ -95,6 +95,17 @@ jobs:
       - name: Upload JRuby runtime archive to S3
         if: steps.build.outputs.status == 'success'
         run: aws s3 sync ./output "s3://${S3_BUCKET}" ${{ case(inputs.dry_run, '--dryrun', '') }}
+      # Marks that a real build happened; matrix job outputs are racy across legs, so create-changelog checks for this artifact instead.
+      - name: Create build marker
+        if: steps.build.outputs.status == 'success'
+        run: echo "${{ matrix.base_image }}" > build-marker.txt
+      - name: Upload build marker
+        if: steps.build.outputs.status == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-marker-${{ matrix.base_image }}
+          path: build-marker.txt
+          if-no-files-found: error
 
   create-changelog:
     needs: build-and-upload
@@ -111,12 +122,34 @@ jobs:
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Cargo build
         run: cargo build --locked
+      # A build marker only exists after a real build; matrix success() is also true when every leg just skipped.
+      - name: Download build markers
+        id: download-markers
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: build-marker-*
+          path: ./build-markers
+          merge-multiple: true
+      - name: Check for a real build
+        id: gate
+        run: |
+          set -euo pipefail
+          if [ -d ./build-markers ] && [ -n "$(ls -A ./build-markers)" ]; then
+            echo "has_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_build=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Create Dev Center changelog
+        if: steps.gate.outputs.has_build == 'true'
         run: |
           set -euo pipefail
           cargo run --locked --bin jruby_changelog -- devcenter \
             --version ${{inputs.jruby_version}} \
             --status published
+      - name: Skip changelog publish
+        if: steps.gate.outputs.has_build != 'true'
+        run: echo "No new build produced in this run; skipping changelog publish."
 
   # # TODO: Pass data from prior jobs to generate one single inventory file
   # #       before generating a PR.
