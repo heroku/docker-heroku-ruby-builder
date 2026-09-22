@@ -17,7 +17,7 @@ Employees of Heroku see: [The Ruby language guides](https://github.com/heroku/la
 
 A [Dev Center changelog](https://devcenter.heroku.com/changelog) entry for a newly built version can be created via the Dev Center private API:
 
-- The [Build Ruby](https://github.com/heroku/docker-heroku-ruby-builder/actions/workflows/build_ruby.yml) and [Build JRuby](https://github.com/heroku/docker-heroku-ruby-builder/actions/workflows/build_jruby.yml) workflows create the entry automatically once every build for the version succeeds. By default it is created as an **unpublished draft**; enable "Publish the Dev Center changelog after builds" to publish immediately.
+- The [Build Ruby](https://github.com/heroku/docker-heroku-ruby-builder/actions/workflows/build_ruby.yml) and [Build JRuby](https://github.com/heroku/docker-heroku-ruby-builder/actions/workflows/build_jruby.yml) workflows can create the entry automatically after all builds for the version succeed, but only when the **"Publish the Dev Center changelog after builds"** option is enabled. It defaults to off, so by default no entry is created; when enabled, the entry is **published live** immediately (these workflows have no draft option).
 - The [Create Dev Center changelog](https://github.com/heroku/docker-heroku-ruby-builder/actions/workflows/create_changelog.yml) workflow creates a single entry on demand. Pick the engine and version, and optionally publish (default draft).
 
 Both require a repository secret **`HEROKU_DEVCENTER_API_TOKEN`**: a Heroku OAuth token for an **active admin** Dev Center user (an `api_client` token is rejected). It is used as the HTTP Basic auth password (with an empty username) against `POST /api/v1/private/changelog_items`.
@@ -35,7 +35,7 @@ $ cargo run --bin ruby_changelog -- devcenter --version 3.4.1 --status draft
 $ cargo run --bin ruby_changelog -- devcenter --version 3.4.1 --status published
 ```
 
-Publishing is guarded against duplicates: `--status published` first scans entries from the last 7 days and, if one already has the same title, content, and published state, reports it and exits non-zero instead of creating a duplicate. Drafts are never deduplicated, so `--status draft` always creates an entry (a convenient check that the API and token work).
+Publishing is guarded against duplicates: `--status published` first scans entries from the last 7 days and, if one already has the same title and published state, reports it and exits non-zero instead of creating a duplicate (content is intentionally not compared, so a regenerated body cannot slip a second entry past the guard). Drafts are never deduplicated, so `--status draft` always creates an entry (a convenient check that the API and token work).
 
 ## Install
 
