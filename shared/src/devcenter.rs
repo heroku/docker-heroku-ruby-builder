@@ -513,6 +513,15 @@ async fn publish_guarding_duplicates_since(
     }
 }
 
+/// Read a response body for use in an error message, substituting a sentinel
+/// when the body itself cannot be read (so the failure is never silent/blank).
+async fn error_body(response: reqwest::Response) -> String {
+    response
+        .text()
+        .await
+        .unwrap_or_else(|err| format!("<failed to read response body: {err}>"))
+}
+
 /// Fetch a single page of the changelog listing endpoint.
 ///
 /// Entries are ordered newest first (`created_at` descending), across pages as
@@ -548,7 +557,7 @@ async fn list_changelog_items_page(
         StatusCode::TOO_MANY_REQUESTS => Err(DevCenterError::RateLimited),
         _ => Err(DevCenterError::Unexpected {
             status,
-            body: response.text().await.unwrap_or_default(),
+            body: error_body(response).await,
         }),
     }
 }
@@ -589,12 +598,12 @@ async fn post_changelog_item(
             .map_err(DevCenterError::Transport),
         StatusCode::UNAUTHORIZED => Err(DevCenterError::AccessDenied),
         StatusCode::UNPROCESSABLE_ENTITY => Err(DevCenterError::Validation {
-            body: response.text().await.unwrap_or_default(),
+            body: error_body(response).await,
         }),
         StatusCode::TOO_MANY_REQUESTS => Err(DevCenterError::RateLimited),
         _ => Err(DevCenterError::Unexpected {
             status,
-            body: response.text().await.unwrap_or_default(),
+            body: error_body(response).await,
         }),
     }
 }
