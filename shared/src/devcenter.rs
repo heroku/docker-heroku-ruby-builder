@@ -459,6 +459,7 @@ async fn publish_guarding_duplicates_since(
     let window_start = started_at - TimeDelta::days(DUPLICATE_WINDOW_DAYS);
 
     let mut attempts: u8 = 0;
+    let mut posted = false;
     loop {
         attempts += 1;
 
@@ -469,10 +470,12 @@ async fn publish_guarding_duplicates_since(
         let mut preexisting = None;
         for candidate in recent {
             if candidate.matches(item) {
-                if candidate.created_at >= started_at {
-                    // Created at/after this call began: a previous attempt of
-                    // ours succeeded but its response was lost. Adopt it rather
-                    // than POST a duplicate.
+                if posted && candidate.created_at >= started_at {
+                    // A POST has gone out and the match postdates this call's
+                    // start, so it is that POST's own entry resurfacing after its
+                    // response was lost. Adopt it rather than POST a duplicate.
+                    // Before any POST, an entry postdating the start is instead a
+                    // concurrent racer or clock skew and stays a duplicate below.
                     return Ok(CreateOutcome::Created(candidate.into_created()));
                 }
                 preexisting.get_or_insert(candidate);
@@ -485,6 +488,7 @@ async fn publish_guarding_duplicates_since(
         match post_changelog_item(host, token, item).await {
             Ok(created) => return Ok(CreateOutcome::Created(created)),
             Err(error) if attempts < MAX_RETRY_ATTEMPTS && error.is_retryable() => {
+                posted = true;
                 tokio::time::sleep(RETRY_DELAY).await;
             }
             Err(error) => return Err(error),
@@ -1029,6 +1033,47 @@ mod test {
             post_calls.load(Ordering::SeqCst),
             1,
             "must not POST again after recovering our own entry"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publish_does_not_adopt_a_match_on_the_first_scan() {
+        let post_calls = Arc::new(AtomicUsize::new(0));
+        let post_counter = Arc::clone(&post_calls);
+
+        // The match's `created_at` postdates `started_at` (a concurrent racer, or
+        // clock skew between the runner and the Dev Center server), yet no POST has
+        // been issued, so it cannot be this call's own lost attempt.
+        let (addr, _requests) = spawn_router(move |method, _url| {
+            if method == "GET" {
+                (
+                    200,
+                    r#"{"results":[{"id":13,"title":"Ruby 3.4.1","content":"body","created_at":"2026-09-20T13:00:00Z","published_at":"2026-09-20T13:00:00Z"}],"next_page":null}"#
+                        .to_string(),
+                )
+            } else {
+                post_counter.fetch_add(1, Ordering::SeqCst);
+                (500, "must not POST past a first-scan duplicate".to_string())
+            }
+        });
+
+        let outcome = publish_guarding_duplicates_since(
+            &addr,
+            &token(),
+            &publish("Ruby 3.4.1", "body"),
+            at("2026-09-20T12:00:00Z"),
+        )
+        .await
+        .unwrap();
+
+        match outcome {
+            CreateOutcome::AlreadyPublished(existing) => assert_eq!(existing.id, 13),
+            other => panic!("expected AlreadyPublished, got {other:?}"),
+        }
+        assert_eq!(
+            post_calls.load(Ordering::SeqCst),
+            0,
+            "a match on the first scan is a pre-existing publish, not our own lost attempt"
         );
     }
 
