@@ -52,7 +52,8 @@ jobs:
             echo "Triggering build for Ruby $version"
             gh workflow run build_ruby.yml \
               -f ruby_version="$version" \
-              -f on_conflict=skip
+              -f on_conflict=skip \
+              -f publish_changelog=true
           done
 
   check-jruby-releases:
@@ -94,5 +95,6 @@ jobs:
             echo "Triggering build for JRuby $version"
             gh workflow run build_jruby.yml \
               -f jruby_version="$version" \
-              -f on_conflict=skip
+              -f on_conflict=skip \
+              -f publish_changelog=true
           done
