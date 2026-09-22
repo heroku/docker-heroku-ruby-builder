@@ -7,10 +7,11 @@
 //! where the password is a Heroku OAuth token belonging to an active *admin* Dev
 //! Center user (an empty username is sent).
 //!
-//! [`create_changelog_item`] is the only way to create an entry; the underlying
-//! POST is private so a caller cannot bypass the duplicate guard. Creating an
-//! entry is not idempotent, so publishing is protected against duplicates:
-//! before each POST it scans recent entries for a matching published entry.
+//! Every entry is created through [`create_changelog_item`] (directly or via
+//! [`create_and_report`]); the underlying POST is private so a caller cannot
+//! bypass the duplicate guard. Creating an entry is not idempotent, so
+//! publishing is protected against duplicates: before each POST it scans recent
+//! entries for a matching published entry.
 
 use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, with_retries};
 use chrono::{DateTime, TimeDelta, Utc};
@@ -26,9 +27,9 @@ pub static DEVCENTER_HOST: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|
     Url::parse("https://devcenter.heroku.com").expect("hard-coded Dev Center host is a valid URL")
 });
 
-/// How far back [`create_changelog_item`] looks for an already-published
-/// duplicate when publishing. Entries published earlier than this are not
-/// considered duplicates.
+/// How far back [`create_changelog_item`] looks for a duplicate when publishing.
+/// The scan filters on `created_at`, so an entry created earlier than this is not
+/// considered a duplicate even if it was published more recently.
 pub const DUPLICATE_WINDOW_DAYS: i64 = 7;
 
 /// The largest page the Dev Center private API will serve (`per_page`), used to
@@ -199,8 +200,8 @@ pub enum CreateOutcome {
     /// A new entry was created (a draft, a fresh publish, or a publish recovered
     /// from a retried attempt whose response was lost).
     Created(CreatedChangelogItem),
-    /// Publishing was skipped: a matching entry was already published within
-    /// [`DUPLICATE_WINDOW_DAYS`]. Nothing was created.
+    /// Publishing was skipped: a matching published entry was created within the
+    /// last [`DUPLICATE_WINDOW_DAYS`] days. Nothing was created.
     AlreadyPublished(ExistingChangelogItem),
 }
 
