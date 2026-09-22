@@ -486,11 +486,6 @@ async fn publish_guarding_duplicates_since(
         for candidate in recent {
             if candidate.matches(item) {
                 if posted && candidate.created_at >= started_at {
-                    // A POST has gone out and the match postdates this call's
-                    // start, so it is that POST's own entry resurfacing after its
-                    // response was lost. Adopt it rather than POST a duplicate.
-                    // Before any POST, an entry postdating the start is instead a
-                    // concurrent racer or clock skew and stays a duplicate below.
                     return Ok(CreateOutcome::Created(candidate.into_created()));
                 }
                 preexisting.get_or_insert(candidate);
