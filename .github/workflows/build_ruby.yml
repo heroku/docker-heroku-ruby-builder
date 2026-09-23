@@ -121,4 +121,5 @@ jobs:
           set -euo pipefail
           cargo run --locked --bin ruby_changelog -- devcenter \
             --version ${{inputs.ruby_version}} \
-            --status published
+            --status published \
+            --summary-file "$GITHUB_STEP_SUMMARY"

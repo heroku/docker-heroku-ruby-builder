@@ -45,4 +45,5 @@ jobs:
           set -euo pipefail
           cargo run --locked --bin ${{inputs.engine}}_changelog -- devcenter \
             --version ${{inputs.version}} \
-            ${{ inputs.published && '--status published' || '--status draft' }}
+            ${{ inputs.published && '--status published' || '--status draft' }} \
+            --summary-file "$GITHUB_STEP_SUMMARY"

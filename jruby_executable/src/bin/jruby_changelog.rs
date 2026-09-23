@@ -1,4 +1,4 @@
-use std::{error::Error, io::Write};
+use std::{error::Error, io::Write, path::PathBuf};
 
 use bullet_stream::global::print;
 use clap::{Args, Parser, Subcommand};
@@ -33,6 +33,10 @@ struct DevcenterArgs {
     /// Whether to create the entry as an unpublished draft or publish it live.
     #[arg(long, value_enum)]
     status: Status,
+    /// Optional file to append a Markdown summary (with the entry's URL) to,
+    /// e.g. `$GITHUB_STEP_SUMMARY`.
+    #[arg(long = "summary-file")]
+    summary_file: Option<PathBuf>,
 }
 
 /// The `title` and `content` of a changelog entry, kept separate so the Dev
@@ -84,11 +88,14 @@ async fn create(args: &DevcenterArgs) -> Result<(), Box<dyn Error>> {
         .await?
         .ruby_stdlib_version()?;
     let ChangelogParts { title, content } = jruby_changelog_parts(&args.version, &stdlib_version);
-    create_and_report(&NewChangelogItem {
-        title,
-        content,
-        status: args.status.clone(),
-    })
+    create_and_report(
+        &NewChangelogItem {
+            title,
+            content,
+            status: args.status.clone(),
+        },
+        args.summary_file.as_deref(),
+    )
     .await
 }
 
@@ -195,5 +202,44 @@ mod test {
             panic!("expected the devcenter subcommand");
         };
         assert_eq!(args.status, Status::Published);
+    }
+
+    #[test]
+    fn devcenter_parses_summary_file() {
+        let cli = Cli::try_parse_from([
+            "jruby_changelog",
+            "devcenter",
+            "--version",
+            "9.4.7.0",
+            "--status",
+            "published",
+            "--summary-file",
+            "/tmp/summary.md",
+        ])
+        .unwrap();
+        let Command::Devcenter(args) = cli.command else {
+            panic!("expected the devcenter subcommand");
+        };
+        assert_eq!(
+            args.summary_file.as_deref(),
+            Some(std::path::Path::new("/tmp/summary.md"))
+        );
+    }
+
+    #[test]
+    fn devcenter_summary_file_is_optional() {
+        let cli = Cli::try_parse_from([
+            "jruby_changelog",
+            "devcenter",
+            "--version",
+            "9.4.7.0",
+            "--status",
+            "draft",
+        ])
+        .unwrap();
+        let Command::Devcenter(args) = cli.command else {
+            panic!("expected the devcenter subcommand");
+        };
+        assert_eq!(args.summary_file, None);
     }
 }

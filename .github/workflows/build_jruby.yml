@@ -116,7 +116,8 @@ jobs:
           set -euo pipefail
           cargo run --locked --bin jruby_changelog -- devcenter \
             --version ${{inputs.jruby_version}} \
-            --status published
+            --status published \
+            --summary-file "$GITHUB_STEP_SUMMARY"
 
   # # TODO: Pass data from prior jobs to generate one single inventory file
   # #       before generating a PR.

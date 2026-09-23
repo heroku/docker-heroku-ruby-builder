@@ -18,6 +18,8 @@ use chrono::{DateTime, TimeDelta, Utc};
 use clap::ValueEnum;
 use reqwest::{StatusCode, Url};
 use std::fmt;
+use std::io::Write;
+use std::path::Path;
 use std::time::Duration;
 
 /// Production Dev Center base URL, parsed once and shared by callers of
@@ -380,14 +382,28 @@ fn token_from_env(
 /// publishing is idempotent, so a re-run that finds its earlier changelog leaves
 /// it untouched rather than failing.
 ///
+/// When `summary_path` is `Some`, a Markdown summary linking to the entry is also
+/// appended there (typically a build's `$GITHUB_STEP_SUMMARY`). Failing to write
+/// it is logged but does not fail the command, since the entry already exists.
+///
 /// # Errors
 ///
 /// Returns an error when `HEROKU_DEVCENTER_API_TOKEN` is unset, when its value
 /// is not a usable token, or when the Dev Center API call fails.
-pub async fn create_and_report(item: &NewChangelogItem) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn create_and_report(
+    item: &NewChangelogItem,
+    summary_path: Option<&Path>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let token = token_from_env(std::env::var_os("HEROKU_DEVCENTER_API_TOKEN"))?;
+    let outcome = create_changelog_item(&DEVCENTER_HOST, &token, item).await?;
 
-    report_outcome(create_changelog_item(&DEVCENTER_HOST, &token, item).await?)
+    if let Err(error) =
+        write_changelog_summary(summary_path, &outcome, &item.title, &DEVCENTER_HOST)
+    {
+        eprintln!("Warning: failed to write changelog summary: {error}");
+    }
+
+    report_outcome(outcome)
 }
 
 /// Turn a [`CreateOutcome`] into a process result.
@@ -420,6 +436,60 @@ fn report_outcome(outcome: CreateOutcome) -> Result<(), Box<dyn std::error::Erro
             Ok(())
         }
     }
+}
+
+/// The public Dev Center URL for the changelog entry with `id`, e.g.
+/// `https://devcenter.heroku.com/changelog-items/3820`. A draft's URL only
+/// renders for a logged-in Dev Center admin until the entry is published.
+fn changelog_item_url(host: &Url, id: u64) -> Url {
+    let mut url = host.clone();
+    url.set_path(&format!("/changelog-items/{id}"));
+    url
+}
+
+/// A Markdown summary of `outcome` for a build's `$GITHUB_STEP_SUMMARY`, naming
+/// the entry and its bare (auto-linked) Dev Center URL.
+///
+/// `item_title` is the title that was submitted, used for a freshly
+/// [`Created`](CreateOutcome::Created) entry (whose API response carries no
+/// title); an [`AlreadyPublished`](CreateOutcome::AlreadyPublished) match instead
+/// reports the existing entry's own title.
+fn changelog_summary(outcome: &CreateOutcome, item_title: &str, host: &Url) -> String {
+    let line = match outcome {
+        CreateOutcome::Created(created) => {
+            let url = changelog_item_url(host, created.id);
+            if created.is_published() {
+                format!("📣 Published: {item_title} {url}")
+            } else {
+                format!("📝 Drafted (visible to Dev Center admins): {item_title} {url}")
+            }
+        }
+        CreateOutcome::AlreadyPublished(existing) => {
+            let url = changelog_item_url(host, existing.id);
+            let title = existing.title.trim();
+            format!("✅ Already published — no new entry created: {title} {url}")
+        }
+    };
+    format!("### Dev Center changelog\n\n{line}\n")
+}
+
+/// Append the [`changelog_summary`] for `outcome` to the file at `path` (creating
+/// it if absent), or do nothing when `path` is `None` so callers can forward an
+/// optional `--summary-file` argument directly. Intended for a build's
+/// `$GITHUB_STEP_SUMMARY`.
+fn write_changelog_summary(
+    path: Option<&Path>,
+    outcome: &CreateOutcome,
+    item_title: &str,
+    host: &Url,
+) -> std::io::Result<()> {
+    let Some(path) = path else { return Ok(()) };
+    let markdown = changelog_summary(outcome, item_title, host);
+    fs_err::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)
+        .and_then(|mut file| file.write_all(markdown.as_bytes()))
 }
 
 /// Fetch changelog entries created at or after `created_after`, newest first.
@@ -1469,6 +1539,125 @@ mod test {
             requests.iter().all(|request| request.method == "GET"),
             "titles differing only by surrounding whitespace are the same announcement"
         );
+    }
+
+    #[test]
+    fn changelog_item_url_points_at_the_item_path() {
+        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let url = changelog_item_url(&host, 3820);
+        assert_eq!(
+            url.as_str(),
+            "https://devcenter.heroku.com/changelog-items/3820"
+        );
+    }
+
+    #[test]
+    fn summary_reports_a_published_entry_with_a_bare_url() {
+        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let outcome = CreateOutcome::Created(CreatedChangelogItem {
+            id: 3820,
+            published_at: Some(at("2026-09-21T00:00:00Z")),
+        });
+
+        let summary = changelog_summary(&outcome, "Ruby version 3.4.1 is now available", &host);
+
+        assert!(
+            summary.contains(
+                "📣 Published: Ruby version 3.4.1 is now available https://devcenter.heroku.com/changelog-items/3820"
+            ),
+            "summary: {summary}"
+        );
+        assert!(
+            !summary.contains("]("),
+            "expected a bare URL, not a Markdown link: {summary}"
+        );
+    }
+
+    #[test]
+    fn summary_reports_a_draft_and_notes_admin_visibility() {
+        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let outcome = CreateOutcome::Created(CreatedChangelogItem {
+            id: 77,
+            published_at: None,
+        });
+
+        let summary = changelog_summary(&outcome, "Ruby version 3.4.1 is now available", &host);
+
+        assert!(summary.contains("Drafted"), "summary: {summary}");
+        assert!(
+            summary.contains("admins"),
+            "a draft summary should note admin-only visibility: {summary}"
+        );
+        assert!(
+            summary.contains(
+                "Ruby version 3.4.1 is now available https://devcenter.heroku.com/changelog-items/77"
+            ),
+            "summary: {summary}"
+        );
+    }
+
+    #[test]
+    fn summary_reports_an_already_published_match_using_the_existing_title() {
+        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let outcome = CreateOutcome::AlreadyPublished(ExistingChangelogItem {
+            id: 5,
+            title: "  Ruby version 3.4.1 is now available\n".to_string(),
+            content: "body".to_string(),
+            created_at: at("2026-09-20T00:00:00Z"),
+            published_at: Some(at("2026-09-20T00:00:00Z")),
+        });
+
+        let summary = changelog_summary(&outcome, "ignored fallback title", &host);
+
+        assert!(summary.contains("Already published"), "summary: {summary}");
+        assert!(
+            summary.contains(
+                "Ruby version 3.4.1 is now available https://devcenter.heroku.com/changelog-items/5"
+            ),
+            "summary should use the existing entry's trimmed title: {summary}"
+        );
+        assert!(
+            !summary.contains("ignored fallback title"),
+            "an existing match reports its own title, not the submitted one: {summary}"
+        );
+    }
+
+    #[test]
+    fn write_changelog_summary_creates_and_appends_to_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("step-summary.md");
+        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let outcome = CreateOutcome::Created(CreatedChangelogItem {
+            id: 3820,
+            published_at: Some(at("2026-09-21T00:00:00Z")),
+        });
+
+        write_changelog_summary(
+            Some(&path),
+            &outcome,
+            "Ruby version 3.4.1 is now available",
+            &host,
+        )
+        .unwrap();
+
+        let contents = fs_err::read_to_string(&path).unwrap();
+        assert!(
+            contents.contains(
+                "📣 Published: Ruby version 3.4.1 is now available https://devcenter.heroku.com/changelog-items/3820"
+            ),
+            "contents: {contents}"
+        );
+    }
+
+    #[test]
+    fn write_changelog_summary_none_is_a_noop() {
+        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let outcome = CreateOutcome::Created(CreatedChangelogItem {
+            id: 1,
+            published_at: None,
+        });
+
+        write_changelog_summary(None, &outcome, "unused", &host).unwrap();
     }
 
     #[test]
