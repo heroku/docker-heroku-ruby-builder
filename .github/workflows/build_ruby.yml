@@ -22,7 +22,7 @@ on:
           default: false
           required: false
       publish_changelog:
-          description: "Publish the Dev Center changelog after builds (when disabled, no entry is created)"
+          description: "Publish the Dev Center changelog after builds (when deactivated, no entry is created)"
           type: boolean
           default: false
           required: false
