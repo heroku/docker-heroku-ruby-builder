@@ -35,7 +35,7 @@ $ cargo run --bin ruby_changelog -- devcenter --version 3.4.1 --status draft
 $ cargo run --bin ruby_changelog -- devcenter --version 3.4.1 --status published
 ```
 
-Publishing is guarded against duplicates: `--status published` first scans published entries from roughly the last four years (wide enough to cover every supported version) and, if one already has the same title and published state, reports it and exits successfully (status 0) without creating a duplicate — a matching entry is treated as an idempotent no-op, not an error, so re-running a build for an already-announced version leaves the existing entry untouched. Content is intentionally not compared, so a regenerated body cannot slip a second entry past the guard. Drafts are never deduplicated, so `--status draft` always creates an entry (a convenient check that the API and token work).
+Publishing is guarded against duplicates: `--status published` first queries existing entries by title (regardless of when they were published) and, if one already has the same title and published state, reports it and exits successfully (status 0) without creating a duplicate — a matching entry is treated as an idempotent no-op, not an error, so re-running a build for an already-announced version leaves the existing entry untouched. Content is intentionally not compared, so a regenerated body cannot slip a second entry past the guard. Drafts are never deduplicated, so `--status draft` always creates an entry (a convenient check that the API and token work).
 
 ## Install
 
