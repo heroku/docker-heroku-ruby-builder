@@ -10,11 +10,11 @@
 //! Every entry is created through [`create_changelog_item`] (directly or via
 //! [`create_and_report`]); the underlying POST is private so a caller cannot
 //! bypass the duplicate guard. Creating an entry is not idempotent, so
-//! publishing is protected against duplicates: before each POST it scans recent
-//! entries for a matching published entry.
+//! publishing is protected against duplicates: before each POST it queries
+//! existing entries by title for a matching published entry.
 
 use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, with_retries, with_retries_if};
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 use clap::ValueEnum;
 use reqwest::{StatusCode, Url};
 use std::fmt;
@@ -28,17 +28,8 @@ pub static DEVCENTER_HOST: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|
     Url::parse("https://devcenter.heroku.com").expect("hard-coded Dev Center host is a valid URL")
 });
 
-/// How far back [`create_changelog_item`] looks for a duplicate when publishing.
-///
-/// Scoped to exceed the Ruby support window (the most recent three versions,
-/// roughly three years) with a margin, so re-running a build for any version
-/// still in support finds its earlier changelog and refuses to publish a
-/// duplicate. The scan filters on `created_at`, so an entry created earlier than
-/// this is not considered a duplicate even if it was published more recently.
-pub const DUPLICATE_WINDOW_DAYS: i64 = 365 * 4;
-
 /// The largest page the Dev Center private API will serve (`per_page`), used to
-/// scan recent entries in as few requests as possible.
+/// page through title matches in as few requests as possible.
 const MAX_PER_PAGE: u32 = 120;
 
 /// A Heroku Dev Center OAuth token
@@ -205,8 +196,8 @@ pub enum CreateOutcome {
     /// A new entry was created (a draft, a fresh publish, or a publish recovered
     /// from a retried attempt whose response was lost).
     Created(CreatedChangelogItem),
-    /// Publishing was skipped: a matching published entry was created within the
-    /// last [`DUPLICATE_WINDOW_DAYS`] days. Nothing was created.
+    /// Publishing was skipped: an existing published entry has the same title.
+    /// Nothing was created.
     AlreadyPublished(ExistingChangelogItem),
 }
 
@@ -305,8 +296,8 @@ fn client() -> reqwest::Client {
 /// drafts are harmless), which doubles as a check that the API and token work.
 /// Only transient failures are retried.
 ///
-/// A **publish** (`NewChangelogItem.status == Status::Published`) first scans entries created within
-/// the last [`DUPLICATE_WINDOW_DAYS`] for one matching `item`'s title (ignoring
+/// A **publish** (`NewChangelogItem.status == Status::Published`) first queries existing
+/// entries whose title contains `item`'s title for one matching it (ignoring
 /// surrounding whitespace) and publish state:
 ///
 /// - If a pre-existing match is found, returns
@@ -377,10 +368,9 @@ fn token_from_env(
 /// Create `item` against [`DEVCENTER_HOST`] using the token from the
 /// `HEROKU_DEVCENTER_API_TOKEN` environment variable, reporting the outcome.
 ///
-/// A newly created entry is printed to stdout as success. A matching published
-/// entry created within the last [`DUPLICATE_WINDOW_DAYS`] days is also success:
-/// publishing is idempotent, so a re-run that finds its earlier changelog leaves
-/// it untouched rather than failing.
+/// A newly created entry is printed to stdout as success. An existing published
+/// entry with the same title is also success: publishing is idempotent, so a
+/// re-run that finds its earlier changelog leaves it untouched rather than failing.
 ///
 /// When `summary_path` is `Some`, a Markdown summary linking to the entry is also
 /// appended there (typically a build's `$GITHUB_STEP_SUMMARY`). Failing to write
@@ -492,40 +482,35 @@ fn write_changelog_summary(
         .and_then(|mut file| file.write_all(markdown.as_bytes()))
 }
 
-/// Fetch changelog entries created at or after `created_after`, newest first.
+/// Fetch existing changelog entries whose title contains `title`, newest first.
 ///
-/// The listing's own order is not trusted: every page is filtered by
-/// `created_at` and the collected entries are sorted, so a reordered or pinned
-/// entry cannot hide an in-window match behind an older one. Paging continues
-/// until a page yields no in-window entry (or the listing ends). Each page
-/// request is retried on failure.
+/// Filtering happens server-side via the listing endpoint's `query` param, so
+/// only title matches are returned rather than the entire changelog. The
+/// listing's own order is not trusted: the collected entries are sorted, so a
+/// reordered or pinned entry cannot hide a match behind an older one. Paging
+/// continues until the listing ends. Each page request is retried on failure.
 ///
 /// # Errors
 ///
 /// Returns [`DevCenterError`] on transport failure or a non-2xx response.
-pub async fn scan_recent_changelog_items(
+async fn find_changelog_items_by_title(
     host: &Url,
     token: &DevCenterToken,
-    created_after: DateTime<Utc>,
+    title: &str,
 ) -> Result<Vec<ExistingChangelogItem>, DevCenterError> {
     let mut items = Vec::new();
     let mut page = 1;
 
     loop {
         let ChangelogItemsPage { results, next_page } =
-            with_retries(|| list_changelog_items_page(host, token, page, MAX_PER_PAGE)).await?;
+            with_retries(|| list_changelog_items_page(host, token, title, page, MAX_PER_PAGE))
+                .await?;
 
-        let kept_before = items.len();
-        items.extend(
-            results
-                .into_iter()
-                .filter(|item| item.created_at >= created_after),
-        );
-        let page_had_in_window = items.len() > kept_before;
+        items.extend(results);
 
         match next_page {
-            Some(next) if page_had_in_window => page = next,
-            _ => break,
+            Some(next) => page = next,
+            None => break,
         }
     }
 
@@ -544,8 +529,6 @@ async fn publish_guarding_duplicates_since(
     item: &NewChangelogItem,
     started_at: DateTime<Utc>,
 ) -> Result<CreateOutcome, DevCenterError> {
-    let window_start = started_at - TimeDelta::days(DUPLICATE_WINDOW_DAYS);
-
     let mut attempts: u8 = 0;
     let mut posted = false;
     loop {
@@ -553,10 +536,10 @@ async fn publish_guarding_duplicates_since(
 
         // Fails closed: the `?` means a scan error returns without POSTing, so a
         // failed scan can never let a duplicate publish through.
-        let recent = scan_recent_changelog_items(host, token, window_start).await?;
+        let candidates = find_changelog_items_by_title(host, token, &item.title).await?;
 
         let mut preexisting = None;
-        for candidate in recent {
+        for candidate in candidates {
             if candidate.matches(item) {
                 if posted && candidate.created_at >= started_at {
                     return Ok(CreateOutcome::Created(candidate.into_created()));
@@ -597,16 +580,18 @@ async fn error_body(response: reqwest::Response) -> String {
 ///
 /// The endpoint tends to return entries newest first (`created_at` descending),
 /// but the private API does not guarantee that order, so callers must not rely
-/// on it. [`scan_recent_changelog_items`] filters and sorts defensively instead.
+/// on it. [`find_changelog_items_by_title`] sorts defensively instead.
 async fn list_changelog_items_page(
     host: &Url,
     token: &DevCenterToken,
+    query: &str,
     page: u32,
     per_page: u32,
 ) -> Result<ChangelogItemsPage, DevCenterError> {
     let mut url = host.clone();
     url.set_path("/api/v1/private/changelog_items");
     url.query_pairs_mut()
+        .append_pair("query", query)
         .append_pair("page", &page.to_string())
         .append_pair("per_page", &per_page.to_string());
 
@@ -960,13 +945,13 @@ mod test {
     async fn scans_all_pages_following_next_page() {
         let (addr, requests) = spawn_router(|method, url| {
             assert_eq!(method, "GET");
-            if url.contains("?page=1") {
+            if url.contains("page=1&") {
                 (
                     200,
                     r#"{"results":[{"id":1,"title":"A","content":"a","created_at":"2026-09-20T00:00:00Z","published_at":"2026-09-20T00:00:00Z"}],"next_page":2}"#
                         .to_string(),
                 )
-            } else if url.contains("?page=2") {
+            } else if url.contains("page=2&") {
                 (
                     200,
                     r#"{"results":[{"id":2,"title":"B","content":"b","created_at":"2026-09-19T00:00:00Z","published_at":null}],"next_page":null}"#
@@ -977,7 +962,7 @@ mod test {
             }
         });
 
-        let items = scan_recent_changelog_items(&addr, &token(), at("2000-01-01T00:00:00Z"))
+        let items = find_changelog_items_by_title(&addr, &token(), "A")
             .await
             .unwrap();
 
@@ -987,9 +972,10 @@ mod test {
         );
         let requests = requests.lock().unwrap();
         assert_eq!(requests.len(), 2);
-        assert!(requests[0].url.contains("?page=1"));
+        assert!(requests[0].url.contains("query=A"));
+        assert!(requests[0].url.contains("page=1&"));
         assert!(requests[0].url.contains("per_page=120"));
-        assert!(requests[1].url.contains("?page=2"));
+        assert!(requests[1].url.contains("page=2&"));
         assert_eq!(requests[0].accept.as_deref(), Some("application/json"));
         assert!(
             requests[0]
@@ -1000,52 +986,52 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn scan_pages_past_a_stale_entry_and_stops_on_a_fully_stale_page() {
+    async fn find_by_title_sorts_matches_newest_first_across_pages() {
+        // The private listing is not guaranteed newest-first, so a match on a
+        // later page can be newer than one on an earlier page; the result must be
+        // sorted by `created_at` regardless of the order pages arrive in.
         let (addr, requests) = spawn_router(|_method, url| {
-            if url.contains("?page=1") {
+            if url.contains("page=1&") {
                 (
                     200,
-                    r#"{"results":[
-                        {"id":1,"title":"recent","content":"r","created_at":"2026-09-20T00:00:00Z","published_at":"2026-09-20T00:00:00Z"},
-                        {"id":2,"title":"old","content":"o","created_at":"2026-09-01T00:00:00Z","published_at":"2026-09-01T00:00:00Z"}
-                    ],"next_page":2}"#
+                    r#"{"results":[{"id":1,"title":"Ruby 3.4.1","content":"o","created_at":"2026-08-01T00:00:00Z","published_at":"2026-08-01T00:00:00Z"}],"next_page":2}"#
                         .to_string(),
                 )
-            } else if url.contains("?page=2") {
+            } else if url.contains("page=2&") {
                 (
                     200,
-                    r#"{"results":[
-                        {"id":3,"title":"older","content":"o","created_at":"2026-08-01T00:00:00Z","published_at":"2026-08-01T00:00:00Z"}
-                    ],"next_page":3}"#
+                    r#"{"results":[{"id":2,"title":"Ruby 3.4.1","content":"n","created_at":"2026-09-01T00:00:00Z","published_at":"2026-09-01T00:00:00Z"}],"next_page":null}"#
                         .to_string(),
                 )
             } else {
-                (500, "should not fetch page 3".to_string())
+                (500, "unexpected page".to_string())
             }
         });
 
-        let items = scan_recent_changelog_items(&addr, &token(), at("2026-09-13T12:00:00Z"))
+        let items = find_changelog_items_by_title(&addr, &token(), "Ruby 3.4.1")
             .await
             .unwrap();
 
         assert_eq!(
             items.iter().map(|item| item.id).collect::<Vec<_>>(),
-            vec![1]
+            vec![2, 1],
+            "entries must be sorted newest-first regardless of page order"
         );
         let requests = requests.lock().unwrap();
-        assert_eq!(
-            requests.len(),
-            2,
-            "a stale entry on page 1 must not stop the scan; a fully stale page 2 must"
+        assert!(
+            requests
+                .iter()
+                .all(|request| request.url.contains("query=Ruby+3.4.1")),
+            "every page request must carry the title as the query filter"
         );
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn scan_maps_unauthorized_to_access_denied() {
+    async fn find_by_title_maps_unauthorized_to_access_denied() {
         let (addr, _requests) =
             spawn_router(|_method, _url| (401, r#"{"error":"Access denied"}"#.to_string()));
 
-        let error = scan_recent_changelog_items(&addr, &token(), at("2000-01-01T00:00:00Z"))
+        let error = find_changelog_items_by_title(&addr, &token(), "anything")
             .await
             .unwrap_err();
 
@@ -1178,8 +1164,8 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_refuses_a_duplicate_published_months_ago() {
-        // A prior publish far outside a one-week window but well within the
-        // multi-year support window must still be recognized as a duplicate.
+        // The title query has no time bound, so a prior publish from any point in
+        // the past must still be recognized as a duplicate.
         let (addr, requests) = spawn_router(|method, _url| {
             if method == "GET" {
                 (
@@ -1211,15 +1197,14 @@ mod test {
         let requests = requests.lock().unwrap();
         assert!(
             requests.iter().all(|request| request.method == "GET"),
-            "a publish from months ago is still a duplicate within the support window"
+            "a publish from months ago is still a title-match duplicate"
         );
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn publish_finds_a_duplicate_on_a_later_page_despite_an_earlier_stale_entry() {
-        // The private listing is not guaranteed strictly newest-first. A stale
-        // entry on an earlier page must not end the scan, or a pre-existing
-        // duplicate on a later page is missed and a second entry gets published.
+    async fn publish_finds_a_duplicate_on_a_later_page() {
+        // Title matches can span multiple pages, so the scan must page through to
+        // the end; a duplicate on a later page must be found before POSTing.
         let (addr, requests) = spawn_router(|method, url| {
             if method != "GET" {
                 return (
@@ -1227,7 +1212,7 @@ mod test {
                     r#"{"id":99,"published_at":"2026-09-20T12:30:00Z"}"#.to_string(),
                 );
             }
-            if url.contains("?page=1") {
+            if url.contains("page=1&") {
                 (
                     200,
                     r#"{"results":[
