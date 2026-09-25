@@ -19,13 +19,24 @@ where
     F: Fn() -> Fut,
     Fut: std::future::Future<Output = Result<T, E>>,
 {
+    with_retries_if(|_| true, f).await
+}
+
+/// Like [`with_retries`], but retries only errors for which `should_retry`
+/// returns `true`; any other error is returned immediately.
+pub async fn with_retries_if<T, E, F, Fut, P>(should_retry: P, f: F) -> Result<T, E>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<T, E>>,
+    P: Fn(&E) -> bool,
+{
     let mut attempts = 0;
     loop {
         attempts += 1;
         match f().await {
             Ok(val) => return Ok(val),
             Err(error) => {
-                if attempts >= MAX_RETRY_ATTEMPTS {
+                if attempts >= MAX_RETRY_ATTEMPTS || !should_retry(&error) {
                     return Err(error);
                 }
                 tokio::time::sleep(RETRY_DELAY).await;
@@ -35,6 +46,7 @@ where
 }
 
 mod base_image;
+pub mod devcenter;
 mod download_ruby_version;
 pub mod github;
 mod inventory_help;

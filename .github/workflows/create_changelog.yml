@@ -1,0 +1,49 @@
+name: Create Dev Center changelog
+
+run-name: "Create ${{ inputs.engine }} changelog ${{ inputs.version }}${{ inputs.published && ' [publish]' || ' [draft]' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      engine:
+          description: "Which engine's changelog to create"
+          type: choice
+          options:
+            - ruby
+            - jruby
+          default: ruby
+          required: true
+      version:
+          description: "The version to announce (Ruby: X.Y.Z, JRuby: 9.4.7.0)"
+          type: string
+          required: true
+      published:
+          description: "Publish immediately (otherwise create an unpublished draft)"
+          type: boolean
+          default: false
+          required: false
+
+permissions:
+  contents: read
+
+jobs:
+  create-changelog:
+    runs-on: ubuntu-24.04
+    env:
+      HEROKU_DEVCENTER_API_TOKEN: ${{ secrets.HEROKU_DEVCENTER_API_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Cargo build
+        run: cargo build --locked
+      - name: Create Dev Center changelog
+        run: |
+          set -euo pipefail
+          cargo run --locked --bin ${{inputs.engine}}_changelog -- devcenter \
+            --version ${{inputs.version}} \
+            ${{ inputs.published && '--status published' || '--status draft' }} \
+            --summary-file "$GITHUB_STEP_SUMMARY"
