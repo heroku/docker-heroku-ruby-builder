@@ -248,6 +248,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+      - name: Update Rust toolchain
+        run: rustup update
       - name: Grab prior commits
         run: |
           set -eu
