@@ -305,6 +305,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ignores_prereleases_even_when_built() {
+        let branches = [branch("3.5", BranchStatus::NormalMaintenance)];
+        let releases = versions(&["3.5.0-rc1"]);
+
+        let rows = collect(
+            &branches,
+            &releases,
+            "3.1".parse().unwrap(),
+            &crate::stacks(),
+            |_| std::future::ready(Ok::<_, String>(true)),
+        )
+        .await
+        .unwrap();
+
+        assert!(rows.is_empty(), "{:?}", cells(&rows));
+    }
+
+    #[tokio::test]
+    async fn returns_an_s3_error() {
+        let branches = [branch("3.4", BranchStatus::NormalMaintenance)];
+        let releases = versions(&["3.4.1"]);
+
+        let result = collect(
+            &branches,
+            &releases,
+            "3.1".parse().unwrap(),
+            &crate::stacks(),
+            |_| std::future::ready(Err::<bool, _>("S3 is down".to_string())),
+        )
+        .await;
+
+        assert_eq!(result.unwrap_err(), "S3 is down");
+    }
+
+    #[tokio::test]
     async fn stops_at_the_first_available_patch() {
         let branches = [branch("3.4", BranchStatus::NormalMaintenance)];
         let releases = versions(&["3.4.1", "3.4.0"]);

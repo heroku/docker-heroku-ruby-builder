@@ -190,6 +190,40 @@ mod tests {
     }
 
     #[test]
+    fn writes_every_table() {
+        let content = format!(
+            "{}<!-- BEGIN GENERATED other -->\r\n<!-- END GENERATED other -->\r\n",
+            article("")
+        );
+        let mut other = ruby(&[&["3.3", "3.3.9"]]);
+        other.name = "other";
+
+        let update = update(&content, &[ruby(&[&["3.4", "3.4.1"]]), other]).unwrap();
+
+        assert_eq!(update.changes.len(), 2);
+        assert!(
+            update.content.contains("<td>3.4.1</td>"),
+            "{}",
+            update.content
+        );
+        assert!(
+            update.content.contains("<td>3.3.9</td>"),
+            "{}",
+            update.content
+        );
+    }
+
+    #[test]
+    fn refuses_missing_markers_for_any_table() {
+        let mut other = ruby(&[&["3.3", "3.3.9"]]);
+        other.name = "other";
+
+        let error = update(&article(""), &[ruby(&[&["3.4", "3.4.1"]]), other]).unwrap_err();
+
+        assert!(matches!(error, UpdateError::Marker(_)), "got {error}");
+    }
+
+    #[test]
     fn refuses_missing_markers() {
         let error = update("no markers here", &[ruby(&[&["3.4", "3.4.1"]])]).unwrap_err();
 
