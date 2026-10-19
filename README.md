@@ -45,7 +45,7 @@ Only the text between `<!-- BEGIN GENERATED ruby_versions_table -->` and `<!-- E
 
 A run refuses to publish when a table would show less than the article does now: a series disappears, or a cell becomes unavailable or moves to an older version. That usually means a bad read from S3. Raise `--minimum-ruby-series` or `--minimum-jruby-version` in the workflow to drop old series on purpose.
 
-To preview the article with regenerated tables without changing Dev Center:
+To preview the article with regenerated tables without changing Dev Center (`--from-devcenter` reads the article with `HEROKU_DEVCENTER_API_TOKEN`, or pass `--from-file article.md` instead):
 
 ```
 $ cargo run --bin support_article -- print \
