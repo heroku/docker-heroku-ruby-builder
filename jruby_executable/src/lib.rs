@@ -1,5 +1,6 @@
 // See `bin/*.rs` for scripts
 
+pub mod github_releases;
 pub mod jruby_version;
 pub use jruby_version::JRubyVersion;
 
