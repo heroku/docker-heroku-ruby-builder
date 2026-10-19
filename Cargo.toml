@@ -4,6 +4,7 @@ members = [
     "jruby_executable",
     "ruby_executable",
     "shared",
+    "support_article",
 ]
 
 [workspace.package]
