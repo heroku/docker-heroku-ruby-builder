@@ -37,6 +37,24 @@ $ cargo run --bin ruby_changelog -- devcenter --version 3.4.1 --status published
 
 Publishing is guarded against duplicates: `--status published` first queries existing entries by title (regardless of when they were published) and, if one already has the same title and published state, reports it and exits successfully (status 0) without creating a duplicate — a matching entry is treated as an idempotent no-op, not an error, so re-running a build for an already-announced version leaves the existing entry untouched. Content is intentionally not compared, so a regenerated body cannot slip a second entry past the guard. Drafts are never deduplicated, so `--status draft` always creates an entry (a convenient check that the API and token work).
 
+## Updating the Ruby Support article
+
+The Ruby and JRuby version tables in [Heroku Ruby Support](https://devcenter.heroku.com/articles/ruby-support-reference) are generated. The [Update Ruby Support article](https://github.com/heroku/docker-heroku-ruby-builder/actions/workflows/update_support_article.yml) workflow runs daily and on demand. It regenerates each table from ruby-lang.org, GitHub JRuby releases, and the S3 bucket, then **publishes live** when a table changed. It uses the same `HEROKU_DEVCENTER_API_TOKEN` secret as the changelog workflows.
+
+Only the text between `<!-- BEGIN GENERATED ruby_versions_table -->` and `<!-- END GENERATED ruby_versions_table -->` (and the matching `jruby_versions_table` markers) is replaced. Edit the rest of the article on Dev Center as usual. Anything hand-edited between the markers is overwritten, or, if it is no longer a table the tool can read, the run fails.
+
+A run refuses to publish when a table would show less than the article does now: a series disappears, or a cell becomes unavailable or moves to an older version. That usually means a bad read from S3. Raise `--minimum-ruby-series` or `--minimum-jruby-version` in the workflow to drop old series on purpose.
+
+To preview the article with regenerated tables without changing Dev Center:
+
+```
+$ cargo run --bin support_article -- print \
+    --gh-token "$(gh auth token)" \
+    --minimum-ruby-series 3.1 \
+    --minimum-jruby-version 9.4 \
+    --from-devcenter > article.md
+```
+
 ## Install
 
 - Download the repo
