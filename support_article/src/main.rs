@@ -93,16 +93,15 @@ struct PublishArgs {
 
 /// Every value, or one error listing every failure.
 fn all_ok<T, E: Display>(results: ResultVec<T, E>, what: &str) -> Result<Vec<T>, String> {
-    let (values, errors): (Vec<_>, Vec<_>) =
-        results.into_inner().into_iter().partition(Result::is_ok);
+    let mut errors: Vec<E> = Vec::new();
+    let values = results.unwrap_drain_errs(&mut errors);
     if errors.is_empty() {
-        Ok(values.into_iter().flatten().collect())
+        Ok(values)
     } else {
         Err(format!(
             "Failed reading {what}:\n{}",
             errors
-                .into_iter()
-                .filter_map(Result::err)
+                .iter()
                 .map(|error| format!("- {error}"))
                 .collect::<Vec<_>>()
                 .join("\n")
@@ -110,7 +109,7 @@ fn all_ok<T, E: Display>(results: ResultVec<T, E>, what: &str) -> Result<Vec<T>,
     }
 }
 
-/// Builds both tables from upstream release data and S3. Any failure aborts so a partial table is never written.
+/// Builds both tables from upstream release data and S3. Any failed request aborts.
 async fn generate(args: &TableArgs) -> Result<Vec<GeneratedTable>, BoxError> {
     let stacks = stacks();
 
@@ -216,7 +215,7 @@ async fn publish(args: &PublishArgs) -> Result<(), BoxError> {
     let update = update(&article.content, &tables)?;
     report_changes(&update.changes);
 
-    let outcome = if update.content == article.content {
+    let outcome = if update.changes.is_empty() {
         Outcome::AlreadyCurrent {
             versions_count: article.versions_count,
         }
