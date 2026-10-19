@@ -1,4 +1,4 @@
-//! One row per JRuby minor line, newest first, showing the newest release of that line and where it is available.
+//! One row per JRuby minor line, newest first, showing a release of that line and where it is available.
 
 use crate::guard::{self, GuardRow};
 use crate::html_table::{Row, Table};
@@ -38,8 +38,9 @@ fn tar_urls(version: &JRubyVersion, ruby_stdlib: &str, stack: &Stack) -> Vec<Url
 
 /// Builds a row for every JRuby minor line at or above `floor`.
 ///
-/// Each row is the newest release of its line that is available on at least one stack, so a release that is not
-/// built yet does not replace one that is. A line with nothing available is left out.
+/// Each row is the newest release of its line that is available on every stack where the next older available
+/// release is, so a release that is not fully built yet does not replace one that is. A line with nothing available is
+/// left out.
 pub async fn collect<S, SFut, F, Fut, E>(
     releases: &[JRubyVersion],
     floor: Series,
@@ -61,28 +62,41 @@ where
     releases.sort_by(|a, b| b.cmp(a));
     releases.dedup();
 
-    let mut rows: Vec<JRubyRow> = Vec::new();
-    for version in releases {
-        if rows
-            .last()
-            .is_some_and(|row| series(&row.version) == series(&version))
-        {
-            continue;
-        }
-        let ruby_compat = ruby_stdlib(version.clone()).await?;
-        let mut cells = Vec::new();
-        for stack in stacks {
-            cells.push(all_exist(tar_urls(&version, &ruby_compat, stack), &exists).await?);
-        }
-        if cells.iter().any(|available| *available) {
-            rows.push(JRubyRow {
-                version,
+    let mut rows = Vec::new();
+    for line in releases.chunk_by(|a, b| series(a) == series(b)) {
+        let mut candidate: Option<JRubyRow> = None;
+        for version in line {
+            let ruby_compat = ruby_stdlib(version.clone()).await?;
+            let mut cells = Vec::new();
+            for stack in stacks {
+                cells.push(all_exist(tar_urls(version, &ruby_compat, stack), &exists).await?);
+            }
+            if !cells.contains(&true) {
+                continue;
+            }
+            if candidate
+                .as_ref()
+                .is_some_and(|newer| covers(&newer.cells, &cells))
+            {
+                break;
+            }
+            candidate = Some(JRubyRow {
+                version: version.clone(),
                 ruby_compat,
                 cells,
             });
         }
+        rows.extend(candidate);
     }
     Ok(rows)
+}
+
+/// Whether `newer` is available on every stack that `older` is.
+fn covers(newer: &[bool], older: &[bool]) -> bool {
+    newer
+        .iter()
+        .zip(older)
+        .all(|(newer, older)| *newer || !*older)
 }
 
 pub fn render(rows: &[JRubyRow], stacks: &[Stack]) -> Table {
@@ -176,16 +190,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn shows_the_newest_available_release_of_each_line() {
-        let releases = versions(&["9.3.15.0", "9.4.14.0", "9.4.15.0", "10.0.6.0", "10.0.7.0"]);
+    async fn shows_the_newest_fully_built_release_of_each_line() {
+        let releases = versions(&[
+            "9.3.15.0", "9.4.14.0", "9.4.15.0", "10.0.5.0", "10.0.6.0", "10.0.7.0",
+        ]);
         let s3 = bucket(&[
-            // 10.0.7.0 is not built anywhere yet, so 10.0.6.0 stays.
+            // 10.0.7.0 is only built on heroku-24 so far, so 10.0.6.0 stays.
+            "heroku-24/amd64/ruby-3.4.5-jruby-10.0.7.0.tgz",
+            "heroku-24/arm64/ruby-3.4.5-jruby-10.0.7.0.tgz",
             "heroku-22/amd64/ruby-3.4.5-jruby-10.0.6.0.tgz",
             "heroku-24/amd64/ruby-3.4.5-jruby-10.0.6.0.tgz",
             "heroku-24/arm64/ruby-3.4.5-jruby-10.0.6.0.tgz",
+            "heroku-22/amd64/ruby-3.4.5-jruby-10.0.5.0.tgz",
+            "heroku-24/amd64/ruby-3.4.5-jruby-10.0.5.0.tgz",
+            "heroku-24/arm64/ruby-3.4.5-jruby-10.0.5.0.tgz",
+            // 9.4.15.0 covers 9.4.14.0. Only one heroku-26 arch, so heroku-26 is unavailable.
             "heroku-22/amd64/ruby-3.1.7-jruby-9.4.15.0.tgz",
-            // Only one heroku-26 arch, so heroku-26 is unavailable.
             "heroku-26/amd64/ruby-3.1.7-jruby-9.4.15.0.tgz",
+            "heroku-22/amd64/ruby-3.1.7-jruby-9.4.14.0.tgz",
             "heroku-22/amd64/ruby-3.1.7-jruby-9.3.15.0.tgz",
         ]);
 
@@ -206,6 +228,69 @@ mod tests {
                 "9.4.15.0 (3.1.7): [true, false, false]",
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn skips_an_unbuilt_release() {
+        let releases = versions(&["10.0.6.0", "10.0.7.0"]);
+        let s3 = bucket(&["heroku-22/amd64/ruby-3.4.5-jruby-10.0.6.0.tgz"]);
+
+        let rows = collect(
+            &releases,
+            "10.0".parse().unwrap(),
+            &crate::stacks(),
+            stdlib,
+            s3,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            summary(&rows),
+            vec!["10.0.6.0 (3.4.5): [true, false, false]"]
+        );
+    }
+
+    #[tokio::test]
+    async fn stops_at_the_first_release_the_newer_one_covers() {
+        let releases = versions(&["9.4.13.0", "9.4.14.0", "9.4.15.0"]);
+        let checked = std::sync::Mutex::new(Vec::new());
+        let s3 = bucket(&[
+            "heroku-22/amd64/ruby-3.1.7-jruby-9.4.15.0.tgz",
+            "heroku-22/amd64/ruby-3.1.7-jruby-9.4.14.0.tgz",
+            "heroku-22/amd64/ruby-3.1.7-jruby-9.4.13.0.tgz",
+        ]);
+
+        collect(
+            &releases,
+            "9.4".parse().unwrap(),
+            &crate::stacks(),
+            |version: JRubyVersion| {
+                checked.lock().unwrap().push(version.to_string());
+                stdlib(version)
+            },
+            s3,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(*checked.lock().unwrap(), vec!["9.4.15.0", "9.4.14.0"]);
+    }
+
+    #[tokio::test]
+    async fn returns_an_s3_error() {
+        let releases = versions(&["10.0.7.0"]);
+
+        let result = collect(
+            &releases,
+            "9.4".parse().unwrap(),
+            &crate::stacks(),
+            stdlib,
+            |_| std::future::ready(Err::<bool, _>("S3 is down".to_string())),
+        )
+        .await;
+
+        assert_eq!(result.unwrap_err(), "S3 is down");
     }
 
     #[tokio::test]
