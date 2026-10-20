@@ -60,13 +60,13 @@ use shared::github::{self, GitHubToken};
 #[derive(Debug)]
 pub struct BuildProperties {
     body: Vec<u8>,
-    url: String,
+    url: Url,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Cannot find `ruby.version=` from {url}.\n Body:\n{body}")]
-    CannotParseJrubyStdlibVersion { url: String, body: String },
+    CannotParseJrubyStdlibVersion { url: Url, body: String },
 
     #[error("Failed to fetch {0}")]
     FailedRequest(#[from] reqwest::Error),
@@ -102,7 +102,7 @@ pub async fn jruby_build_properties(
 
     Ok(BuildProperties {
         body: response.body.into_bytes(),
-        url: url.to_string(),
+        url,
     })
 }
 
@@ -131,7 +131,7 @@ mod test {
         .to_string();
         let properties = BuildProperties {
             body: body.as_bytes().to_vec(),
-            url: "https://example.com".to_string(),
+            url: Url::parse("https://example.com").unwrap(),
         };
 
         assert!(properties.ruby_stdlib_version().is_err());
@@ -148,7 +148,7 @@ mod test {
         .to_string();
         let properties = BuildProperties {
             body: body.as_bytes().to_vec(),
-            url: "https://example.com".to_string(),
+            url: Url::parse("https://example.com").unwrap(),
         };
 
         assert_eq!(properties.ruby_stdlib_version().unwrap(), "3.1.4");
