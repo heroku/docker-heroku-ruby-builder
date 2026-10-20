@@ -12,6 +12,8 @@
 //! bypass the duplicate guard. Creating an entry is not idempotent, so
 //! publishing is protected against duplicates: before each POST it queries
 //! existing entries by title for a matching published entry.
+//!
+//! Articles are read and updated through the [`article`] module.
 
 use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, parse_url, with_retries, with_retries_if};
 use chrono::{DateTime, Utc};
@@ -21,6 +23,8 @@ use std::fmt;
 use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
+
+pub mod article;
 
 /// Production Dev Center base URL, parsed once and shared by callers of
 /// [`create_changelog_item`] as its `host`.
@@ -243,6 +247,29 @@ pub enum DevCenterError {
         /// The id of the created-but-unpublished entry.
         id: u64,
     },
+
+    /// Dev Center refused the article content, either on validation or on save.
+    #[error("Dev Center rejected the content for article {id}: {errors}")]
+    ArticleRejected {
+        id: article::ArticleId,
+        errors: article::ModelErrors,
+    },
+
+    /// The article was edited after it was read, so nothing was written.
+    #[error(
+        "Article {id} changed while this run was in progress (versions_count {expected} became {found}). Nothing was written. The next run starts from the new revision."
+    )]
+    ArticleChanged {
+        id: article::ArticleId,
+        expected: u64,
+        found: u64,
+    },
+
+    /// Dev Center accepted the save but the stored content differs from what was sent.
+    #[error(
+        "Dev Center accepted the update to article {id} but the stored content differs from what was sent"
+    )]
+    ArticleNotStored { id: article::ArticleId },
 }
 
 impl DevCenterError {
@@ -254,7 +281,10 @@ impl DevCenterError {
             DevCenterError::Unexpected { status, .. } => status.is_server_error(),
             DevCenterError::AccessDenied
             | DevCenterError::Validation { .. }
-            | DevCenterError::PublishedAsDraft { .. } => false,
+            | DevCenterError::PublishedAsDraft { .. }
+            | DevCenterError::ArticleRejected { .. }
+            | DevCenterError::ArticleChanged { .. }
+            | DevCenterError::ArticleNotStored { .. } => false,
         }
     }
 }
@@ -365,6 +395,15 @@ fn token_from_env(
     Ok(DevCenterToken::try_from(value.as_str())?)
 }
 
+/// Read the token from the `HEROKU_DEVCENTER_API_TOKEN` environment variable.
+///
+/// # Errors
+///
+/// Returns an error when the variable is unset, not UTF-8, or blank.
+pub fn token_from_environment() -> Result<DevCenterToken, Box<dyn std::error::Error>> {
+    token_from_env(std::env::var_os("HEROKU_DEVCENTER_API_TOKEN"))
+}
+
 /// Create `item` against [`DEVCENTER_HOST`] using the token from the
 /// `HEROKU_DEVCENTER_API_TOKEN` environment variable, reporting the outcome.
 ///
@@ -384,7 +423,7 @@ pub async fn create_and_report(
     item: &NewChangelogItem,
     summary_path: Option<&Path>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let token = token_from_env(std::env::var_os("HEROKU_DEVCENTER_API_TOKEN"))?;
+    let token = token_from_environment()?;
     let outcome = create_changelog_item(&DEVCENTER_HOST, &token, item).await?;
 
     if let Err(error) =
@@ -672,12 +711,12 @@ mod test {
     use std::thread;
     use tiny_http::{Response, Server};
 
-    struct CapturedRequest {
-        method: String,
-        url: String,
-        authorization: Option<String>,
-        accept: Option<String>,
-        body: String,
+    pub(super) struct CapturedRequest {
+        pub(super) method: String,
+        pub(super) url: String,
+        pub(super) authorization: Option<String>,
+        pub(super) accept: Option<String>,
+        pub(super) body: String,
     }
 
     fn header(request: &tiny_http::Request, name: &'static str) -> Option<String> {
@@ -696,7 +735,7 @@ mod test {
     /// Uses a small worker pool so a keep-alive connection idling between
     /// requests (as the shared client's pooled connection does) cannot block
     /// serving another connection.
-    fn spawn_router<H>(handler: H) -> (Url, Arc<Mutex<Vec<CapturedRequest>>>)
+    pub(super) fn spawn_router<H>(handler: H) -> (Url, Arc<Mutex<Vec<CapturedRequest>>>)
     where
         H: Fn(&str, &str) -> (u16, String) + Send + Sync + 'static,
     {
@@ -736,7 +775,7 @@ mod test {
         (addr, captured)
     }
 
-    fn token() -> DevCenterToken {
+    pub(super) fn token() -> DevCenterToken {
         DevCenterToken::try_from("secret-token").unwrap()
     }
 
