@@ -1,25 +1,28 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use reqwest::{Client, Url};
+use reqwest::Url;
+use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
 use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3_url_exists};
 use std::{
     error::Error,
     path::{Path, PathBuf},
-    time::Duration,
 };
 use tokio::task::JoinSet;
 use yaml_rust2::{ScanError, Yaml, YamlLoader};
 
 static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
-    Url::parse("https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml")
+    Url::parse("https://api.github.com/repos/ruby/www.ruby-lang.org/contents/_data/releases.yml")
         .expect("valid releases URL constant")
 });
 
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
 struct Args {
+    #[command(flatten)]
+    github: GitHubTokenArg,
+
     /// Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked.
     #[arg(long = "minimum-version", required = true)]
     minimum_version: RubyDownloadVersion,
@@ -27,24 +30,6 @@ struct Args {
     /// Path to write JSON output file containing versions that need builds
     #[arg(long = "output", required = true)]
     output: PathBuf,
-}
-
-async fn get_body(client: &Client, url: Url) -> Result<String, reqwest::Error> {
-    client
-        .get(url)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await
-}
-
-async fn fetch_ruby_lang_body(url: &Url) -> Result<String, reqwest::Error> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-
-    shared::with_retries(|| get_body(&client, url.clone())).await
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -161,8 +146,8 @@ async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
 
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
-    let releases = match fetch_ruby_lang_body(&RELEASES_URL).await {
-        Ok(body) => ruby_lang_versions(body).unwrap_drain_errs(&mut errors),
+    let releases = match github::get_raw_with_retry(&RELEASES_URL, &args.github.token).await {
+        Ok(response) => ruby_lang_versions(response.body).unwrap_drain_errs(&mut errors),
         Err(e) => {
             errors.push(e.into());
             Vec::new()
@@ -361,9 +346,11 @@ mod tests {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
         Check for Ruby releases missing from Heroku S3
 
-        Usage: ruby_release_check --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+        Usage: ruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
 
         Options:
+              --gh-token <TOKEN>
+                  GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
               --minimum-version <MINIMUM_VERSION>
                   Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked
               --output <OUTPUT>
