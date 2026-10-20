@@ -5,7 +5,7 @@ use reqwest::Url;
 use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
-use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3_url_exists};
+use shared::{RubyDownloadVersion, build_matrix, output_ruby_tar_path, s3_url, s3_url_exists};
 use std::{
     error::Error,
     path::{Path, PathBuf},
@@ -44,17 +44,11 @@ fn retain_releases_gte(
 }
 
 fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
-    let matrix = build_matrix();
-    let base_url = Url::parse(S3_BASE_URL).expect("valid base URL constant");
-    matrix
+    build_matrix()
         .iter()
         .map(|(base_image, arch)| {
             let tar_path = output_ruby_tar_path(Path::new(""), version, base_image, Some(arch));
-            let mut url = base_url.clone();
-            url.path_segments_mut()
-                .expect("valid base URL")
-                .extend(tar_path.iter().map(|s| s.to_string_lossy()));
-            (format!("{base_image}/{arch}"), url)
+            (format!("{base_image}/{arch}"), s3_url(&tar_path))
         })
         .collect()
 }

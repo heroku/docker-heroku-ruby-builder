@@ -4,18 +4,15 @@ use fs_err::{self as fs, PathExt};
 use indoc::formatdoc;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use libherokubuildpack::inventory::artifact::Arch;
-use reqwest::Url;
 use shared::github::GitHubTokenArg;
 use shared::{
-    BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar, s3_url_exists,
-    sha256_from_path, tar_dir_to_file, untar_to_dir, write_job_metadata,
+    BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar, s3_url,
+    s3_url_exists, sha256_from_path, tar_dir_to_file, untar_to_dir, write_job_metadata,
 };
 use std::convert::From;
 use std::error::Error;
 use std::path::PathBuf;
 use std::time::Instant;
-
-static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 enum OnConflict {
@@ -93,14 +90,7 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
                 return Ok(BuildStatus::Skipped);
             }
 
-            let s3_path = expected_output.strip_prefix(volume_output_dir)?;
-            let url = {
-                let mut url = Url::parse(S3_BASE_URL)?;
-                url.path_segments_mut()
-                    .expect("valid base URL")
-                    .extend(s3_path.iter().map(|s| s.to_string_lossy()));
-                url
-            };
+            let url = s3_url(expected_output.strip_prefix(volume_output_dir)?);
 
             print::bullet(format!("Checking if already uploaded: {url}"));
             if s3_url_exists(url.clone()).await? {

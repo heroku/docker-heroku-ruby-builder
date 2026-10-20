@@ -182,6 +182,15 @@ pub fn validate_version_for_stack(
     Ok(())
 }
 
+/// The S3 URL of the object at `path`, relative to the bucket root.
+pub fn s3_url(path: &Path) -> Url {
+    let mut url = Url::parse(S3_BASE_URL).expect("valid base URL constant");
+    url.path_segments_mut()
+        .expect("valid base URL")
+        .extend(path.iter().map(|segment| segment.to_string_lossy()));
+    url
+}
+
 /// Performs an HTTP HEAD request to check if a URL returns a successful status.
 pub async fn s3_url_exists(url: Url) -> Result<bool, Error> {
     with_retries(|| s3_url_exists_inner(url.clone())).await
@@ -349,6 +358,14 @@ mod test {
     use std::thread;
     use tempfile::tempdir;
     use tiny_http::{Response, Server};
+
+    #[test]
+    fn s3_url_joins_path_segments() {
+        assert_eq!(
+            s3_url(Path::new("heroku-24/amd64/ruby-3.4.1.tgz")).as_str(),
+            format!("{S3_BASE_URL}/heroku-24/amd64/ruby-3.4.1.tgz")
+        );
+    }
 
     #[test]
     fn test_update_shebang_with_ruby_shebang() {

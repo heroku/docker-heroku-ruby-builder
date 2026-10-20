@@ -5,8 +5,9 @@ use libherokubuildpack::inventory::artifact::Arch;
 use serde::Deserialize;
 use shared::github::{self, GitHubToken};
 use shared::maybe_err::ResultVec;
-use shared::{BaseImage, S3_BASE_URL, build_matrix};
+use shared::{BaseImage, build_matrix, s3_url};
 use std::future::Future;
+use std::path::Path;
 use url::Url;
 
 pub static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
@@ -110,18 +111,13 @@ pub fn s3_urls_to_check(
     version: &JRubyVersion,
     ruby_stdlib_version: &str,
 ) -> Vec<(Url, BaseImage, Arch)> {
-    let base_url = Url::parse(S3_BASE_URL).expect("internal Url is parsable");
-
     build_matrix()
-        .iter()
+        .into_iter()
         .map(|(base_image, arch)| {
-            let mut url = base_url.clone();
-            url.path_segments_mut()
-                .expect("valid base URL")
-                .push(base_image.name())
-                .push(&arch.to_string())
-                .push(&format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz"));
-            (url, base_image.clone(), *arch)
+            let path = Path::new(base_image.name())
+                .join(arch.to_string())
+                .join(format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz"));
+            (s3_url(&path), base_image, arch)
         })
         .collect()
 }
