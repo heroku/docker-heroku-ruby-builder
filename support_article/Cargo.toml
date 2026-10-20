@@ -4,6 +4,9 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+bullet_stream = { workspace = true }
+clap = { workspace = true }
+fs-err = { workspace = true }
 indoc = { workspace = true }
 jruby_executable = { path = "../jruby_executable" }
 libherokubuildpack = { workspace = true }
@@ -16,4 +19,5 @@ tokio = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true }
 pretty_assertions = { workspace = true }

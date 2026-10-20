@@ -4,6 +4,7 @@ use jruby_executable::JRubyVersion;
 use minijinja::{Environment, Value};
 use ruby_executable::ruby_lang::RubyBranch;
 use scraper::{ElementRef, Html, Selector};
+use shared::devcenter::article::ArticleId;
 use shared::{BaseImage, RubyDownloadVersion};
 use std::fmt;
 use std::str::FromStr;
@@ -13,6 +14,9 @@ pub mod guard;
 pub mod jruby_table;
 pub mod ruby_table;
 pub mod update;
+
+/// Dev Center id of <https://devcenter.heroku.com/articles/ruby-support-reference>.
+pub const ARTICLE_ID: ArticleId = ArticleId(698);
 
 /// Shown in a cell when nothing is available.
 const UNAVAILABLE: &str = "–";
