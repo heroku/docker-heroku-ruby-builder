@@ -1,11 +1,14 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
+use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
-use shared::{RubyDownloadVersion, build_matrix, output_ruby_tar_path, s3_url, s3_url_exists};
+use shared::{
+    BaseImage, RubyDownloadVersion, build_matrix, output_ruby_tar_path, s3_presence, s3_url,
+};
 use std::{
     error::Error,
     path::{Path, PathBuf},
@@ -43,35 +46,25 @@ fn retain_releases_gte(
         .collect()
 }
 
-fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
+fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(Url, BaseImage, Arch)> {
     build_matrix()
-        .iter()
+        .into_iter()
         .map(|(base_image, arch)| {
-            let tar_path = output_ruby_tar_path(Path::new(""), version, base_image, Some(arch));
-            (format!("{base_image}/{arch}"), s3_url(&tar_path))
+            let tar_path = output_ruby_tar_path(Path::new(""), version, &base_image, Some(&arch));
+            (s3_url(&tar_path), base_image, arch)
         })
         .collect()
 }
 
 async fn check_version_on_s3(
     version: RubyDownloadVersion,
-) -> Result<(RubyDownloadVersion, Vec<String>), Box<dyn std::error::Error + Send + Sync>> {
-    let mut set = JoinSet::new();
-    for (label, url) in urls_to_check(&version) {
-        set.spawn(async move {
-            let exists = s3_url_exists(url).await?;
-            Ok::<_, Box<dyn std::error::Error + Send + Sync>>((label, exists))
-        });
-    }
-
-    let mut missing = Vec::new();
-    while let Some(result) = set.join_next().await {
-        let (label, exists) = result??;
-        if !exists {
-            missing.push(label);
-        }
-    }
-
+) -> Result<(RubyDownloadVersion, Vec<String>), shared::Error> {
+    let missing = s3_presence(urls_to_check(&version))
+        .await?
+        .missing
+        .into_iter()
+        .map(|(base_image, arch)| format!("{base_image}/{arch}"))
+        .collect();
     Ok((version, missing))
 }
 
@@ -104,7 +97,7 @@ async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
 
     let mut versions_to_build = Vec::new();
     while let Some(result) = set.join_next().await {
-        match result.map_err(|e| e.into()) {
+        match result {
             Ok(Ok((version, missing))) => {
                 if missing.is_empty() {
                     print::sub_bullet(format!("{version}: all binaries present"));
@@ -117,7 +110,8 @@ async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
                     versions_to_build.push(version);
                 }
             }
-            Err(e) | Ok(Err(e)) => errors.push(e),
+            Ok(Err(e)) => errors.push(e.into()),
+            Err(e) => errors.push(e.into()),
         }
     }
 

@@ -154,6 +154,9 @@ pub enum Error {
         source: std::io::Error,
     },
 
+    #[error("S3 check task failed: {0}")]
+    S3CheckTask(#[source] tokio::task::JoinError),
+
     #[error("Error {0}")]
     Other(String),
 }
@@ -189,6 +192,36 @@ pub fn s3_url(path: &Path) -> Url {
         .expect("valid base URL")
         .extend(path.iter().map(|segment| segment.to_string_lossy()));
     url
+}
+
+/// Which base image and architecture pairs have an artifact on S3.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct S3Presence {
+    pub present: Vec<(BaseImage, Arch)>,
+    pub missing: Vec<(BaseImage, Arch)>,
+}
+
+/// Check every URL concurrently. Each URL is the artifact for its base image and architecture.
+pub async fn s3_presence(urls: Vec<(Url, BaseImage, Arch)>) -> Result<S3Presence, Error> {
+    let mut set = tokio::task::JoinSet::new();
+    for (url, base_image, arch) in urls {
+        set.spawn(async move {
+            s3_url_exists(url)
+                .await
+                .map(|exists| (exists, base_image, arch))
+        });
+    }
+
+    let mut presence = S3Presence::default();
+    while let Some(result) = set.join_next().await {
+        let (exists, base_image, arch) = result.map_err(Error::S3CheckTask)??;
+        if exists {
+            presence.present.push((base_image, arch));
+        } else {
+            presence.missing.push((base_image, arch));
+        }
+    }
+    Ok(presence)
 }
 
 /// Performs an HTTP HEAD request to check if a URL returns a successful status.

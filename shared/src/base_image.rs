@@ -14,7 +14,7 @@ static KNOWN_BASE_IMAGES: &[(&str, &str, &[Arch])] = &[
 #[error("Invalid base image {0} must be one of {known}", known = KNOWN_BASE_IMAGES.iter().map(|(name, _, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
 pub struct BaseImageError(String);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BaseImage {
     name: String,
     distro_number: String,
@@ -41,6 +41,23 @@ impl BaseImage {
 
     pub fn has_legacy_path(&self) -> bool {
         self.name == "heroku-22"
+    }
+
+    /// Every supported base image, oldest first.
+    pub fn all() -> Vec<BaseImage> {
+        KNOWN_BASE_IMAGES
+            .iter()
+            .map(|&(name, _, _)| BaseImage::new(name).expect("known base image"))
+            .collect()
+    }
+
+    /// The architectures Ruby binaries are built for on this base image.
+    pub fn archs(&self) -> &'static [Arch] {
+        KNOWN_BASE_IMAGES
+            .iter()
+            .find(|&&(name, _, _)| name == self.name)
+            .map(|&(_, _, archs)| archs)
+            .expect("base images are only constructed from KNOWN_BASE_IMAGES")
     }
 }
 
@@ -70,12 +87,13 @@ impl FromStr for BaseImage {
 
 /// Returns all valid (BaseImage, Arch) pairs for building Ruby binaries.
 pub fn build_matrix() -> Vec<(BaseImage, Arch)> {
-    let mut matrix = Vec::new();
-    for &(name, _, archs) in KNOWN_BASE_IMAGES {
-        let base_image = BaseImage::new(name).expect("known base image");
-        for arch in archs {
-            matrix.push((base_image.clone(), *arch));
-        }
-    }
-    matrix
+    BaseImage::all()
+        .into_iter()
+        .flat_map(|base_image| {
+            base_image
+                .archs()
+                .iter()
+                .map(move |arch| (base_image.clone(), *arch))
+        })
+        .collect()
 }
