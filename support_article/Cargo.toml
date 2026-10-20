@@ -4,10 +4,16 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+indoc = { workspace = true }
 jruby_executable = { path = "../jruby_executable" }
+libherokubuildpack = { workspace = true }
+minijinja = { workspace = true }
 ruby_executable = { path = "../ruby_executable" }
+scraper = { workspace = true }
 shared = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
