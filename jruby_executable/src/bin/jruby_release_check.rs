@@ -10,7 +10,7 @@ use fs_err as fs;
 use jruby_executable::{JRubyVersion, jruby_build_properties, jruby_version};
 use libherokubuildpack::inventory::artifact::Arch;
 use serde::Deserialize;
-use shared::github::{self, GitHubTokenArg};
+use shared::github::{self, GitHubToken, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
 use shared::{BaseImage, S3_BASE_URL};
 use shared::{build_matrix, s3_url_exists};
@@ -169,8 +169,9 @@ fn s3_urls_to_check(
 /// implements, returning it paired with the version it belongs to.
 async fn resolve_stdlib_version(
     version: JRubyVersion,
+    gh_token: GitHubToken,
 ) -> Result<(JRubyVersion, String), Box<dyn Error + Send + Sync>> {
-    let stdlib = jruby_build_properties(&version)
+    let stdlib = jruby_build_properties(&version, &gh_token)
         .await
         .and_then(|props| props.ruby_stdlib_version())?;
     Ok((version, stdlib))
@@ -266,7 +267,7 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
     print::bullet("Ruby stdlib versions");
     let mut stdlib_set = JoinSet::new();
     for version in versions_to_check {
-        stdlib_set.spawn(resolve_stdlib_version(version));
+        stdlib_set.spawn(resolve_stdlib_version(version, gh_token.clone()));
     }
 
     let mut resolved = Vec::new();

@@ -5,6 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use indoc::formatdoc;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use shared::devcenter::{NewChangelogItem, Status, create_and_report};
+use shared::github::GitHubTokenArg;
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -24,12 +25,16 @@ enum Command {
 struct PrintArgs {
     #[arg(long)]
     version: JRubyVersion,
+    #[command(flatten)]
+    github: GitHubTokenArg,
 }
 
 #[derive(Args, Debug)]
 struct DevcenterArgs {
     #[arg(long)]
     version: JRubyVersion,
+    #[command(flatten)]
+    github: GitHubTokenArg,
     /// Whether to create the entry as an unpublished draft or publish it live.
     #[arg(long, value_enum)]
     status: Status,
@@ -76,7 +81,7 @@ where
 }
 
 async fn render(args: &PrintArgs) -> Result<(), Box<dyn Error>> {
-    let stdlib_version = jruby_build_properties(&args.version)
+    let stdlib_version = jruby_build_properties(&args.version, &args.github.token)
         .await?
         .ruby_stdlib_version()?;
     render_jruby_changelog(&args.version, &stdlib_version, std::io::stdout())?;
@@ -84,7 +89,7 @@ async fn render(args: &PrintArgs) -> Result<(), Box<dyn Error>> {
 }
 
 async fn create(args: &DevcenterArgs) -> Result<(), Box<dyn Error>> {
-    let stdlib_version = jruby_build_properties(&args.version)
+    let stdlib_version = jruby_build_properties(&args.version, &args.github.token)
         .await?
         .ruby_stdlib_version()?;
     let ChangelogParts { title, content } = jruby_changelog_parts(&args.version, &stdlib_version);
@@ -167,7 +172,13 @@ mod test {
 
     #[test]
     fn devcenter_requires_status() {
-        let result = Cli::try_parse_from(["jruby_changelog", "devcenter", "--version", "9.4.7.0"]);
+        let result = Cli::try_parse_from([
+            "jruby_changelog",
+            "devcenter",
+            "--version",
+            "9.4.7.0",
+            "--gh-token=test-token",
+        ]);
         assert!(result.is_err(), "expected --status to be required");
     }
 
@@ -178,6 +189,7 @@ mod test {
             "devcenter",
             "--version",
             "9.4.7.0",
+            "--gh-token=test-token",
             "--status=draft",
         ])
         .unwrap();
@@ -194,6 +206,7 @@ mod test {
             "devcenter",
             "--version",
             "9.4.7.0",
+            "--gh-token=test-token",
             "--status",
             "published",
         ])
@@ -211,6 +224,7 @@ mod test {
             "devcenter",
             "--version",
             "9.4.7.0",
+            "--gh-token=test-token",
             "--status",
             "published",
             "--summary-file",
@@ -233,6 +247,7 @@ mod test {
             "devcenter",
             "--version",
             "9.4.7.0",
+            "--gh-token=test-token",
             "--status",
             "draft",
         ])
