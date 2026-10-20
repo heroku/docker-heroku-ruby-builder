@@ -100,12 +100,12 @@ impl fmt::Debug for GitHubToken {
 /// # async fn run() -> Result<(), reqwest::Error> {
 /// let url = Url::parse("https://api.github.com/repos/jruby/jruby/releases").unwrap();
 /// let token = GitHubToken::try_from("gh_token").unwrap();
-/// let response = github::get_with_auth_and_retry(&url, &token).await?;
+/// let response = github::get_json_with_retry(&url, &token).await?;
 /// # let _ = response;
 /// # Ok(())
 /// # }
 /// ```
-pub async fn get_with_auth_and_retry(
+pub async fn get_json_with_retry(
     url: &Url,
     token: &GitHubToken,
 ) -> Result<GitHubResponse, reqwest::Error> {

@@ -243,7 +243,7 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
     let gh_token = &args.gh_token;
     let releases = paginate_releases_accumulated(RELEASES_URL.clone(), |url| async move {
-        let response = github::get_with_auth_and_retry(&url, gh_token).await?;
+        let response = github::get_json_with_retry(&url, gh_token).await?;
 
         let releases = serde_json::from_str(&response.body).map_err(|error| {
             GithubReleaseError::ReleaseResponseParse {
