@@ -55,6 +55,29 @@ impl GitHubToken {
     }
 }
 
+/// The `--gh-token` CLI argument, shared so every binary reads the token the same way.
+///
+/// Add it to a parser with `#[command(flatten)]`.
+#[derive(Debug, Clone, clap::Args)]
+// Keeps this doc out of the parent command's `--help`.
+#[command(about = None, long_about = None)]
+pub struct GitHubTokenArg {
+    /// GitHub API token. e.g. `--gh-token=$(gh auth token)`
+    #[arg(
+        long = "gh-token",
+        env = "GITHUB_TOKEN",
+        hide_env_values = true,
+        value_parser = parse_cli_token
+    )]
+    pub token: GitHubToken,
+}
+
+fn parse_cli_token(value: &str) -> std::result::Result<GitHubToken, String> {
+    GitHubToken::try_from(value).map_err(|error| {
+        format!("{error}. Suggestion: generate one locally with: `--gh-token=$(gh auth token)` or set GITHUB_TOKEN")
+    })
+}
+
 impl TryFrom<&str> for GitHubToken {
     type Error = TokenError;
 
