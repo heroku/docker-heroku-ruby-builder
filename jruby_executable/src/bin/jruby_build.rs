@@ -5,6 +5,7 @@ use indoc::formatdoc;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
+use shared::github::GitHubTokenArg;
 use shared::{
     BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar, s3_url_exists,
     sha256_from_path, tar_dir_to_file, untar_to_dir, write_job_metadata,
@@ -41,6 +42,9 @@ struct Args {
 
     #[arg(long = "job-metadata")]
     job_metadata: Option<PathBuf>,
+
+    #[command(flatten)]
+    github: GitHubTokenArg,
 }
 
 async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
@@ -51,6 +55,7 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
         artifact_dir,
         cache_dir,
         job_metadata: _,
+        github,
     } = args;
 
     let start = Instant::now();
@@ -61,7 +66,7 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     fs::create_dir_all(volume_cache_dir)?;
     fs::create_dir_all(volume_output_dir)?;
 
-    let ruby_stdlib_version = jruby_build_properties(version)
+    let ruby_stdlib_version = jruby_build_properties(version, &github.token)
         .await?
         .ruby_stdlib_version()?;
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");

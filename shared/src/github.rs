@@ -2,7 +2,7 @@
 
 use crate::with_retries;
 use reqwest::Url;
-use reqwest::header::{HeaderMap, LINK, ToStrError};
+use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, LINK, ToStrError};
 use std::fmt;
 use std::time::Duration;
 use winnow::{
@@ -55,6 +55,31 @@ impl GitHubToken {
     }
 }
 
+/// The `--gh-token` CLI argument, shared so every binary reads the token the same way.
+///
+/// Add it to a parser with `#[command(flatten)]`.
+#[derive(Debug, Clone, clap::Args)]
+// Keeps this doc out of the parent command's `--help`.
+#[command(about = None, long_about = None)]
+pub struct GitHubTokenArg {
+    /// GitHub API token used to read data from GitHub.
+    ///
+    /// Required. Generate one locally with: `--gh-token=$(gh auth token)`
+    #[arg(
+        long = "gh-token",
+        env = "GITHUB_TOKEN",
+        hide_env_values = true,
+        value_parser = parse_cli_token
+    )]
+    pub token: GitHubToken,
+}
+
+fn parse_cli_token(value: &str) -> std::result::Result<GitHubToken, String> {
+    GitHubToken::try_from(value).map_err(|error| {
+        format!("{error}. Suggestion: generate one locally with: `--gh-token=$(gh auth token)` or set GITHUB_TOKEN")
+    })
+}
+
 impl TryFrom<&str> for GitHubToken {
     type Error = TokenError;
 
@@ -100,14 +125,43 @@ impl fmt::Debug for GitHubToken {
 /// # async fn run() -> Result<(), reqwest::Error> {
 /// let url = Url::parse("https://api.github.com/repos/jruby/jruby/releases").unwrap();
 /// let token = GitHubToken::try_from("gh_token").unwrap();
-/// let response = github::get_with_auth_and_retry(&url, &token).await?;
+/// let response = github::get_json_with_retry(&url, &token).await?;
 /// # let _ = response;
 /// # Ok(())
 /// # }
 /// ```
-pub async fn get_with_auth_and_retry(
+pub async fn get_json_with_retry(
     url: &Url,
     token: &GitHubToken,
+) -> Result<GitHubResponse, reqwest::Error> {
+    get(
+        url,
+        token,
+        HeaderValue::from_static("application/vnd.github+json"),
+    )
+    .await
+}
+
+/// Like [`get_json_with_retry`], but a [contents API] file comes back as its raw body
+/// instead of a base64-encoded JSON envelope.
+///
+/// [contents API]: https://docs.github.com/en/rest/repos/contents#get-repository-content
+pub async fn get_raw_with_retry(
+    url: &Url,
+    token: &GitHubToken,
+) -> Result<GitHubResponse, reqwest::Error> {
+    get(
+        url,
+        token,
+        HeaderValue::from_static("application/vnd.github.raw+json"),
+    )
+    .await
+}
+
+async fn get(
+    url: &Url,
+    token: &GitHubToken,
+    accept: HeaderValue,
 ) -> Result<GitHubResponse, reqwest::Error> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -118,6 +172,7 @@ pub async fn get_with_auth_and_retry(
         let response = client
             .get(url.clone())
             .bearer_auth(token.as_str())
+            .header(ACCEPT, accept.clone())
             .send()
             .await?
             .error_for_status()?;
@@ -301,8 +356,9 @@ fn token<'a>(input: &mut &'a str) -> Result<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reqwest::header::HeaderValue;
     use std::assert_matches;
+    use std::thread;
+    use tiny_http::{Header, Response, Server};
 
     fn headers_with_link(value: &str) -> HeaderMap {
         let mut headers = HeaderMap::new();
@@ -408,6 +464,47 @@ mod tests {
                 url: "https://example.com/page2",
                 params: vec![("rel", "next"), ("type", "text/html")],
             }
+        );
+    }
+
+    fn request_header(request: &tiny_http::Request, name: &'static str) -> Option<String> {
+        request
+            .headers()
+            .iter()
+            .find(|Header { field, .. }| field.equiv(name))
+            .map(|Header { value, .. }| value.as_str().to_owned())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn get_raw_sends_token_and_raw_media_type() {
+        let server = Server::http("127.0.0.1:0").unwrap();
+        let url = Url::parse(&format!(
+            "http://{}/repos/o/r/contents/file.yml",
+            server.server_addr()
+        ))
+        .unwrap();
+        let handle = thread::spawn(move || {
+            let request = server.recv().unwrap();
+            let headers = (
+                request_header(&request, "Authorization"),
+                request_header(&request, "Accept"),
+            );
+            request
+                .respond(Response::from_string("- version: 3.4.1\n"))
+                .unwrap();
+            headers
+        });
+
+        let token = GitHubToken::try_from("supersecret").unwrap();
+        let response = get_raw_with_retry(&url, &token).await.unwrap();
+
+        assert_eq!(response.body, "- version: 3.4.1\n");
+        assert_eq!(
+            handle.join().unwrap(),
+            (
+                Some("Bearer supersecret".to_owned()),
+                Some("application/vnd.github.raw+json".to_owned())
+            )
         );
     }
 }
