@@ -10,6 +10,7 @@ use std::str::FromStr;
 use tokio::task::JoinSet;
 
 pub mod guard;
+pub mod jruby_table;
 pub mod ruby_table;
 pub mod update;
 
@@ -79,6 +80,9 @@ impl From<&RubyBranch> for MajorMinor {
 pub enum CheckError {
     #[error(transparent)]
     S3(#[from] shared::Error),
+
+    #[error(transparent)]
+    JRubyProperties(#[from] jruby_executable::Error),
 
     #[error("S3 check task failed: {0}")]
     Task(#[from] tokio::task::JoinError),

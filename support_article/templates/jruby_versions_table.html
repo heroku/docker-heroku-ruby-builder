@@ -1,0 +1,22 @@
+<table>
+<thead>
+<tr>
+<th>JRuby version</th>
+<th>Ruby compatibility</th>
+{%- for base_image in base_images %}
+<th>{{ base_image }}</th>
+{%- endfor %}
+</tr>
+</thead>
+<tbody>
+{%- for row in rows %}
+<tr>
+<td>{{ row.version }}</td>
+<td>{{ row.ruby_compat }}</td>
+{%- for built in row.built %}
+<td>{{ available if built else unavailable }}</td>
+{%- endfor %}
+</tr>
+{%- endfor %}
+</tbody>
+</table>
