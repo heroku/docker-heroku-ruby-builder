@@ -13,7 +13,7 @@ rust-version = "1.99"
 [workspace.dependencies]
 bullet_stream = "0.11"
 chrono = {version = "0.4", features = ["serde"] }
-clap = { version = "4.6", features = ["derive"] }
+clap = { version = "4.6", features = ["derive", "env"] }
 # We use the `zlib-rs` backend, since it's the fastest:
 # https://github.com/rust-lang/flate2-rs#backends
 # https://trifectatech.org/blog/zlib-rs-is-faster-than-c/
