@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["jruby_executable", "ruby_executable", "shared"]
+members = ["jruby_executable", "ruby_executable", "shared", "support_article"]
 
 [workspace.package]
 edition = "2024"
