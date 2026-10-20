@@ -29,6 +29,8 @@ jobs:
       - name: Cargo build
         run: cargo build --locked
       - name: Check for missing Ruby versions
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           cargo run --locked --bin ruby_release_check -- \
             --minimum-version 3.2.1 \
