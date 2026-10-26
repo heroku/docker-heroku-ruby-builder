@@ -319,6 +319,27 @@ pub fn update_shebang(contents: String) -> Option<String> {
     }
 }
 
+/// Returns help text for given command
+#[track_caller]
+pub fn help(cmd: clap::Command, args: &[&str]) -> String {
+    let bin_name = std::path::Path::new(std::panic::Location::caller().file())
+        .file_stem()
+        .and_then(std::ffi::OsStr::to_str)
+        .unwrap();
+
+    cmd.try_get_matches_from(
+        std::iter::once(bin_name)
+            .chain(args.iter().copied())
+            .chain(["--help"]),
+    )
+    .unwrap_err()
+    .to_string()
+    .lines()
+    .map(str::trim_end)
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
