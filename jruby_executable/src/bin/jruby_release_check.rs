@@ -414,6 +414,7 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::CommandFactory;
 
     #[test]
     fn bullet_point_formatting() {
@@ -598,5 +599,29 @@ mod tests {
             "got: {:?}",
             errors[0]
         );
+    }
+
+    #[test]
+    fn get_help() {
+        insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
+        Check for JRuby releases missing from Heroku S3
+
+        Usage: jruby_release_check --gh-token <GH_TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+
+        Options:
+              --gh-token <GH_TOKEN>
+                  GitHub API token used to authenticate release lookups.
+
+                  Required. Generate one locally with: `--gh-token=$(gh auth token)`
+
+              --minimum-version <MINIMUM_VERSION>
+                  Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be checked
+
+              --output <OUTPUT>
+                  Path to write JSON output file containing versions that need builds
+
+          -h, --help
+                  Print help (see a summary with '-h')
+        ");
     }
 }
