@@ -130,3 +130,23 @@ async fn main() {
         std::process::exit(1);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn get_help() {
+        insta::assert_snapshot!(shared::help(RubyArgs::command(), &[]), @r"
+        Usage: jruby_check --arch <ARCH> --version <VERSION> --base-image <BASE_IMAGE> --artifact-dir <ARTIFACT_DIR>
+
+        Options:
+              --arch <ARCH>
+              --version <VERSION>
+              --base-image <BASE_IMAGE>
+              --artifact-dir <ARTIFACT_DIR>
+          -h, --help                         Print help
+        ");
+    }
+}
