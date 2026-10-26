@@ -219,3 +219,25 @@ async fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn get_help() {
+        insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
+        Usage: jruby_build [OPTIONS] --version <VERSION> --base-image <BASE_IMAGE> --on-conflict <ON_CONFLICT> --artifact-dir <ARTIFACT_DIR> --cache-dir <CACHE_DIR>
+
+        Options:
+              --version <VERSION>
+              --base-image <BASE_IMAGE>
+              --on-conflict <ON_CONFLICT>    [possible values: skip, overwrite]
+              --artifact-dir <ARTIFACT_DIR>
+              --cache-dir <CACHE_DIR>
+              --job-metadata <JOB_METADATA>
+          -h, --help                         Print help
+        ");
+    }
+}
