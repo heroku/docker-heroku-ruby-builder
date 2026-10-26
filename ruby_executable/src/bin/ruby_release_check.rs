@@ -244,6 +244,7 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::CommandFactory;
     use std::assert_matches;
 
     #[test]
@@ -353,5 +354,22 @@ mod tests {
         let filtered = retain_releases_gte(&releases, &min);
         let names: Vec<String> = filtered.iter().map(|v| v.to_string()).collect();
         assert_eq!(vec!["3.4.1", "3.3.7", "3.2.0"], names);
+    }
+
+    #[test]
+    fn get_help() {
+        insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
+        Check for Ruby releases missing from Heroku S3
+
+        Usage: ruby_release_check --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+
+        Options:
+              --minimum-version <MINIMUM_VERSION>
+                  Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked
+              --output <OUTPUT>
+                  Path to write JSON output file containing versions that need builds
+          -h, --help
+                  Print help
+        ");
     }
 }
