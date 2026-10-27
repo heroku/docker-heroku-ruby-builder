@@ -11,6 +11,7 @@ jruby_executable = { path = "../jruby_executable" }
 libherokubuildpack = { workspace = true }
 minijinja = { workspace = true }
 ruby_executable = { path = "../ruby_executable" }
+scraper = { workspace = true }
 shared = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

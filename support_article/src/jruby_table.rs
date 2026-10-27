@@ -1,6 +1,8 @@
 //! One row per JRuby `MAJOR.MINOR` line, newest first, showing a release of that line and where it is available.
 
-use crate::{CheckError, MajorMinor, UNAVAILABLE, join_all, render};
+use crate::guard::RowVersions;
+use crate::update::VersionTable;
+use crate::{CheckError, MajorMinor, ReadError, TableText, UNAVAILABLE, join_all, render};
 use jruby_executable::github_releases::s3_urls_to_check;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use minijinja::{Value, context};
@@ -91,9 +93,12 @@ impl JRubyTable {
     }
 }
 
-impl JRubyTable {
-    /// HTML with `\n` line endings.
-    pub fn render(&self) -> String {
+impl VersionTable for JRubyTable {
+    const NAME: &'static str = "jruby_versions_table";
+
+    type Version = JRubyVersion;
+
+    fn render(&self) -> String {
         let rows = self
             .rows
             .iter()
@@ -119,6 +124,68 @@ impl JRubyTable {
                 unavailable => UNAVAILABLE,
             },
         )
+    }
+
+    fn read(html: &str) -> Result<JRubyTable, ReadError> {
+        let TableText { base_images, rows } =
+            TableText::read(html, &["JRuby version", "Ruby compatibility"])?;
+        let rows = rows
+            .iter()
+            .map(|cells| {
+                let [version, ruby_compat, marks @ ..] = &cells[..] else {
+                    unreachable!("every row has a cell per column")
+                };
+                let version = JRubyVersion::parse(version).map_err(|_| ReadError::Cell {
+                    expected: "a JRuby version",
+                    found: version.clone(),
+                })?;
+                let ruby_compat =
+                    RubyDownloadVersion::new(ruby_compat).map_err(|_| ReadError::Cell {
+                        expected: "a Ruby version",
+                        found: ruby_compat.clone(),
+                    })?;
+                let mut built = BTreeSet::new();
+                for (base_image, mark) in base_images.iter().zip(marks) {
+                    match mark.as_str() {
+                        AVAILABLE => {
+                            built.insert(base_image.clone());
+                        }
+                        UNAVAILABLE => {}
+                        _ => {
+                            return Err(ReadError::Cell {
+                                expected: "an availability mark",
+                                found: mark.clone(),
+                            });
+                        }
+                    }
+                }
+                Ok(JRubyBuild {
+                    version,
+                    ruby_compat,
+                    base_images: built,
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(JRubyTable { base_images, rows })
+    }
+
+    fn base_images(&self) -> &[BaseImage] {
+        &self.base_images
+    }
+
+    /// An available cell shows the row's release.
+    fn row_versions(&self) -> Vec<RowVersions<JRubyVersion>> {
+        self.rows
+            .iter()
+            .map(|row| RowVersions {
+                major_minor: MajorMinor::from(&row.version),
+                versions: row
+                    .base_images
+                    .iter()
+                    .map(|base_image| (base_image.clone(), row.version.clone()))
+                    .collect(),
+            })
+            .collect()
     }
 }
 
@@ -243,6 +310,26 @@ mod tests {
                 </tr>
                 </tbody>
                 </table>"}
+        );
+    }
+
+    #[test]
+    fn reads_what_it_renders() {
+        let table = rendered_fixture();
+        assert_eq!(JRubyTable::read(&table.render()), Ok(table));
+    }
+
+    #[test]
+    fn rejects_an_unrecognized_mark() {
+        let html = rendered_fixture()
+            .render()
+            .replacen("<td>–</td>", "<td>soon</td>", 1);
+        assert_eq!(
+            JRubyTable::read(&html),
+            Err(ReadError::Cell {
+                expected: "an availability mark",
+                found: "soon".to_string()
+            })
         );
     }
 }

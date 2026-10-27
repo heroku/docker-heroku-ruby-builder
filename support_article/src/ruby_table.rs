@@ -1,6 +1,8 @@
 //! One row per Ruby `MAJOR.MINOR` line, newest first, with the newest release available on each base image.
 
-use crate::{CheckError, MajorMinor, UNAVAILABLE, join_all, render};
+use crate::guard::RowVersions;
+use crate::update::VersionTable;
+use crate::{CheckError, MajorMinor, ReadError, TableText, UNAVAILABLE, join_all, render};
 use libherokubuildpack::inventory::artifact::Arch;
 use minijinja::{Value, context};
 use ruby_executable::ruby_lang::{BranchStatus, RubyBranch};
@@ -128,9 +130,28 @@ impl RubyTable {
     }
 }
 
-impl RubyTable {
-    /// HTML with `\n` line endings.
-    pub fn render(&self) -> String {
+fn read_label(label: &str) -> Result<(MajorMinor, Lifecycle), ReadError> {
+    let (major_minor, lifecycle) = match label.split_once(' ') {
+        None => (label, Lifecycle::Maintained),
+        Some((major_minor, "(security-only)")) => (major_minor, Lifecycle::SecurityOnly),
+        Some((major_minor, "(EOL)")) => (major_minor, Lifecycle::Eol),
+        Some(_) => ("", Lifecycle::Maintained),
+    };
+    major_minor
+        .parse()
+        .map(|major_minor| (major_minor, lifecycle))
+        .map_err(|_| ReadError::Cell {
+            expected: "a Ruby series label",
+            found: label.to_string(),
+        })
+}
+
+impl VersionTable for RubyTable {
+    const NAME: &'static str = "ruby_versions_table";
+
+    type Version = RubyDownloadVersion;
+
+    fn render(&self) -> String {
         let rows = self
             .rows
             .iter()
@@ -160,6 +181,52 @@ impl RubyTable {
                 unavailable => UNAVAILABLE,
             },
         )
+    }
+
+    fn read(html: &str) -> Result<RubyTable, ReadError> {
+        let TableText { base_images, rows } = TableText::read(html, &["Ruby series"])?;
+        let rows = rows
+            .iter()
+            .map(|cells| {
+                let (label, cells) = cells
+                    .split_first()
+                    .expect("every row has a cell per column");
+                let (major_minor, lifecycle) = read_label(label)?;
+                let versions = base_images
+                    .iter()
+                    .zip(cells)
+                    .filter(|(_, cell)| *cell != UNAVAILABLE)
+                    .map(|(base_image, cell)| {
+                        RubyDownloadVersion::new(cell)
+                            .map(|version| (base_image.clone(), version))
+                            .map_err(|_| ReadError::Cell {
+                                expected: "a Ruby version",
+                                found: cell.clone(),
+                            })
+                    })
+                    .collect::<Result<_, _>>()?;
+                Ok(RubyRow {
+                    major_minor,
+                    lifecycle,
+                    versions,
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(RubyTable { base_images, rows })
+    }
+
+    fn base_images(&self) -> &[BaseImage] {
+        &self.base_images
+    }
+
+    fn row_versions(&self) -> Vec<RowVersions<RubyDownloadVersion>> {
+        self.rows
+            .iter()
+            .map(|row| RowVersions {
+                major_minor: row.major_minor,
+                versions: row.versions.clone(),
+            })
+            .collect()
     }
 }
 
@@ -327,6 +394,31 @@ mod tests {
                 </tr>
                 </tbody>
                 </table>"#}
+        );
+    }
+
+    #[test]
+    fn reads_what_it_renders() {
+        let table = rendered_fixture();
+        assert_eq!(RubyTable::read(&table.render()), Ok(table));
+    }
+
+    #[test]
+    fn rejects_unrecognized_cells() {
+        let html = rendered_fixture().render();
+        assert_eq!(
+            RubyTable::read(&html.replace("8.1 (security-only)", "8.1 (maybe)")),
+            Err(ReadError::Cell {
+                expected: "a Ruby series label",
+                found: "8.1 (maybe)".to_string()
+            })
+        );
+        assert_eq!(
+            RubyTable::read(&html.replace("<td>8.0.7</td>", "<td>soon</td>")),
+            Err(ReadError::Cell {
+                expected: "a Ruby version",
+                found: "soon".to_string()
+            })
         );
     }
 }

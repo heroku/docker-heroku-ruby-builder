@@ -20,6 +20,7 @@ use std::io::Write;
 use support_article::MajorMinor;
 use support_article::jruby_table::{self, JRubyTable};
 use support_article::ruby_table::{self, RubyTable};
+use support_article::update::VersionTable;
 
 type BoxError = Box<dyn Error + Send + Sync>;
 
