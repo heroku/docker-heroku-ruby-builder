@@ -147,6 +147,8 @@ jobs:
             --job-metadata "$METAFILE"
           grep -q "status=success" "$METAFILE"
       - name: Check JRuby
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           cargo run --locked --bin jruby_check -- \
             --version ${{matrix.version}} \

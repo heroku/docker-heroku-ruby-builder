@@ -89,6 +89,8 @@ jobs:
             --job-metadata "$GITHUB_OUTPUT"
       - name: Check JRuby
         if: steps.build.outputs.status == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           cargo run --locked --bin jruby_check -- \
             --version ${{inputs.jruby_version}} \
