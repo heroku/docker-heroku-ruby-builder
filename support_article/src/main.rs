@@ -7,6 +7,7 @@
 use bullet_stream::global::print;
 use clap::{Args, Parser, Subcommand};
 use indoc::formatdoc;
+use jruby_executable::github_releases;
 use ruby_executable::ruby_lang::{
     BRANCHES_URL, RELEASES_URL, ruby_lang_branches, ruby_lang_versions,
 };
@@ -16,6 +17,7 @@ use shared::maybe_err::ResultVec;
 use std::error::Error;
 use std::fmt::Display;
 use std::io::Write;
+use support_article::jruby_table::{self, JRubyTable};
 use support_article::ruby_table::{self, RubyTable};
 
 type BoxError = Box<dyn Error + Send + Sync>;
@@ -23,7 +25,7 @@ type BoxError = Box<dyn Error + Send + Sync>;
 #[derive(Parser, Debug)]
 #[command(
     bin_name = "support_article",
-    about = "Generate the Ruby version table in the Heroku Ruby Support Dev Center article"
+    about = "Generate the Ruby and JRuby version tables in the Heroku Ruby Support Dev Center article"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -44,6 +46,10 @@ struct TableArgs {
     /// Oldest Ruby `MAJOR.MINOR` line to list, such as `3.1`.
     #[arg(long)]
     minimum_ruby_major_minor: MajorMinor,
+
+    /// Oldest JRuby `MAJOR.MINOR` line to list, such as `9.4`.
+    #[arg(long)]
+    minimum_jruby_major_minor: MajorMinor,
 }
 
 #[derive(Args, Debug)]
@@ -72,6 +78,7 @@ fn all_ok<T, E: Display>(results: ResultVec<T, E>, what: &str) -> Result<Vec<T>,
 
 struct Tables {
     ruby: RubyTable,
+    jruby: JRubyTable,
 }
 
 /// Builds the tables from upstream release data and S3.
@@ -102,12 +109,31 @@ async fn generate(args: TableArgs) -> Result<Tables, BoxError> {
         print::sub_bullet(format!("{} ({:?})", row.major_minor, row.lifecycle));
     }
 
-    Ok(Tables { ruby })
+    print::bullet(format!("Fetching {}", *github_releases::RELEASES_URL));
+    let jruby_releases = all_ok(
+        github_releases::fetch_releases(gh_token).await,
+        "JRuby releases",
+    )?;
+
+    print::bullet("Checking S3 for JRuby builds");
+    let jruby_builds =
+        jruby_table::builds(&jruby_releases, args.minimum_jruby_major_minor, gh_token).await?;
+    let jruby = JRubyTable::new(&jruby_builds, args.minimum_jruby_major_minor)?;
+    for row in &jruby.rows {
+        print::sub_bullet(row.major_minor.to_string());
+    }
+
+    Ok(Tables { ruby, jruby })
 }
 
 async fn print_tables(args: PrintArgs) -> Result<(), BoxError> {
     let tables = generate(args.tables).await?;
-    writeln!(std::io::stdout(), "{}", tables.ruby.render()?)?;
+    writeln!(
+        std::io::stdout(),
+        "{}\n\n{}",
+        tables.ruby.render()?,
+        tables.jruby.render()?
+    )?;
     Ok(())
 }
 
@@ -149,7 +175,7 @@ mod tests {
     #[test]
     fn get_help() {
         insta::assert_snapshot!(shared::help(Cli::command(), &[]), @r"
-        Generate the Ruby version table in the Heroku Ruby Support Dev Center article
+        Generate the Ruby and JRuby version tables in the Heroku Ruby Support Dev Center article
 
         Usage: support_article <COMMAND>
 
@@ -167,13 +193,15 @@ mod tests {
         insta::assert_snapshot!(shared::help(Cli::command(), &["print"]), @r"
         Print the generated table HTML to stdout
 
-        Usage: support_article print --gh-token <TOKEN> --minimum-ruby-major-minor <MINIMUM_RUBY_MAJOR_MINOR>
+        Usage: support_article print --gh-token <TOKEN> --minimum-ruby-major-minor <MINIMUM_RUBY_MAJOR_MINOR> --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR>
 
         Options:
               --gh-token <TOKEN>
                   GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
               --minimum-ruby-major-minor <MINIMUM_RUBY_MAJOR_MINOR>
                   Oldest Ruby `MAJOR.MINOR` line to list, such as `3.1`
+              --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR>
+                  Oldest JRuby `MAJOR.MINOR` line to list, such as `9.4`
           -h, --help
                   Print help
         ");

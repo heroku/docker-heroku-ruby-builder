@@ -1752,6 +1752,7 @@ dependencies = [
  "clap",
  "indoc",
  "insta",
+ "jruby_executable",
  "libherokubuildpack",
  "minijinja",
  "pretty_assertions",
