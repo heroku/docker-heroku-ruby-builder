@@ -118,6 +118,7 @@ pub async fn get_with_auth_and_retry(
         let response = client
             .get(url.clone())
             .bearer_auth(token.as_str())
+            .header("X-GitHub-Api-Version", "2026-03-10")
             .send()
             .await?
             .error_for_status()?;
