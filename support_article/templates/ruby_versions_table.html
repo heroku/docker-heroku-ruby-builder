@@ -1,0 +1,28 @@
+<table>
+<thead>
+<tr>
+<th>Ruby series</th>
+{%- for base_image in base_images %}
+<th>{{ base_image }}</th>
+{%- endfor %}
+</tr>
+</thead>
+<tbody>
+{%- for row in rows %}
+{%- if row.lifecycle == "security_only" %}
+<tr style="background-color:#fcf8e3;color:#8a6d3b;">
+<td>{{ row.major_minor }} (security-only)</td>
+{%- elif row.lifecycle == "eol" %}
+<tr style="background-color:#f2dede;color:#a94442;">
+<td>{{ row.major_minor }} (EOL)</td>
+{%- else %}
+<tr>
+<td>{{ row.major_minor }}</td>
+{%- endif %}
+{%- for version in row.versions %}
+<td>{{ version or unavailable }}</td>
+{%- endfor %}
+</tr>
+{%- endfor %}
+</tbody>
+</table>
