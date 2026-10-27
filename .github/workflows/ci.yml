@@ -4,6 +4,9 @@ on:
   - push
   - pull_request
 
+permissions:
+  contents: read
+
 jobs:
   shellcheck:
     runs-on: ubuntu-24.04
@@ -126,8 +129,12 @@ jobs:
       - name: Cargo build (to make test logs shorter)
         run: cargo build --locked
       - name: Output CHANGELOG
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo run --locked --bin jruby_changelog -- print --version "${{matrix.version}}"
       - name: Build JRuby
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           METAFILE=$(mktemp)
@@ -140,6 +147,8 @@ jobs:
             --job-metadata "$METAFILE"
           grep -q "status=success" "$METAFILE"
       - name: Check JRuby
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           cargo run --locked --bin jruby_check -- \
             --version ${{matrix.version}} \
@@ -205,6 +214,8 @@ jobs:
       - name: Cargo build
         run: cargo build --locked
       - name: "on-conflict=skip: skips when S3 URL exists"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           LOGFILE=$(mktemp)
@@ -221,6 +232,8 @@ jobs:
           grep -q "status=skipped" "$METAFILE"
           test -d ./output
       - name: "on-conflict=skip: skips when local file exists"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           LOGFILE=$(mktemp)

@@ -3,6 +3,7 @@ use clap::Parser;
 use indoc::formatdoc;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use libherokubuildpack::inventory::artifact::Arch;
+use shared::github::GitHubTokenArg;
 use shared::{BaseImage, source_dir};
 use std::error::Error;
 use std::io::Write;
@@ -24,6 +25,9 @@ struct RubyArgs {
 
     #[arg(long = "artifact-dir")]
     artifact_dir: PathBuf,
+
+    #[command(flatten)]
+    github: GitHubTokenArg,
 }
 
 async fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
@@ -32,9 +36,10 @@ async fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         version,
         base_image,
         artifact_dir,
+        github,
     } = args;
 
-    let jruby_stdlib_version = jruby_build_properties(version)
+    let jruby_stdlib_version = jruby_build_properties(version, &github.token)
         .await?
         .ruby_stdlib_version()?;
 
@@ -139,13 +144,14 @@ mod tests {
     #[test]
     fn get_help() {
         insta::assert_snapshot!(shared::help(RubyArgs::command(), &[]), @r"
-        Usage: jruby_check --arch <ARCH> --version <VERSION> --base-image <BASE_IMAGE> --artifact-dir <ARTIFACT_DIR>
+        Usage: jruby_check --arch <ARCH> --version <VERSION> --base-image <BASE_IMAGE> --artifact-dir <ARTIFACT_DIR> --gh-token <TOKEN>
 
         Options:
               --arch <ARCH>
               --version <VERSION>
               --base-image <BASE_IMAGE>
               --artifact-dir <ARTIFACT_DIR>
+              --gh-token <TOKEN>             GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
           -h, --help                         Print help
         ");
     }

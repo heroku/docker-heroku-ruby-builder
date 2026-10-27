@@ -10,7 +10,7 @@ use fs_err as fs;
 use jruby_executable::{JRubyVersion, jruby_build_properties, jruby_version};
 use libherokubuildpack::inventory::artifact::Arch;
 use serde::Deserialize;
-use shared::github::{self, GitHubToken};
+use shared::github::{self, GitHubToken, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
 use shared::{BaseImage, S3_BASE_URL};
 use shared::{build_matrix, s3_url_exists};
@@ -27,13 +27,8 @@ static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
 #[derive(Parser, Debug)]
 #[command(about = "Check for JRuby releases missing from Heroku S3")]
 struct Args {
-    /// GitHub API token used to authenticate release lookups.
-    ///
-    /// Required. Generate one locally with: `--gh-token=$(gh auth token)`
-    #[arg(long = "gh-token", value_parser = |s: &str| -> Result<GitHubToken, String> {
-        GitHubToken::try_from(s).map_err(|error| format!("{error}. Suggestion: generate one locally with: `--gh-token=$(gh auth token)`"))
-    })]
-    gh_token: GitHubToken,
+    #[command(flatten)]
+    github: GitHubTokenArg,
 
     /// Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be checked.
     #[arg(long = "minimum-version", required = true)]
@@ -174,8 +169,9 @@ fn s3_urls_to_check(
 /// implements, returning it paired with the version it belongs to.
 async fn resolve_stdlib_version(
     version: JRubyVersion,
+    gh_token: GitHubToken,
 ) -> Result<(JRubyVersion, String), Box<dyn Error + Send + Sync>> {
-    let stdlib = jruby_build_properties(&version)
+    let stdlib = jruby_build_properties(&version, &gh_token)
         .await
         .and_then(|props| props.ruby_stdlib_version())?;
     Ok((version, stdlib))
@@ -243,9 +239,9 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
     // erasure, not stringification: the boxed error still carries its source chain;
     // a `String` would throw that away. Text is produced only when we print/return.
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
-    let gh_token = &args.gh_token;
+    let gh_token = &args.github.token;
     let releases = paginate_releases_accumulated(RELEASES_URL.clone(), |url| async move {
-        let response = github::get_with_auth_and_retry(&url, gh_token).await?;
+        let response = github::get_json_with_retry(&url, gh_token).await?;
 
         let releases = serde_json::from_str(&response.body).map_err(|error| {
             GithubReleaseError::ReleaseResponseParse {
@@ -271,7 +267,7 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
     print::bullet("Ruby stdlib versions");
     let mut stdlib_set = JoinSet::new();
     for version in versions_to_check {
-        stdlib_set.spawn(resolve_stdlib_version(version));
+        stdlib_set.spawn(resolve_stdlib_version(version, gh_token.clone()));
     }
 
     let mut resolved = Vec::new();
@@ -606,22 +602,17 @@ mod tests {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
         Check for JRuby releases missing from Heroku S3
 
-        Usage: jruby_release_check --gh-token <GH_TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+        Usage: jruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
 
         Options:
-              --gh-token <GH_TOKEN>
-                  GitHub API token used to authenticate release lookups.
-
-                  Required. Generate one locally with: `--gh-token=$(gh auth token)`
-
+              --gh-token <TOKEN>
+                  GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
               --minimum-version <MINIMUM_VERSION>
                   Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be checked
-
               --output <OUTPUT>
                   Path to write JSON output file containing versions that need builds
-
           -h, --help
-                  Print help (see a summary with '-h')
+                  Print help
         ");
     }
 }

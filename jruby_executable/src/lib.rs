@@ -3,6 +3,9 @@
 pub mod jruby_version;
 pub use jruby_version::JRubyVersion;
 
+use reqwest::Url;
+use shared::github::{self, GitHubToken};
+
 /// Short: This struct parses a file based on the input jruby version to determine
 /// what Ruby version it targets.
 ///
@@ -57,13 +60,13 @@ pub use jruby_version::JRubyVersion;
 #[derive(Debug)]
 pub struct BuildProperties {
     body: Vec<u8>,
-    url: String,
+    url: Url,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Cannot find `ruby.version=` from {url}.\n Body:\n{body}")]
-    CannotParseJrubyStdlibVersion { url: String, body: String },
+    CannotParseJrubyStdlibVersion { url: Url, body: String },
 
     #[error("Failed to fetch {0}")]
     FailedRequest(#[from] reqwest::Error),
@@ -92,38 +95,24 @@ impl BuildProperties {
 
 pub async fn jruby_build_properties(
     jruby_version: &JRubyVersion,
+    gh_token: &GitHubToken,
 ) -> Result<BuildProperties, Error> {
-    shared::with_retries(|| jruby_build_properties_inner(jruby_version)).await
-}
-
-async fn jruby_build_properties_inner(
-    jruby_version: &JRubyVersion,
-) -> Result<BuildProperties, Error> {
-    let url = format!(
-        "https://raw.githubusercontent.com/jruby/jruby/{jruby_version}/default.build.properties",
-    );
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(Error::FailedRequest)?;
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(Error::FailedRequest)?;
-
-    let body = response
-        .error_for_status()
-        .map_err(Error::FailedRequest)?
-        .text()
-        .await
-        .map_err(Error::FailedRequest)?;
+    let url = build_properties_url(jruby_version);
+    let response = github::get_raw_with_retry(&url, gh_token).await?;
 
     Ok(BuildProperties {
-        body: body.as_bytes().to_vec(),
-        url: url.clone(),
+        body: response.body.into_bytes(),
+        url,
     })
+}
+
+fn build_properties_url(jruby_version: &JRubyVersion) -> Url {
+    let mut url =
+        Url::parse("https://api.github.com/repos/jruby/jruby/contents/default.build.properties")
+            .expect("valid build properties URL constant");
+    url.query_pairs_mut()
+        .append_pair("ref", &jruby_version.to_string());
+    url
 }
 
 #[cfg(test)]
@@ -142,7 +131,7 @@ mod test {
         .to_string();
         let properties = BuildProperties {
             body: body.as_bytes().to_vec(),
-            url: "https://example.com".to_string(),
+            url: Url::parse("https://example.com").unwrap(),
         };
 
         assert!(properties.ruby_stdlib_version().is_err());
@@ -159,9 +148,19 @@ mod test {
         .to_string();
         let properties = BuildProperties {
             body: body.as_bytes().to_vec(),
-            url: "https://example.com".to_string(),
+            url: Url::parse("https://example.com").unwrap(),
         };
 
         assert_eq!(properties.ruby_stdlib_version().unwrap(), "3.1.4");
+    }
+
+    #[test]
+    fn test_build_properties_url_targets_the_release_tag() {
+        let version = JRubyVersion::parse("9.4.7.0").unwrap();
+
+        assert_eq!(
+            build_properties_url(&version).as_str(),
+            "https://api.github.com/repos/jruby/jruby/contents/default.build.properties?ref=9.4.7.0"
+        );
     }
 }
