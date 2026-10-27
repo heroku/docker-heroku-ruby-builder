@@ -27,9 +27,7 @@ static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
 #[derive(Parser, Debug)]
 #[command(about = "Check for JRuby releases missing from Heroku S3")]
 struct Args {
-    /// GitHub API token used to authenticate release lookups.
-    ///
-    /// Required. Generate one locally with: `--gh-token=$(gh auth token)`
+    /// GitHub API token used to authenticate release lookups. e.g. `--gh-token=$(gh auth token)`
     #[arg(long = "gh-token", value_parser = |s: &str| -> Result<GitHubToken, String> {
         GitHubToken::try_from(s).map_err(|error| format!("{error}. Suggestion: generate one locally with: `--gh-token=$(gh auth token)`"))
     })]
@@ -610,18 +608,13 @@ mod tests {
 
         Options:
               --gh-token <GH_TOKEN>
-                  GitHub API token used to authenticate release lookups.
-
-                  Required. Generate one locally with: `--gh-token=$(gh auth token)`
-
+                  GitHub API token used to authenticate release lookups. e.g. `--gh-token=$(gh auth token)`
               --minimum-version <MINIMUM_VERSION>
                   Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be checked
-
               --output <OUTPUT>
                   Path to write JSON output file containing versions that need builds
-
           -h, --help
-                  Print help (see a summary with '-h')
+                  Print help
         ");
     }
 }
