@@ -6,6 +6,7 @@
 
 use bullet_stream::global::print;
 use clap::{Args, Parser, Subcommand};
+use fs_err as fs;
 use indoc::formatdoc;
 use jruby_executable::github_releases;
 use ruby_executable::ruby_lang::{
@@ -17,10 +18,11 @@ use shared::maybe_err::ResultVec;
 use std::error::Error;
 use std::fmt::Display;
 use std::io::Write;
+use std::path::PathBuf;
 use support_article::MajorMinor;
 use support_article::jruby_table::{self, JRubyTable};
 use support_article::ruby_table::{self, RubyTable};
-use support_article::update::VersionTable;
+use support_article::update::{Change, replace_table};
 
 type BoxError = Box<dyn Error + Send + Sync>;
 
@@ -36,7 +38,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Print the generated table HTML to stdout.
+    /// Print the article with regenerated tables to stdout.
     Print(PrintArgs),
 }
 
@@ -58,6 +60,10 @@ struct TableArgs {
 struct PrintArgs {
     #[command(flatten)]
     tables: TableArgs,
+
+    /// Read the current article Markdown from a file.
+    #[arg(long)]
+    from_file: PathBuf,
 }
 
 /// Every value, or one error listing every failure.
@@ -81,6 +87,23 @@ fn all_ok<T, E: Display>(results: ResultVec<T, E>, what: &str) -> Result<Vec<T>,
 struct Tables {
     ruby: RubyTable,
     jruby: JRubyTable,
+    args: TableArgs,
+}
+
+impl Tables {
+    /// Replaces both tables in `content`, returning the new content and the tables that changed.
+    fn update(&self, content: &str) -> Result<(String, Vec<Change>), BoxError> {
+        let ruby = replace_table(content, &self.ruby, self.args.minimum_ruby_major_minor)?;
+        let jruby = replace_table(
+            &ruby.content,
+            &self.jruby,
+            self.args.minimum_jruby_major_minor,
+        )?;
+        Ok((
+            jruby.content,
+            ruby.change.into_iter().chain(jruby.change).collect(),
+        ))
+    }
 }
 
 /// Builds the tables from upstream release data and S3.
@@ -134,17 +157,25 @@ async fn generate(args: TableArgs) -> Result<Tables, BoxError> {
         print::sub_bullet(format!("{} (Ruby {})", row.version, row.ruby_compat));
     }
 
-    Ok(Tables { ruby, jruby })
+    Ok(Tables { ruby, jruby, args })
 }
 
-async fn print_tables(args: PrintArgs) -> Result<(), BoxError> {
+fn report_changes(changes: &[Change]) {
+    if changes.is_empty() {
+        print::bullet("Tables are already current");
+    }
+    for change in changes {
+        print::bullet(format!("Changed {}", change.name));
+    }
+}
+
+async fn print_article(args: PrintArgs) -> Result<(), BoxError> {
     let tables = generate(args.tables).await?;
-    writeln!(
-        std::io::stdout(),
-        "{}\n\n{}",
-        tables.ruby.render(),
-        tables.jruby.render()
-    )?;
+    let content = fs::read_to_string(&args.from_file)?;
+
+    let (content, changes) = tables.update(&content)?;
+    report_changes(&changes);
+    std::io::stdout().write_all(content.as_bytes())?;
     Ok(())
 }
 
@@ -152,7 +183,7 @@ async fn print_tables(args: PrintArgs) -> Result<(), BoxError> {
 async fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
-        Command::Print(args) => print_tables(args).await,
+        Command::Print(args) => print_article(args).await,
     };
 
     if let Err(error) = result {
@@ -184,6 +215,19 @@ mod tests {
     }
 
     #[test]
+    fn print_requires_the_article_file() {
+        let base = [
+            "support_article",
+            "print",
+            "--gh-token=t",
+            "--minimum-ruby-major-minor=3.1",
+            "--minimum-jruby-major-minor=9.4",
+        ];
+        assert!(Cli::try_parse_from(base).is_err());
+        assert!(Cli::try_parse_from(base.into_iter().chain(["--from-file=a.md"])).is_ok());
+    }
+
+    #[test]
     fn get_help() {
         insta::assert_snapshot!(shared::help(Cli::command(), &[]), @r"
         Generate the Ruby and JRuby version tables in the Heroku Ruby Support Dev Center article
@@ -191,7 +235,7 @@ mod tests {
         Usage: support_article <COMMAND>
 
         Commands:
-          print  Print the generated table HTML to stdout
+          print  Print the article with regenerated tables to stdout
           help   Print this message or the help of the given subcommand(s)
 
         Options:
@@ -202,9 +246,9 @@ mod tests {
     #[test]
     fn get_print_help() {
         insta::assert_snapshot!(shared::help(Cli::command(), &["print"]), @r"
-        Print the generated table HTML to stdout
+        Print the article with regenerated tables to stdout
 
-        Usage: support_article print --gh-token <TOKEN> --minimum-ruby-major-minor <MINIMUM_RUBY_MAJOR_MINOR> --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR>
+        Usage: support_article print --gh-token <TOKEN> --minimum-ruby-major-minor <MINIMUM_RUBY_MAJOR_MINOR> --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR> --from-file <FROM_FILE>
 
         Options:
               --gh-token <TOKEN>
@@ -213,6 +257,8 @@ mod tests {
                   Oldest Ruby `MAJOR.MINOR` line to list, such as `3.1`
               --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR>
                   Oldest JRuby `MAJOR.MINOR` line to list, such as `9.4`
+              --from-file <FROM_FILE>
+                  Read the current article Markdown from a file
           -h, --help
                   Print help
         ");

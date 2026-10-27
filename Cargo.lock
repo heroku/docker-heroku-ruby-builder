@@ -2030,6 +2030,7 @@ version = "0.0.0"
 dependencies = [
  "bullet_stream",
  "clap",
+ "fs-err",
  "indoc",
  "insta",
  "jruby_executable",
