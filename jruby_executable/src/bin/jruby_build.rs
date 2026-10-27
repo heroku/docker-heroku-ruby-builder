@@ -55,7 +55,7 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
         artifact_dir,
         cache_dir,
         job_metadata: _,
-        github: _,
+        github,
     } = args;
 
     let start = Instant::now();
@@ -66,7 +66,7 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     fs::create_dir_all(volume_cache_dir)?;
     fs::create_dir_all(volume_output_dir)?;
 
-    let ruby_stdlib_version = jruby_build_properties(version)
+    let ruby_stdlib_version = jruby_build_properties(version, &github.token)
         .await?
         .ruby_stdlib_version()?;
     let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");

@@ -36,10 +36,10 @@ async fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
         version,
         base_image,
         artifact_dir,
-        github: _,
+        github,
     } = args;
 
-    let jruby_stdlib_version = jruby_build_properties(version)
+    let jruby_stdlib_version = jruby_build_properties(version, &github.token)
         .await?
         .ruby_stdlib_version()?;
 

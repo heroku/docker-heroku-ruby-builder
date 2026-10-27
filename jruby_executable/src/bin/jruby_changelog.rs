@@ -81,7 +81,7 @@ where
 }
 
 async fn render(args: &PrintArgs) -> Result<(), Box<dyn Error>> {
-    let stdlib_version = jruby_build_properties(&args.version)
+    let stdlib_version = jruby_build_properties(&args.version, &args.github.token)
         .await?
         .ruby_stdlib_version()?;
     render_jruby_changelog(&args.version, &stdlib_version, std::io::stdout())?;
@@ -89,7 +89,7 @@ async fn render(args: &PrintArgs) -> Result<(), Box<dyn Error>> {
 }
 
 async fn create(args: &DevcenterArgs) -> Result<(), Box<dyn Error>> {
-    let stdlib_version = jruby_build_properties(&args.version)
+    let stdlib_version = jruby_build_properties(&args.version, &args.github.token)
         .await?
         .ruby_stdlib_version()?;
     let ChangelogParts { title, content } = jruby_changelog_parts(&args.version, &stdlib_version);
