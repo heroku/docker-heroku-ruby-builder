@@ -116,6 +116,7 @@ async fn main() {
 #[cfg(test)]
 mod test {
     use super::*;
+    use clap::CommandFactory;
     use pretty_assertions::assert_eq;
 
     fn parts(version: &str) -> ChangelogParts {
@@ -270,5 +271,48 @@ mod test {
             panic!("expected the devcenter subcommand");
         };
         assert_eq!(args.summary_file, None);
+    }
+
+    #[test]
+    fn get_help() {
+        insta::assert_snapshot!(shared::help(Cli::command(), &[]), @r"
+        Usage: ruby_changelog <COMMAND>
+
+        Commands:
+          print      Print the Dev Center changelog markdown to stdout
+          devcenter  Create the changelog entry via the Dev Center private API
+          help       Print this message or the help of the given subcommand(s)
+
+        Options:
+          -h, --help  Print help
+        ");
+    }
+
+    #[test]
+    fn get_help_print() {
+        insta::assert_snapshot!(shared::help(Cli::command(), &["print"]), @r"
+        Print the Dev Center changelog markdown to stdout
+
+        Usage: ruby_changelog print --version <VERSION>
+
+        Options:
+              --version <VERSION>
+          -h, --help               Print help
+        ");
+    }
+
+    #[test]
+    fn get_help_devcenter() {
+        insta::assert_snapshot!(shared::help(Cli::command(), &["devcenter"]), @r"
+        Create the changelog entry via the Dev Center private API
+
+        Usage: ruby_changelog devcenter [OPTIONS] --version <VERSION> --status <STATUS>
+
+        Options:
+              --version <VERSION>
+              --status <STATUS>              Whether to create the entry as an unpublished draft or publish it live [possible values: draft, published]
+              --summary-file <SUMMARY_FILE>  Optional file to append a Markdown summary (with the entry's URL) to, e.g. `$GITHUB_STEP_SUMMARY`
+          -h, --help                         Print help
+        ");
     }
 }

@@ -25,4 +25,5 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true }
 pretty_assertions = { workspace = true }

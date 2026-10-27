@@ -42,4 +42,5 @@ winnow = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true }
 pretty_assertions = { workspace = true }

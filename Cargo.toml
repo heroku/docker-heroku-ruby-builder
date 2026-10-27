@@ -1,10 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
-    "jruby_executable",
-    "ruby_executable",
-    "shared",
-]
+members = ["jruby_executable", "ruby_executable", "shared"]
 
 [workspace.package]
 edition = "2024"
@@ -12,12 +8,15 @@ rust-version = "1.99"
 
 [workspace.dependencies]
 bullet_stream = "0.11"
-chrono = {version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6", features = ["derive"] }
 # We use the `zlib-rs` backend, since it's the fastest:
 # https://github.com/rust-lang/flate2-rs#backends
 # https://trifectatech.org/blog/zlib-rs-is-faster-than-c/
-flate2 = { version = "1", default-features = false, features = ["zlib-rs", "runtime_detection"] }
+flate2 = { version = "1", default-features = false, features = [
+    "zlib-rs",
+    "runtime_detection",
+] }
 fs-err = { version = "3", features = ["debug", "debug_tokio", "tokio"] }
 fs2 = "0.4"
 fun_run = "0.8"
@@ -27,12 +26,15 @@ hex = "0.4"
 indoc = "2"
 java-properties = "2"
 lazy_static = "1"
-libherokubuildpack = { version = "0.32", default-features = false, features = ["inventory", "inventory-sha2"] }
+libherokubuildpack = { version = "0.32", default-features = false, features = [
+    "inventory",
+    "inventory-sha2",
+] }
 winnow = "1.0"
 pretty_assertions = "1"
 regex = "1"
 reqwest = { version = "0.13", features = ["json"] }
-serde = {version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 sha2 = "0.11"
 shared = { path = "shared" }
 tar = "0.4"
@@ -43,3 +45,4 @@ serde_json = "1"
 yaml-rust2 = "0.13"
 toml = "1.1"
 url = "2"
+insta = "1.49.0"

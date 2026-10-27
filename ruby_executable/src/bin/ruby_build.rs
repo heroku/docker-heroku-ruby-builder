@@ -212,3 +212,26 @@ async fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn get_help() {
+        insta::assert_snapshot!(shared::help(RubyArgs::command(), &[]), @r"
+        Usage: ruby_build [OPTIONS] --arch <ARCH> --version <VERSION> --base-image <BASE_IMAGE> --on-conflict <ON_CONFLICT> --artifact-dir <ARTIFACT_DIR> --cache-dir <CACHE_DIR>
+
+        Options:
+              --arch <ARCH>
+              --version <VERSION>
+              --base-image <BASE_IMAGE>
+              --on-conflict <ON_CONFLICT>    [possible values: skip, overwrite]
+              --artifact-dir <ARTIFACT_DIR>
+              --cache-dir <CACHE_DIR>
+              --job-metadata <JOB_METADATA>
+          -h, --help                         Print help
+        ");
+    }
+}
