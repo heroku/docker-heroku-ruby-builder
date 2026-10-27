@@ -77,6 +77,8 @@ jobs:
         run: cargo build --locked
       - name: Build JRuby
         id: build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           cargo run --locked --bin jruby_build -- \
             --version ${{inputs.jruby_version}} \

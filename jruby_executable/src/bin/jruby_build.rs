@@ -5,6 +5,7 @@ use indoc::formatdoc;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
+use shared::github::GitHubTokenArg;
 use shared::{
     BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar, s3_url_exists,
     sha256_from_path, tar_dir_to_file, untar_to_dir, write_job_metadata,
@@ -41,6 +42,9 @@ struct Args {
 
     #[arg(long = "job-metadata")]
     job_metadata: Option<PathBuf>,
+
+    #[command(flatten)]
+    github: GitHubTokenArg,
 }
 
 async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
@@ -51,6 +55,7 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
         artifact_dir,
         cache_dir,
         job_metadata: _,
+        github: _,
     } = args;
 
     let start = Instant::now();
@@ -228,7 +233,7 @@ mod tests {
     #[test]
     fn get_help() {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
-        Usage: jruby_build [OPTIONS] --version <VERSION> --base-image <BASE_IMAGE> --on-conflict <ON_CONFLICT> --artifact-dir <ARTIFACT_DIR> --cache-dir <CACHE_DIR>
+        Usage: jruby_build [OPTIONS] --version <VERSION> --base-image <BASE_IMAGE> --on-conflict <ON_CONFLICT> --artifact-dir <ARTIFACT_DIR> --cache-dir <CACHE_DIR> --gh-token <TOKEN>
 
         Options:
               --version <VERSION>
@@ -237,6 +242,7 @@ mod tests {
               --artifact-dir <ARTIFACT_DIR>
               --cache-dir <CACHE_DIR>
               --job-metadata <JOB_METADATA>
+              --gh-token <TOKEN>             GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
           -h, --help                         Print help
         ");
     }
