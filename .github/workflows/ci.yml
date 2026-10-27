@@ -129,6 +129,8 @@ jobs:
       - name: Cargo build (to make test logs shorter)
         run: cargo build --locked
       - name: Output CHANGELOG
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: cargo run --locked --bin jruby_changelog -- print --version "${{matrix.version}}"
       - name: Build JRuby
         run: |

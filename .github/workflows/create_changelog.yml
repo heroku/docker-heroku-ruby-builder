@@ -41,6 +41,8 @@ jobs:
       - name: Cargo build
         run: cargo build --locked
       - name: Create Dev Center changelog
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           cargo run --locked --bin ${{inputs.engine}}_changelog -- devcenter \
