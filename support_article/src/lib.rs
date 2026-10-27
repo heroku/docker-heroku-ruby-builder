@@ -1,5 +1,6 @@
 //! Generates the Ruby and JRuby version tables in the Dev Center article "Heroku Ruby Support".
 
+use jruby_executable::JRubyVersion;
 use minijinja::{Environment, Value};
 use ruby_executable::ruby_lang::RubyBranch;
 use shared::RubyDownloadVersion;
@@ -7,6 +8,7 @@ use std::fmt;
 use std::str::FromStr;
 use tokio::task::JoinSet;
 
+pub mod jruby_table;
 pub mod ruby_table;
 
 /// Shown in a cell when nothing is available.
@@ -53,6 +55,15 @@ impl From<&RubyDownloadVersion> for MajorMinor {
     }
 }
 
+impl From<&JRubyVersion> for MajorMinor {
+    fn from(version: &JRubyVersion) -> Self {
+        MajorMinor {
+            major: version.major(),
+            minor: version.minor(),
+        }
+    }
+}
+
 impl From<&RubyBranch> for MajorMinor {
     fn from(branch: &RubyBranch) -> Self {
         MajorMinor {
@@ -66,6 +77,9 @@ impl From<&RubyBranch> for MajorMinor {
 pub enum CheckError {
     #[error(transparent)]
     S3(#[from] shared::Error),
+
+    #[error(transparent)]
+    JRubyProperties(#[from] jruby_executable::Error),
 
     #[error("S3 check task failed: {0}")]
     Task(#[from] tokio::task::JoinError),
