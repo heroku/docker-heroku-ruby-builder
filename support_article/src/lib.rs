@@ -8,6 +8,7 @@ use std::fmt;
 use std::str::FromStr;
 use tokio::task::JoinSet;
 
+pub mod guard;
 pub mod jruby_table;
 pub mod ruby_table;
 
