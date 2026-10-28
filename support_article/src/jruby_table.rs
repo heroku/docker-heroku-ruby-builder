@@ -1,7 +1,7 @@
 //! One row per JRuby `MAJOR.MINOR` line, newest first, with the newest release available on each base image.
 
 use crate::{CheckError, join_all};
-use jruby_executable::github_releases::s3_urls_to_check;
+use jruby_executable::github_releases::s3_url_to_check;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use minijinja::{Value, context};
 use shared::github::GitHubToken;
@@ -69,7 +69,7 @@ pub async fn builds(
             let stdlib = jruby_build_properties(&version, &gh_token)
                 .await?
                 .ruby_stdlib_version()?;
-            let presence = s3_presence(s3_urls_to_check(&version, &stdlib)).await?;
+            let presence = s3_presence(|target| s3_url_to_check(&version, &stdlib, target)).await?;
             Ok(JRubyBuild {
                 release: JRubyRelease {
                     version,

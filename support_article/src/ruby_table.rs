@@ -1,12 +1,11 @@
 //! One row per Ruby `MAJOR.MINOR` line, newest first, with the newest release available on each base image.
 
 use crate::{CheckError, join_all};
-use libherokubuildpack::inventory::artifact::Arch;
 use minijinja::{Value, context};
 use ruby_executable::ruby_lang::BranchStatus;
 use shared::{
-    BaseImage, BuildTarget, MajorMinor, RubyDownloadVersion, build_matrix, output_ruby_tar_path,
-    s3_presence, s3_url,
+    BaseImage, BuildTarget, MajorMinor, RubyDownloadVersion, output_ruby_tar_path, s3_presence,
+    s3_url,
 };
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
@@ -51,19 +50,19 @@ pub struct EmptyTable {
     pub floor: MajorMinor,
 }
 
-/// Where `version` lives on S3 for each base image and architecture.
+/// Where `version` lives on S3 for `target`.
 ///
 /// `heroku-22` is checked at its legacy path without an architecture directory. Older `heroku-22` builds exist only
 /// there.
-fn tar_urls(version: &RubyDownloadVersion) -> Vec<(Url, BaseImage, Arch)> {
-    build_matrix()
-        .into_iter()
-        .map(|BuildTarget { base_image, arch }| {
-            let arch_dir = (!base_image.has_legacy_path()).then_some(&arch);
-            let path = output_ruby_tar_path(Path::new(""), version, &base_image, arch_dir);
-            (s3_url(&path), base_image, arch)
-        })
-        .collect()
+fn tar_url(version: &RubyDownloadVersion, target: &BuildTarget) -> Url {
+    let base_image = &target.base_image;
+    let arch_dir = (!base_image.has_legacy_path()).then_some(&target.arch);
+    s3_url(&output_ruby_tar_path(
+        Path::new(""),
+        version,
+        base_image,
+        arch_dir,
+    ))
 }
 
 /// Checks S3 for every stable release at or above `floor`.
@@ -78,7 +77,7 @@ pub async fn builds(
         .cloned()
     {
         set.spawn(async move {
-            let presence = s3_presence(tar_urls(&version)).await?;
+            let presence = s3_presence(|target| tar_url(&version, target)).await?;
             Ok(RubyBuild {
                 version,
                 base_images: presence.complete_base_images().into_iter().collect(),
@@ -194,6 +193,7 @@ impl RubyTable {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use shared::build_matrix;
 
     fn branch(name: &str, status: BranchStatus) -> (MajorMinor, BranchStatus) {
         (name.parse().unwrap(), status)
@@ -235,9 +235,9 @@ mod tests {
 
     #[test]
     fn checks_heroku_22_at_the_legacy_path_and_other_base_images_per_arch() {
-        let paths = tar_urls(&version("8.1.2"))
-            .into_iter()
-            .map(|(url, _, _)| url.path().to_string())
+        let paths = build_matrix()
+            .iter()
+            .map(|target| tar_url(&version("8.1.2"), target).path().to_string())
             .collect::<Vec<_>>();
 
         for expected in [

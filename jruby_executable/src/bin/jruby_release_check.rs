@@ -7,7 +7,7 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use jruby_executable::github_releases::{self, RELEASES_URL, s3_urls_to_check};
+use jruby_executable::github_releases::{self, RELEASES_URL, s3_url_to_check};
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use shared::github::{GitHubToken, GitHubTokenArg};
 use shared::{S3Presence, s3_presence};
@@ -62,7 +62,8 @@ async fn check_version_on_s3(
     version: JRubyVersion,
     ruby_stdlib_version: String,
 ) -> Result<(JRubyVersion, S3Presence), shared::Error> {
-    let presence = s3_presence(s3_urls_to_check(&version, &ruby_stdlib_version)).await?;
+    let presence =
+        s3_presence(|target| s3_url_to_check(&version, &ruby_stdlib_version, target)).await?;
     Ok((version, presence))
 }
 

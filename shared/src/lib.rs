@@ -222,7 +222,7 @@ pub enum S3Status {
     Missing,
 }
 
-/// The S3 status of an artifact for each build target checked.
+/// The S3 status of an artifact for each target in [`build_matrix`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct S3Presence(BTreeMap<BuildTarget, S3Status>);
 
@@ -252,26 +252,23 @@ impl S3Presence {
     }
 }
 
-/// Check every URL concurrently. Each URL is the artifact for its base image and architecture.
-pub async fn s3_presence(urls: Vec<(Url, BaseImage, Arch)>) -> Result<S3Presence, Error> {
+/// Check concurrently whether the artifact at `url_for(target)` exists for each target in [`build_matrix`].
+pub async fn s3_presence(url_for: impl Fn(&BuildTarget) -> Url) -> Result<S3Presence, Error> {
     let mut set = tokio::task::JoinSet::new();
-    for (url, base_image, arch) in urls {
-        set.spawn(async move {
-            s3_url_exists(url)
-                .await
-                .map(|exists| (exists, base_image, arch))
-        });
+    for target in build_matrix() {
+        let url = url_for(&target);
+        set.spawn(async move { s3_url_exists(url).await.map(|exists| (target, exists)) });
     }
 
     let mut presence = BTreeMap::new();
     while let Some(result) = set.join_next().await {
-        let (exists, base_image, arch) = result.map_err(Error::S3CheckTask)??;
+        let (target, exists) = result.map_err(Error::S3CheckTask)??;
         let status = if exists {
             S3Status::Present
         } else {
             S3Status::Missing
         };
-        presence.insert(BuildTarget { base_image, arch }, status);
+        presence.insert(target, status);
     }
     Ok(S3Presence(presence))
 }

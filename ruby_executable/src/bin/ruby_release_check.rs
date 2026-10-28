@@ -1,15 +1,11 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
 use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
-use shared::{
-    BaseImage, BuildTarget, RubyDownloadVersion, build_matrix, output_ruby_tar_path, s3_presence,
-    s3_url,
-};
+use shared::{BuildTarget, RubyDownloadVersion, output_ruby_tar_path, s3_presence, s3_url};
 use std::{
     error::Error,
     path::{Path, PathBuf},
@@ -47,20 +43,19 @@ fn retain_releases_gte(
         .collect()
 }
 
-fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(Url, BaseImage, Arch)> {
-    build_matrix()
-        .into_iter()
-        .map(|BuildTarget { base_image, arch }| {
-            let tar_path = output_ruby_tar_path(Path::new(""), version, &base_image, Some(&arch));
-            (s3_url(&tar_path), base_image, arch)
-        })
-        .collect()
+fn tar_url(version: &RubyDownloadVersion, target: &BuildTarget) -> Url {
+    s3_url(&output_ruby_tar_path(
+        Path::new(""),
+        version,
+        &target.base_image,
+        Some(&target.arch),
+    ))
 }
 
 async fn check_version_on_s3(
     version: RubyDownloadVersion,
 ) -> Result<(RubyDownloadVersion, Vec<String>), shared::Error> {
-    let missing = s3_presence(urls_to_check(&version))
+    let missing = s3_presence(|target| tar_url(&version, target))
         .await?
         .missing()
         .map(|target| format!("{}/{}", target.base_image, target.arch))
