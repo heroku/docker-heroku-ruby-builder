@@ -57,6 +57,18 @@ impl JRubyVersion {
     pub fn parse(s: &str) -> Result<Self, ParseError> {
         s.parse()
     }
+
+    /// The first segment, `9` in `9.4.7.0`.
+    #[must_use]
+    pub fn major(&self) -> u32 {
+        self.major
+    }
+
+    /// The second segment, `4` in `9.4.7.0`.
+    #[must_use]
+    pub fn minor(&self) -> u32 {
+        self.minor
+    }
 }
 
 impl fmt::Display for JRubyVersion {
@@ -133,6 +145,7 @@ mod tests {
         assert_eq!(v.minor, 4);
         assert_eq!(v.patch, 7);
         assert_eq!(v.extra, 0);
+        assert_eq!((v.major(), v.minor()), (9, 4));
     }
 
     #[test]
