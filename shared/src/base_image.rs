@@ -86,15 +86,15 @@ impl FromStr for BaseImage {
     }
 }
 
-/// Returns all valid (BaseImage, Arch) pairs for building Ruby binaries.
-pub fn build_matrix() -> Vec<(BaseImage, Arch)> {
+/// Every target Ruby binaries are built for.
+pub fn build_matrix() -> Vec<BuildTarget> {
     BaseImage::all()
         .into_iter()
         .flat_map(|base_image| {
-            base_image
-                .archs()
-                .iter()
-                .map(move |arch| (base_image.clone(), *arch))
+            base_image.archs().iter().map(move |arch| BuildTarget {
+                base_image: base_image.clone(),
+                arch: *arch,
+            })
         })
         .collect()
 }

@@ -7,7 +7,8 @@ use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
 use shared::{
-    BaseImage, RubyDownloadVersion, build_matrix, output_ruby_tar_path, s3_presence, s3_url,
+    BaseImage, BuildTarget, RubyDownloadVersion, build_matrix, output_ruby_tar_path, s3_presence,
+    s3_url,
 };
 use std::{
     error::Error,
@@ -49,7 +50,7 @@ fn retain_releases_gte(
 fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(Url, BaseImage, Arch)> {
     build_matrix()
         .into_iter()
-        .map(|(base_image, arch)| {
+        .map(|BuildTarget { base_image, arch }| {
             let tar_path = output_ruby_tar_path(Path::new(""), version, &base_image, Some(&arch));
             (s3_url(&tar_path), base_image, arch)
         })

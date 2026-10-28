@@ -5,8 +5,8 @@ use libherokubuildpack::inventory::artifact::Arch;
 use minijinja::{Value, context};
 use ruby_executable::ruby_lang::BranchStatus;
 use shared::{
-    BaseImage, MajorMinor, RubyDownloadVersion, build_matrix, output_ruby_tar_path, s3_presence,
-    s3_url,
+    BaseImage, BuildTarget, MajorMinor, RubyDownloadVersion, build_matrix, output_ruby_tar_path,
+    s3_presence, s3_url,
 };
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
@@ -58,7 +58,7 @@ pub struct EmptyTable {
 fn tar_urls(version: &RubyDownloadVersion) -> Vec<(Url, BaseImage, Arch)> {
     build_matrix()
         .into_iter()
-        .map(|(base_image, arch)| {
+        .map(|BuildTarget { base_image, arch }| {
             let arch_dir = (!base_image.has_legacy_path()).then_some(&arch);
             let path = output_ruby_tar_path(Path::new(""), version, &base_image, arch_dir);
             (s3_url(&path), base_image, arch)

@@ -5,7 +5,7 @@ use libherokubuildpack::inventory::artifact::Arch;
 use serde::Deserialize;
 use shared::github::{self, GitHubToken};
 use shared::maybe_err::ResultVec;
-use shared::{BaseImage, build_matrix, parse_url, s3_url};
+use shared::{BaseImage, BuildTarget, build_matrix, parse_url, s3_url};
 use std::future::Future;
 use std::path::Path;
 use url::Url;
@@ -113,7 +113,7 @@ pub fn s3_urls_to_check(
 ) -> Vec<(Url, BaseImage, Arch)> {
     build_matrix()
         .into_iter()
-        .map(|(base_image, arch)| {
+        .map(|BuildTarget { base_image, arch }| {
             let path = Path::new(base_image.name())
                 .join(arch.to_string())
                 .join(format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz"));
