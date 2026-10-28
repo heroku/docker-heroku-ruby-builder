@@ -1,5 +1,6 @@
 //! One row per Ruby `MAJOR.MINOR` line, newest first, with the newest release available on each base image.
 
+use minijinja::{Value, context};
 use ruby_executable::ruby_lang::BranchStatus;
 use shared::{BaseImage, MajorMinor, RubyDownloadVersion};
 use std::cmp::Reverse;
@@ -31,6 +32,15 @@ pub struct RubyRow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RubyTable {
     pub rows: Vec<RubyRow>,
+    /// The version shown in the Gemfile example: the newest one on the newest base image.
+    pub example: RubyDownloadVersion,
+}
+
+/// An empty table means an upstream source or S3 lookup is broken, so it is not published.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[error("no Ruby release at or above {floor} is available on any base image")]
+pub struct EmptyTable {
+    pub floor: MajorMinor,
 }
 
 impl RubyTable {
@@ -40,7 +50,7 @@ impl RubyTable {
         branches: &[(MajorMinor, BranchStatus)],
         builds: &[RubyBuild],
         floor: MajorMinor,
-    ) -> RubyTable {
+    ) -> Result<RubyTable, EmptyTable> {
         let mut rows = branches
             .iter()
             .filter_map(|&(major_minor, status)| {
@@ -75,7 +85,15 @@ impl RubyTable {
             })
             .collect::<Vec<_>>();
         rows.sort_by_key(|row| Reverse(row.major_minor));
-        RubyTable { rows }
+        let (_, example) = rows
+            .iter()
+            .flat_map(|row| &row.versions)
+            .max()
+            .ok_or(EmptyTable { floor })?;
+        Ok(RubyTable {
+            example: example.clone(),
+            rows,
+        })
     }
 
     /// The table's columns.
@@ -84,6 +102,46 @@ impl RubyTable {
             .iter()
             .flat_map(|row| row.versions.keys())
             .collect()
+    }
+}
+
+impl RubyTable {
+    /// Markdown with `\n` line endings: the HTML table, then a Gemfile example.
+    pub fn render(&self) -> Result<String, minijinja::Error> {
+        crate::render_template(
+            "ruby_versions_table.md.jinja",
+            include_str!("../templates/ruby_versions_table.md.jinja"),
+            context! {
+                base_images => self.base_images().iter().map(ToString::to_string).collect::<Value>(),
+                rows => self.render_row_values(),
+                example => self.example.to_string(),
+            },
+        )
+    }
+
+    fn render_row_values(&self) -> Value {
+        self.rows
+            .iter()
+            .map(|row| {
+                let (style, label) = match row.lifecycle {
+                    Lifecycle::Maintained => (None, ""),
+                    Lifecycle::SecurityOnly => (
+                        Some("background-color:#fcf8e3;color:#8a6d3b;"),
+                        " (security-only)",
+                    ),
+                    Lifecycle::Eol => (Some("background-color:#f2dede;color:#a94442;"), " (EOL)"),
+                };
+                context! {
+                    major_minor => row.major_minor.to_string(),
+                    style,
+                    label,
+                    versions => self.base_images()
+                        .iter()
+                        .map(|base_image| row.versions.get(base_image).map(ToString::to_string))
+                        .collect::<Value>(),
+                }
+            })
+            .collect::<Value>()
     }
 }
 
@@ -150,7 +208,7 @@ mod tests {
             build("7.9.5", &["heroku-24", "heroku-26"]),
         ];
 
-        let table = RubyTable::new(&branches, &builds, "8.0".parse().unwrap());
+        let table = RubyTable::new(&branches, &builds, "8.0".parse().unwrap()).unwrap();
 
         insta::assert_snapshot!(summary(&table).join("\n"), @r"
         8.2 Maintained: 8.2.2 8.2.1
@@ -161,12 +219,28 @@ mod tests {
 
     #[test]
     fn leaves_out_a_line_with_nothing_available() {
+        let branches = [
+            branch("8.2", BranchStatus::NormalMaintenance),
+            branch("8.1", BranchStatus::SecurityMaintenance),
+        ];
+        let builds = [build("8.2.0", &[]), build("8.1.9", &["heroku-24"])];
+
+        let table = RubyTable::new(&branches, &builds, "8.0".parse().unwrap()).unwrap();
+
+        assert_eq!(summary(&table), vec!["8.1 SecurityOnly: 8.1.9"]);
+    }
+
+    #[test]
+    fn errors_when_nothing_is_available() {
         let branches = [branch("8.2", BranchStatus::NormalMaintenance)];
         let builds = [build("8.2.0", &[])];
 
-        let table = RubyTable::new(&branches, &builds, "8.0".parse().unwrap());
+        let error = RubyTable::new(&branches, &builds, "8.0".parse().unwrap()).unwrap_err();
 
-        assert_eq!(summary(&table), Vec::<String>::new());
+        assert_eq!(
+            error.to_string(),
+            "no Ruby release at or above 8.0 is available on any base image"
+        );
     }
 
     #[test]
@@ -174,8 +248,84 @@ mod tests {
         let branches = [branch("8.2", BranchStatus::NormalMaintenance)];
         let builds = [build("8.2.1", &["heroku-24"])];
 
-        let table = RubyTable::new(&branches, &builds, "8.0".parse().unwrap());
+        let table = RubyTable::new(&branches, &builds, "8.0".parse().unwrap()).unwrap();
 
         assert_eq!(summary(&table), vec!["8.2 Maintained: 8.2.1"]);
+    }
+
+    fn rendered_fixture() -> RubyTable {
+        let branches = [
+            branch("8.2", BranchStatus::NormalMaintenance),
+            branch("8.1", BranchStatus::SecurityMaintenance),
+            branch("8.0", BranchStatus::Eol),
+        ];
+        let builds = [
+            build("8.2.1", &["heroku-24", "heroku-26"]),
+            build("8.1.9", &["heroku-24", "heroku-26"]),
+            build("8.0.7", &["heroku-24"]),
+        ];
+        RubyTable::new(&branches, &builds, "8.0".parse().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn example_is_the_newest_release_on_the_newest_base_image() {
+        let branches = [
+            branch("8.2", BranchStatus::NormalMaintenance),
+            branch("8.1", BranchStatus::SecurityMaintenance),
+        ];
+        let builds = [
+            build("8.2.2", &["heroku-24"]),
+            build("8.2.1", &["heroku-24", "heroku-26"]),
+            build("8.1.9", &["heroku-26"]),
+        ];
+
+        let table = RubyTable::new(&branches, &builds, "8.0".parse().unwrap()).unwrap();
+
+        assert_eq!(table.example, version("8.2.1"));
+    }
+
+    #[test]
+    fn renders_one_tag_per_line_with_lifecycle_labels_and_styles() {
+        insta::assert_snapshot!(rendered_fixture().render().unwrap(), @r#"
+        <table>
+          <thead>
+            <tr>
+              <th>Ruby series</th>
+                <th>heroku-24</th>
+                <th>heroku-26</th>
+            </tr>
+          </thead>
+          <tbody>
+              <tr>
+                <td>8.2</td>
+                  <td>8.2.1</td>
+                  <td>8.2.1</td>
+              </tr>
+              <tr style="background-color:#fcf8e3;color:#8a6d3b;">
+                <td>8.1 (security-only)</td>
+                  <td>8.1.9</td>
+                  <td>8.1.9</td>
+              </tr>
+              <tr style="background-color:#f2dede;color:#a94442;">
+                <td>8.0 (EOL)</td>
+                  <td>8.0.7</td>
+                  <td>-</td>
+              </tr>
+          </tbody>
+        </table>
+
+        To use a Ruby version, specify it in your `Gemfile`. For example:
+
+        ```ruby
+        # Gemfile
+        ruby '8.2.1'
+        ```
+
+        Then, with that Ruby version installed locally, update your `Gemfile.lock` by running:
+
+        ```term
+        $ bundle update --ruby
+        ```
+        "#);
     }
 }

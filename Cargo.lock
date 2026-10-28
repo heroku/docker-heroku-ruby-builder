@@ -1753,6 +1753,7 @@ dependencies = [
  "pretty_assertions",
  "ruby_executable",
  "shared",
+ "thiserror",
 ]
 
 [[package]]
