@@ -154,6 +154,9 @@ pub enum Error {
         source: std::io::Error,
     },
 
+    #[error("S3 check task failed: {0}")]
+    S3CheckTask(#[source] tokio::task::JoinError),
+
     #[error("Error {0}")]
     Other(String),
 }
@@ -180,6 +183,63 @@ pub fn validate_version_for_stack(
     }
 
     Ok(())
+}
+
+/// A string that failed to parse as a [`Url`].
+#[derive(Debug, thiserror::Error)]
+#[error("cannot parse `{input}` as a URL: {source}")]
+pub struct UrlParseError {
+    pub input: String,
+    pub source: url::ParseError,
+}
+
+/// Parse `input` as a [`Url`], keeping `input` in the error since [`url::ParseError`] omits it.
+pub fn parse_url(input: &str) -> Result<Url, UrlParseError> {
+    #[expect(clippy::disallowed_methods)]
+    let parsed = Url::parse(input);
+    parsed.map_err(|source| UrlParseError {
+        input: input.to_owned(),
+        source,
+    })
+}
+
+/// The S3 URL of the object at `path`, relative to the bucket root.
+pub fn s3_url(path: &Path) -> Url {
+    let mut url = parse_url(S3_BASE_URL).expect("internal constant should be a valid URL");
+    url.path_segments_mut()
+        .expect("valid base URL")
+        .extend(path.iter().map(|segment| segment.to_string_lossy()));
+    url
+}
+
+/// Which base image and architecture pairs have an artifact on S3.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct S3Presence {
+    pub present: Vec<(BaseImage, Arch)>,
+    pub missing: Vec<(BaseImage, Arch)>,
+}
+
+/// Check every URL concurrently. Each URL is the artifact for its base image and architecture.
+pub async fn s3_presence(urls: Vec<(Url, BaseImage, Arch)>) -> Result<S3Presence, Error> {
+    let mut set = tokio::task::JoinSet::new();
+    for (url, base_image, arch) in urls {
+        set.spawn(async move {
+            s3_url_exists(url)
+                .await
+                .map(|exists| (exists, base_image, arch))
+        });
+    }
+
+    let mut presence = S3Presence::default();
+    while let Some(result) = set.join_next().await {
+        let (exists, base_image, arch) = result.map_err(Error::S3CheckTask)??;
+        if exists {
+            presence.present.push((base_image, arch));
+        } else {
+            presence.missing.push((base_image, arch));
+        }
+    }
+    Ok(presence)
 }
 
 /// Performs an HTTP HEAD request to check if a URL returns a successful status.
@@ -349,6 +409,14 @@ mod test {
     use std::thread;
     use tempfile::tempdir;
     use tiny_http::{Response, Server};
+
+    #[test]
+    fn s3_url_joins_path_segments() {
+        assert_eq!(
+            s3_url(Path::new("heroku-24/amd64/ruby-3.4.1.tgz")).as_str(),
+            format!("{S3_BASE_URL}/heroku-24/amd64/ruby-3.4.1.tgz")
+        );
+    }
 
     #[test]
     fn test_update_shebang_with_ruby_shebang() {

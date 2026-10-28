@@ -3,11 +3,10 @@ use clap::Parser;
 use fs_err::{self as fs, PathExt};
 use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
-use reqwest::Url;
 use shared::{
-    BaseImage, BuildStatus, RubyDownloadVersion, S3_BASE_URL, TarDownloadPath,
-    append_filename_with, download_tar, output_ruby_tar_path, s3_url_exists, sha256_from_path,
-    source_dir, write_job_metadata,
+    BaseImage, BuildStatus, RubyDownloadVersion, TarDownloadPath, append_filename_with,
+    download_tar, output_ruby_tar_path, s3_url, s3_url_exists, sha256_from_path, source_dir,
+    write_job_metadata,
 };
 use std::{
     io::Write,
@@ -87,14 +86,7 @@ async fn ruby_build(args: &RubyArgs) -> Result<BuildStatus, Box<dyn std::error::
                 return Ok(BuildStatus::Skipped);
             }
 
-            let s3_path = expected_output.strip_prefix(volume_output_dir)?;
-            let url = {
-                let mut url = Url::parse(S3_BASE_URL)?;
-                url.path_segments_mut()
-                    .expect("valid base URL")
-                    .extend(s3_path.iter().map(|s| s.to_string_lossy()));
-                url
-            };
+            let url = s3_url(expected_output.strip_prefix(volume_output_dir)?);
 
             print::bullet(format!("Checking if already uploaded: {url}"));
             if s3_url_exists(url.clone()).await? {

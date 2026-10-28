@@ -27,4 +27,7 @@ disallowed-methods = [
     { path = "std::path::Path::canonicalize", reason = "Use fs_err::path::PathExt methods" },
     { path = "std::path::Path::read_link", reason = "Use fs_err::path::PathExt methods" },
     { path = "std::path::Path::read_dir", reason = "Use fs_err::path::PathExt methods" },
+
+    # Use shared::parse_url, so the input string is available in the error message
+    { path = "url::Url::parse", replacement = "shared::parse_url" },
 ]

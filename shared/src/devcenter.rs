@@ -13,7 +13,7 @@
 //! publishing is protected against duplicates: before each POST it queries
 //! existing entries by title for a matching published entry.
 
-use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, with_retries, with_retries_if};
+use crate::{MAX_RETRY_ATTEMPTS, RETRY_DELAY, parse_url, with_retries, with_retries_if};
 use chrono::{DateTime, Utc};
 use clap::ValueEnum;
 use reqwest::{StatusCode, Url};
@@ -25,7 +25,7 @@ use std::time::Duration;
 /// Production Dev Center base URL, parsed once and shared by callers of
 /// [`create_changelog_item`] as its `host`.
 pub static DEVCENTER_HOST: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
-    Url::parse("https://devcenter.heroku.com").expect("hard-coded Dev Center host is a valid URL")
+    parse_url("https://devcenter.heroku.com").expect("internal literal should be a valid URL")
 });
 
 /// The largest page the Dev Center private API will serve (`per_page`), used to
@@ -701,7 +701,7 @@ mod test {
         H: Fn(&str, &str) -> (u16, String) + Send + Sync + 'static,
     {
         let server = Arc::new(Server::http("127.0.0.1:0").unwrap());
-        let addr = Url::parse(&format!("http://{}", server.server_addr())).unwrap();
+        let addr = parse_url(&format!("http://{}", server.server_addr())).unwrap();
         let captured = Arc::new(Mutex::new(Vec::new()));
         let handler = Arc::new(handler);
 
@@ -1528,7 +1528,7 @@ mod test {
 
     #[test]
     fn changelog_item_url_points_at_the_item_path() {
-        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let host = parse_url("https://devcenter.heroku.com").unwrap();
         let url = changelog_item_url(&host, 3820);
         assert_eq!(
             url.as_str(),
@@ -1538,7 +1538,7 @@ mod test {
 
     #[test]
     fn summary_reports_a_published_entry_with_a_bare_url() {
-        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let host = parse_url("https://devcenter.heroku.com").unwrap();
         let outcome = CreateOutcome::Created(CreatedChangelogItem {
             id: 3820,
             published_at: Some(at("2026-09-21T00:00:00Z")),
@@ -1560,7 +1560,7 @@ mod test {
 
     #[test]
     fn summary_reports_a_draft_and_notes_admin_visibility() {
-        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let host = parse_url("https://devcenter.heroku.com").unwrap();
         let outcome = CreateOutcome::Created(CreatedChangelogItem {
             id: 77,
             published_at: None,
@@ -1583,7 +1583,7 @@ mod test {
 
     #[test]
     fn summary_reports_an_already_published_match_using_the_existing_title() {
-        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let host = parse_url("https://devcenter.heroku.com").unwrap();
         let outcome = CreateOutcome::AlreadyPublished(ExistingChangelogItem {
             id: 5,
             title: "  Ruby version 3.4.1 is now available\n".to_string(),
@@ -1611,7 +1611,7 @@ mod test {
     fn write_changelog_summary_creates_and_appends_to_the_file() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("step-summary.md");
-        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let host = parse_url("https://devcenter.heroku.com").unwrap();
         let outcome = CreateOutcome::Created(CreatedChangelogItem {
             id: 3820,
             published_at: Some(at("2026-09-21T00:00:00Z")),
@@ -1636,7 +1636,7 @@ mod test {
 
     #[test]
     fn write_changelog_summary_none_is_a_noop() {
-        let host = Url::parse("https://devcenter.heroku.com").unwrap();
+        let host = parse_url("https://devcenter.heroku.com").unwrap();
         let outcome = CreateOutcome::Created(CreatedChangelogItem {
             id: 1,
             published_at: None,

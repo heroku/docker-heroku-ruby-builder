@@ -1,22 +1,19 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
+use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
+use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
-use shared::{RubyDownloadVersion, S3_BASE_URL, build_matrix, output_ruby_tar_path, s3_url_exists};
+use shared::{
+    BaseImage, RubyDownloadVersion, build_matrix, output_ruby_tar_path, s3_presence, s3_url,
+};
 use std::{
     error::Error,
     path::{Path, PathBuf},
 };
 use tokio::task::JoinSet;
-use yaml_rust2::{ScanError, Yaml, YamlLoader};
-
-static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
-    Url::parse("https://api.github.com/repos/ruby/www.ruby-lang.org/contents/_data/releases.yml")
-        .expect("valid releases URL constant")
-});
-
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
 struct Args {
@@ -30,59 +27,6 @@ struct Args {
     /// Path to write JSON output file containing versions that need builds
     #[arg(long = "output", required = true)]
     output: PathBuf,
-}
-
-#[derive(Debug, thiserror::Error)]
-enum FlatYamlError {
-    #[error("Cannot parse yaml due to error {1} from input:\n{0}")]
-    NotYaml(String, ScanError),
-    #[error("Expected first yaml element to be a vec but it was not: {1:?} from input:\n{0}")]
-    FirstNotVec(String, Vec<Yaml>),
-}
-
-#[derive(Debug, thiserror::Error)]
-enum RubyLangEntryError {
-    #[error(transparent)]
-    DocError(#[from] FlatYamlError),
-
-    #[error("expected yaml to have a `version` field but it did not: {0:?}")]
-    MissingVersion(Yaml),
-
-    #[error(transparent)]
-    CannotParse(#[from] shared::Error),
-}
-
-/// Parse output from <https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml>
-fn parse_flat_yaml(body: String) -> Result<Vec<Yaml>, FlatYamlError> {
-    YamlLoader::load_from_str(&body)
-        .map_err(|error| FlatYamlError::NotYaml(body.clone(), error))
-        .and_then(|docs| {
-            docs.first()
-                .and_then(|doc| doc.as_vec())
-                .cloned()
-                .ok_or(FlatYamlError::FirstNotVec(body.clone(), docs.clone()))
-        })
-}
-
-/// Parses output from Ruby Lang into Ruby Versions
-///
-/// Fault tolerant parse result of <https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml>
-fn ruby_lang_versions(body: String) -> ResultVec<RubyDownloadVersion, RubyLangEntryError> {
-    match parse_flat_yaml(body) {
-        Ok(entries) => entries
-            .into_iter()
-            .map(|entry| {
-                entry["version"]
-                    .as_str()
-                    .ok_or_else(|| RubyLangEntryError::MissingVersion(entry.clone()))
-                    .and_then(|v| {
-                        RubyDownloadVersion::new(v).map_err(RubyLangEntryError::CannotParse)
-                    })
-            })
-            .collect(),
-        Err(error) => vec![Err(error.into())],
-    }
-    .into()
 }
 
 fn version_gte(version: &RubyDownloadVersion, minimum: &RubyDownloadVersion) -> bool {
@@ -102,41 +46,25 @@ fn retain_releases_gte(
         .collect()
 }
 
-fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(String, Url)> {
-    let matrix = build_matrix();
-    let base_url = Url::parse(S3_BASE_URL).expect("valid base URL constant");
-    matrix
-        .iter()
+fn urls_to_check(version: &RubyDownloadVersion) -> Vec<(Url, BaseImage, Arch)> {
+    build_matrix()
+        .into_iter()
         .map(|(base_image, arch)| {
-            let tar_path = output_ruby_tar_path(Path::new(""), version, base_image, Some(arch));
-            let mut url = base_url.clone();
-            url.path_segments_mut()
-                .expect("valid base URL")
-                .extend(tar_path.iter().map(|s| s.to_string_lossy()));
-            (format!("{base_image}/{arch}"), url)
+            let tar_path = output_ruby_tar_path(Path::new(""), version, &base_image, Some(&arch));
+            (s3_url(&tar_path), base_image, arch)
         })
         .collect()
 }
 
 async fn check_version_on_s3(
     version: RubyDownloadVersion,
-) -> Result<(RubyDownloadVersion, Vec<String>), Box<dyn std::error::Error + Send + Sync>> {
-    let mut set = JoinSet::new();
-    for (label, url) in urls_to_check(&version) {
-        set.spawn(async move {
-            let exists = s3_url_exists(url).await?;
-            Ok::<_, Box<dyn std::error::Error + Send + Sync>>((label, exists))
-        });
-    }
-
-    let mut missing = Vec::new();
-    while let Some(result) = set.join_next().await {
-        let (label, exists) = result??;
-        if !exists {
-            missing.push(label);
-        }
-    }
-
+) -> Result<(RubyDownloadVersion, Vec<String>), shared::Error> {
+    let missing = s3_presence(urls_to_check(&version))
+        .await?
+        .missing
+        .into_iter()
+        .map(|(base_image, arch)| format!("{base_image}/{arch}"))
+        .collect();
     Ok((version, missing))
 }
 
@@ -169,7 +97,7 @@ async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
 
     let mut versions_to_build = Vec::new();
     while let Some(result) = set.join_next().await {
-        match result.map_err(|e| e.into()) {
+        match result {
             Ok(Ok((version, missing))) => {
                 if missing.is_empty() {
                     print::sub_bullet(format!("{version}: all binaries present"));
@@ -182,7 +110,8 @@ async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
                     versions_to_build.push(version);
                 }
             }
-            Err(e) | Ok(Err(e)) => errors.push(e),
+            Ok(Err(e)) => errors.push(e.into()),
+            Err(e) => errors.push(e.into()),
         }
     }
 
@@ -230,63 +159,6 @@ async fn main() {
 mod tests {
     use super::*;
     use clap::CommandFactory;
-    use std::assert_matches;
-
-    #[test]
-    fn ruby_lang_parsing_returns_partial_result_on_parse_failure() {
-        let body = indoc::indoc! {"
-            - version: 4.0.5
-            - version: 4.doesnotparse.5
-        "}
-        .to_string();
-
-        let mut errors = Vec::new();
-        let versions = ruby_lang_versions(body).unwrap_drain_errs(&mut errors);
-        assert_eq!(
-            vec![String::from("4.0.5")],
-            versions.iter().map(|v| v.to_string()).collect::<Vec<_>>()
-        );
-
-        assert_eq!(1, errors.len());
-        assert_matches!(
-            errors.into_iter().next().unwrap(),
-            RubyLangEntryError::CannotParse(_)
-        );
-    }
-
-    #[test]
-    fn parse_flat_yaml_errors_on_unparseable_yaml() {
-        let body = String::from("cannot_parse: 'unterminated_string");
-        assert_matches!(parse_flat_yaml(body), Err(FlatYamlError::NotYaml(_, _)));
-    }
-
-    #[test]
-    fn parse_flat_yaml_errors_when_top_level_not_vec() {
-        let body = String::from("version: 4.0.5");
-        assert_matches!(parse_flat_yaml(body), Err(FlatYamlError::FirstNotVec(_, _)));
-    }
-
-    #[test]
-    fn ruby_lang_versions_errors_on_missing_version_field() {
-        let body = indoc::indoc! {"
-            - name: ruby
-            - version: 4.0.5
-        "}
-        .to_string();
-
-        let mut errors = Vec::new();
-        let versions = ruby_lang_versions(body).unwrap_drain_errs(&mut errors);
-        assert_eq!(
-            vec![String::from("4.0.5")],
-            versions.iter().map(|v| v.to_string()).collect::<Vec<_>>()
-        );
-
-        assert_eq!(1, errors.len());
-        assert_matches!(
-            errors.into_iter().next().unwrap(),
-            RubyLangEntryError::MissingVersion(_)
-        );
-    }
 
     #[test]
     fn test_version_gte() {
