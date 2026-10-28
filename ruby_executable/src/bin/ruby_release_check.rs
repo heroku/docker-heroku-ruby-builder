@@ -61,9 +61,8 @@ async fn check_version_on_s3(
 ) -> Result<(RubyDownloadVersion, Vec<String>), shared::Error> {
     let missing = s3_presence(urls_to_check(&version))
         .await?
-        .missing
-        .into_iter()
-        .map(|(base_image, arch)| format!("{base_image}/{arch}"))
+        .missing()
+        .map(|target| format!("{}/{}", target.base_image, target.arch))
         .collect();
     Ok((version, missing))
 }

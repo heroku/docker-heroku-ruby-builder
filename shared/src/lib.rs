@@ -2,6 +2,7 @@ use fs_err::{self as fs, File, PathExt};
 use fun_run::CommandWithName;
 use libherokubuildpack::inventory::artifact::Arch;
 use reqwest::Url;
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -214,23 +215,37 @@ pub fn s3_url(path: &Path) -> Url {
     url
 }
 
-/// Which base image and architecture pairs have an artifact on S3.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct S3Presence {
-    pub present: Vec<(BaseImage, Arch)>,
-    pub missing: Vec<(BaseImage, Arch)>,
+/// Whether an artifact is on S3.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum S3Status {
+    Present,
+    Missing,
 }
 
+/// The S3 status of an artifact for each build target checked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct S3Presence(BTreeMap<BuildTarget, S3Status>);
+
 impl S3Presence {
+    /// Build targets without the artifact, ordered by base image then architecture.
+    pub fn missing(&self) -> impl Iterator<Item = &BuildTarget> {
+        self.0
+            .iter()
+            .filter(|(_, status)| **status == S3Status::Missing)
+            .map(|(target, _)| target)
+    }
+
     /// Base images with the artifact present for every one of their architectures.
     pub fn complete_base_images(&self) -> Vec<BaseImage> {
         BaseImage::all()
             .into_iter()
             .filter(|base_image| {
                 base_image.archs().iter().all(|arch| {
-                    self.present
-                        .iter()
-                        .any(|(image, present)| image == base_image && present == arch)
+                    let target = BuildTarget {
+                        base_image: base_image.clone(),
+                        arch: *arch,
+                    };
+                    self.0.get(&target) == Some(&S3Status::Present)
                 })
             })
             .collect()
@@ -248,16 +263,17 @@ pub async fn s3_presence(urls: Vec<(Url, BaseImage, Arch)>) -> Result<S3Presence
         });
     }
 
-    let mut presence = S3Presence::default();
+    let mut presence = BTreeMap::new();
     while let Some(result) = set.join_next().await {
         let (exists, base_image, arch) = result.map_err(Error::S3CheckTask)??;
-        if exists {
-            presence.present.push((base_image, arch));
+        let status = if exists {
+            S3Status::Present
         } else {
-            presence.missing.push((base_image, arch));
-        }
+            S3Status::Missing
+        };
+        presence.insert(BuildTarget { base_image, arch }, status);
     }
-    Ok(presence)
+    Ok(S3Presence(presence))
 }
 
 /// Performs an HTTP HEAD request to check if a URL returns a successful status.
@@ -440,14 +456,20 @@ mod test {
     fn complete_base_images_need_every_arch() {
         let heroku_22 = BaseImage::new("heroku-22").unwrap();
         let heroku_24 = BaseImage::new("heroku-24").unwrap();
-        let presence = S3Presence {
-            present: vec![
-                (heroku_22.clone(), Arch::Amd64),
-                (heroku_24.clone(), Arch::Amd64),
-            ],
-            missing: vec![(heroku_24, Arch::Arm64)],
+        let target = |base_image: &BaseImage, arch| BuildTarget {
+            base_image: base_image.clone(),
+            arch,
         };
+        let presence = S3Presence(BTreeMap::from([
+            (target(&heroku_22, Arch::Amd64), S3Status::Present),
+            (target(&heroku_24, Arch::Amd64), S3Status::Present),
+            (target(&heroku_24, Arch::Arm64), S3Status::Missing),
+        ]));
         assert_eq!(presence.complete_base_images(), vec![heroku_22]);
+        assert_eq!(
+            presence.missing().collect::<Vec<_>>(),
+            vec![&target(&heroku_24, Arch::Arm64)]
+        );
     }
 
     #[test]

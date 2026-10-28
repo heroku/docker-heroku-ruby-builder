@@ -143,20 +143,20 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
     let mut versions_to_build = Vec::new();
     while let Some(result) = s3_set.join_next().await {
         match result {
-            Ok(Ok((version, S3Presence { missing, .. }))) if missing.is_empty() => {
+            Ok(Ok((version, presence))) if presence.missing().next().is_none() => {
                 if errors.is_empty() {
                     print::sub_bullet(format!("{version}: all binaries present"));
                 }
             }
-            Ok(Ok((version, S3Presence { missing, .. }))) => {
+            Ok(Ok((version, presence))) => {
+                let missing = presence
+                    .missing()
+                    .map(|target| format!("{}/{}", target.base_image.name(), target.arch))
+                    .collect::<Vec<_>>();
                 print::sub_bullet(format!(
                     "{version}: missing {} base image(s): {}",
                     missing.len(),
-                    missing
-                        .iter()
-                        .map(|(image, arch)| format!("{}/{}", image.name(), arch))
-                        .collect::<Vec<_>>()
-                        .join(", ")
+                    missing.join(", ")
                 ));
                 versions_to_build.push(version);
             }
