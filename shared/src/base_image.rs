@@ -14,7 +14,7 @@ static KNOWN_BASE_IMAGES: &[(&str, &str, &[Arch])] = &[
 #[error("Invalid base image {0} must be one of {known}", known = KNOWN_BASE_IMAGES.iter().map(|(name, _, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
 pub struct BaseImageError(String);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BaseImage {
     name: String,
     distro_number: String,

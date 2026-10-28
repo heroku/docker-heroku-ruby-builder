@@ -5,3 +5,9 @@ rust-version.workspace = true
 
 [dependencies]
 minijinja = { workspace = true }
+ruby_executable = { path = "../ruby_executable" }
+shared = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+pretty_assertions = { workspace = true }
