@@ -16,7 +16,6 @@ use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
 use std::error::Error;
 use std::fmt::Display;
-use std::io::Write;
 use support_article::jruby_table::{self, JRubyTable};
 use support_article::ruby_table::{self, RubyTable};
 
@@ -128,17 +127,23 @@ async fn generate(args: TableArgs) -> Result<Tables, BoxError> {
 
 async fn print_tables(args: PrintArgs) -> Result<(), BoxError> {
     let tables = generate(args.tables).await?;
-    writeln!(
-        std::io::stdout(),
-        "{}\n\n{}",
-        tables.ruby.render()?,
-        tables.jruby.render()?
-    )?;
+    let ruby = tables.ruby.render()?;
+    let jruby = tables.jruby.render()?;
+    print::h2("Ruby Table");
+    bullet_stream::global::with_locked_writer(std::io::stdout(), || {
+        print::plain(ruby);
+    });
+
+    print::h2("JRuby Table");
+    bullet_stream::global::with_locked_writer(std::io::stdout(), || {
+        print::plain(jruby);
+    });
     Ok(())
 }
 
 #[tokio::main]
 async fn main() {
+    print::h1("Heroku Ruby Support reference");
     let cli = Cli::parse();
     let result = match cli.command {
         Command::Print(args) => print_tables(args).await,
