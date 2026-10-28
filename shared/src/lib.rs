@@ -50,10 +50,12 @@ pub mod devcenter;
 mod download_ruby_version;
 pub mod github;
 mod inventory_help;
+mod major_minor;
 pub mod maybe_err;
 
 pub use base_image::{BaseImage, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
+pub use major_minor::{MajorMinor, MajorMinorError};
 
 pub static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 pub use inventory_help::{
