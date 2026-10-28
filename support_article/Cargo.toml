@@ -1,0 +1,7 @@
+[package]
+name = "support_article"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+minijinja = { workspace = true }
