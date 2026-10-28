@@ -1749,11 +1749,14 @@ name = "support_article"
 version = "0.0.0"
 dependencies = [
  "insta",
+ "libherokubuildpack",
  "minijinja",
  "pretty_assertions",
  "ruby_executable",
  "shared",
  "thiserror",
+ "tokio",
+ "url",
 ]
 
 [[package]]

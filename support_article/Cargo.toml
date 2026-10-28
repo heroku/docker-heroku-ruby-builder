@@ -4,10 +4,13 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+libherokubuildpack = { workspace = true }
 minijinja = { workspace = true }
 ruby_executable = { path = "../ruby_executable" }
 shared = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
