@@ -219,6 +219,22 @@ pub struct S3Presence {
     pub missing: Vec<(BaseImage, Arch)>,
 }
 
+impl S3Presence {
+    /// Base images with the artifact present for every one of their architectures.
+    pub fn complete_base_images(&self) -> Vec<BaseImage> {
+        BaseImage::all()
+            .into_iter()
+            .filter(|base_image| {
+                base_image.archs().iter().all(|arch| {
+                    self.present
+                        .iter()
+                        .any(|(image, present)| image == base_image && present == arch)
+                })
+            })
+            .collect()
+    }
+}
+
 /// Check every URL concurrently. Each URL is the artifact for its base image and architecture.
 pub async fn s3_presence(urls: Vec<(Url, BaseImage, Arch)>) -> Result<S3Presence, Error> {
     let mut set = tokio::task::JoinSet::new();
@@ -416,6 +432,20 @@ mod test {
             s3_url(Path::new("heroku-24/amd64/ruby-3.4.1.tgz")).as_str(),
             format!("{S3_BASE_URL}/heroku-24/amd64/ruby-3.4.1.tgz")
         );
+    }
+
+    #[test]
+    fn complete_base_images_need_every_arch() {
+        let heroku_22 = BaseImage::new("heroku-22").unwrap();
+        let heroku_24 = BaseImage::new("heroku-24").unwrap();
+        let presence = S3Presence {
+            present: vec![
+                (heroku_22.clone(), Arch::Amd64),
+                (heroku_24.clone(), Arch::Amd64),
+            ],
+            missing: vec![(heroku_24, Arch::Arm64)],
+        };
+        assert_eq!(presence.complete_base_images(), vec![heroku_22]);
     }
 
     #[test]
