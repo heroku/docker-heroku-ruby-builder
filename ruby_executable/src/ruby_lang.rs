@@ -1,13 +1,13 @@
 //! Release data published by ruby-lang.org in the `ruby/www.ruby-lang.org` repository.
 
 use reqwest::Url;
-use shared::RubyDownloadVersion;
 use shared::maybe_err::ResultVec;
+use shared::{RubyDownloadVersion, parse_url};
 use yaml_rust2::{ScanError, Yaml, YamlLoader};
 
 pub static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
-    Url::parse("https://api.github.com/repos/ruby/www.ruby-lang.org/contents/_data/releases.yml")
-        .expect("valid releases URL constant")
+    parse_url("https://api.github.com/repos/ruby/www.ruby-lang.org/contents/_data/releases.yml")
+        .expect("internal literal should be a valid URL")
 });
 
 #[derive(Debug, thiserror::Error)]

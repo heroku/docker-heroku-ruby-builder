@@ -185,9 +185,27 @@ pub fn validate_version_for_stack(
     Ok(())
 }
 
+/// A string that failed to parse as a [`Url`].
+#[derive(Debug, thiserror::Error)]
+#[error("cannot parse `{input}` as a URL: {source}")]
+pub struct UrlParseError {
+    pub input: String,
+    pub source: url::ParseError,
+}
+
+/// Parse `input` as a [`Url`], keeping `input` in the error since [`url::ParseError`] omits it.
+pub fn parse_url(input: &str) -> Result<Url, UrlParseError> {
+    #[expect(clippy::disallowed_methods)]
+    let parsed = Url::parse(input);
+    parsed.map_err(|source| UrlParseError {
+        input: input.to_owned(),
+        source,
+    })
+}
+
 /// The S3 URL of the object at `path`, relative to the bucket root.
 pub fn s3_url(path: &Path) -> Url {
-    let mut url = Url::parse(S3_BASE_URL).expect("valid base URL constant");
+    let mut url = parse_url(S3_BASE_URL).expect("internal constant should be a valid URL");
     url.path_segments_mut()
         .expect("valid base URL")
         .extend(path.iter().map(|segment| segment.to_string_lossy()));

@@ -5,15 +5,15 @@ use libherokubuildpack::inventory::artifact::Arch;
 use serde::Deserialize;
 use shared::github::{self, GitHubToken};
 use shared::maybe_err::ResultVec;
-use shared::{BaseImage, build_matrix, s3_url};
+use shared::{BaseImage, build_matrix, parse_url, s3_url};
 use std::future::Future;
 use std::path::Path;
 use url::Url;
 
 pub static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
     // per_page=100 is the GitHub releases API maximum page size.
-    Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100")
-        .expect("valid releases URL constant")
+    parse_url("https://api.github.com/repos/jruby/jruby/releases?per_page=100")
+        .expect("internal literal should be a valid URL")
 });
 
 /// A single entry from the GitHub releases listing API.
@@ -171,7 +171,7 @@ mod tests {
     #[tokio::test]
     async fn paginate_strips_leading_v_from_tag() {
         let page1 =
-            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
+            parse_url("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
 
         let mut errors: Vec<ReleasePageError> = Vec::new();
         let versions = paginate_releases_accumulated(page1, move |_url| async move {
@@ -229,9 +229,9 @@ mod tests {
     #[tokio::test]
     async fn paginate_keeps_releases_collected_before_a_failed_page() {
         let page1 =
-            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
+            parse_url("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
         let page2 =
-            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100&page=2")
+            parse_url("https://api.github.com/repos/jruby/jruby/releases?per_page=100&page=2")
                 .unwrap();
         let expected_failed = page2.clone();
 
@@ -258,7 +258,7 @@ mod tests {
     #[tokio::test]
     async fn paginate_returns_no_error_when_all_pages_succeed() {
         let page1 =
-            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
+            parse_url("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
 
         let mut errors: Vec<ReleasePageError> = Vec::new();
         let versions = paginate_releases_accumulated(page1, move |_url| async move {
@@ -277,7 +277,7 @@ mod tests {
     #[tokio::test]
     async fn paginate_accumulates_version_parse_errors_and_keeps_collecting() {
         let page1 =
-            Url::parse("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
+            parse_url("https://api.github.com/repos/jruby/jruby/releases?per_page=100").unwrap();
 
         let mut errors: Vec<ReleasePageError> = Vec::new();
         let versions = paginate_releases_accumulated(page1, move |_url| async move {

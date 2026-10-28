@@ -6,6 +6,7 @@ pub use jruby_version::JRubyVersion;
 
 use reqwest::Url;
 use shared::github::{self, GitHubToken};
+use shared::parse_url;
 
 /// Short: This struct parses a file based on the input jruby version to determine
 /// what Ruby version it targets.
@@ -109,8 +110,8 @@ pub async fn jruby_build_properties(
 
 fn build_properties_url(jruby_version: &JRubyVersion) -> Url {
     let mut url =
-        Url::parse("https://api.github.com/repos/jruby/jruby/contents/default.build.properties")
-            .expect("valid build properties URL constant");
+        parse_url("https://api.github.com/repos/jruby/jruby/contents/default.build.properties")
+            .expect("internal literal should be a valid URL");
     url.query_pairs_mut()
         .append_pair("ref", &jruby_version.to_string());
     url
@@ -132,7 +133,7 @@ mod test {
         .to_string();
         let properties = BuildProperties {
             body: body.as_bytes().to_vec(),
-            url: Url::parse("https://example.com").unwrap(),
+            url: parse_url("https://example.com").unwrap(),
         };
 
         assert!(properties.ruby_stdlib_version().is_err());
@@ -149,7 +150,7 @@ mod test {
         .to_string();
         let properties = BuildProperties {
             body: body.as_bytes().to_vec(),
-            url: Url::parse("https://example.com").unwrap(),
+            url: parse_url("https://example.com").unwrap(),
         };
 
         assert_eq!(properties.ruby_stdlib_version().unwrap(), "3.1.4");

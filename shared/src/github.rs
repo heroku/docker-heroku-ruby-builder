@@ -1,6 +1,6 @@
 //! Logic and types for working with GitHub API
 
-use crate::with_retries;
+use crate::{UrlParseError, parse_url, with_retries};
 use reqwest::Url;
 use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, LINK, ToStrError};
 use std::fmt;
@@ -119,9 +119,8 @@ impl fmt::Debug for GitHubToken {
 /// ```no_run
 /// use shared::github::{self, GitHubToken};
 ///
-/// # use reqwest::Url;
 /// # async fn run() -> Result<(), reqwest::Error> {
-/// let url = Url::parse("https://api.github.com/repos/jruby/jruby/releases").unwrap();
+/// let url = shared::parse_url("https://api.github.com/repos/jruby/jruby/releases").unwrap();
 /// let token = GitHubToken::try_from("gh_token").unwrap();
 /// let response = github::get_json_with_retry(&url, &token).await?;
 /// # let _ = response;
@@ -234,11 +233,10 @@ pub enum GitHubHeaderError {
     #[error("Malformed Link header `{header}`: {message}")]
     Malformed { header: String, message: String },
 
-    #[error("Cannot parse URL `{raw}` from Link header `{header}`: {source}")]
+    #[error("Invalid URL in Link header `{header}`: {source}")]
     CannotParseUrl {
-        raw: String,
         header: String,
-        source: url::ParseError,
+        source: UrlParseError,
     },
 }
 
@@ -308,8 +306,7 @@ impl LinkEntry<'_> {
             "last" => PageLink::Last,
             _ => return Ok(None),
         };
-        let url = Url::parse(self.url).map_err(|source| GitHubHeaderError::CannotParseUrl {
-            raw: self.url.to_owned(),
+        let url = parse_url(self.url).map_err(|source| GitHubHeaderError::CannotParseUrl {
             header: header.to_owned(),
             source,
         })?;
@@ -431,10 +428,10 @@ mod tests {
         assert_eq!(
             links,
             vec![
-                PageLink::Prev(Url::parse("https://api.github.com/x?page=1").unwrap()),
-                PageLink::Next(Url::parse("https://api.github.com/x?page=3").unwrap()),
-                PageLink::First(Url::parse("https://api.github.com/x?page=1").unwrap()),
-                PageLink::Last(Url::parse("https://api.github.com/x?page=9").unwrap()),
+                PageLink::Prev(parse_url("https://api.github.com/x?page=1").unwrap()),
+                PageLink::Next(parse_url("https://api.github.com/x?page=3").unwrap()),
+                PageLink::First(parse_url("https://api.github.com/x?page=1").unwrap()),
+                PageLink::Last(parse_url("https://api.github.com/x?page=9").unwrap()),
             ]
         );
     }
@@ -445,9 +442,7 @@ mod tests {
         let links = pagination_links(&headers_with_link(header)).unwrap();
         assert_eq!(
             links,
-            vec![PageLink::Next(
-                Url::parse("https://example.com/p2").unwrap()
-            )]
+            vec![PageLink::Next(parse_url("https://example.com/p2").unwrap())]
         );
     }
 
@@ -475,7 +470,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn get_raw_sends_token_and_raw_media_type() {
         let server = Server::http("127.0.0.1:0").unwrap();
-        let url = Url::parse(&format!(
+        let url = parse_url(&format!(
             "http://{}/repos/o/r/contents/file.yml",
             server.server_addr()
         ))
