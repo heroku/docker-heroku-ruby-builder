@@ -265,20 +265,20 @@ mod tests {
             branch("7.9", BranchStatus::Eol),
         ];
         let builds = [
-            build("8.3.0-preview1", &["heroku-24", "heroku-26"]),
-            build("8.2.3-rc1", &["heroku-24", "heroku-26"]),
-            build("8.2.2", &["heroku-24"]),
-            build("8.2.1", &["heroku-24", "heroku-26"]),
-            build("8.1.9", &["heroku-24", "heroku-26"]),
             build("8.1.8", &["heroku-24", "heroku-26"]),
-            build("8.0.7", &["heroku-24"]),
+            build("8.2.9", &["heroku-24", "heroku-26"]),
+            build("8.3.0-preview1", &["heroku-24", "heroku-26"]),
             build("7.9.5", &["heroku-24", "heroku-26"]),
+            build("8.2.10", &["heroku-24"]),
+            build("8.0.7", &["heroku-24"]),
+            build("8.2.11-rc1", &["heroku-24", "heroku-26"]),
+            build("8.1.9", &["heroku-24", "heroku-26"]),
         ];
 
         let table = RubyTable::new(&branches, &builds, "8.0".parse().unwrap()).unwrap();
 
         insta::assert_snapshot!(summary(&table).join("\n"), @r"
-        8.2 Maintained: 8.2.2 8.2.1
+        8.2 Maintained: 8.2.10 8.2.9
         8.1 SecurityOnly: 8.1.9 8.1.9
         8.0 Eol: 8.0.7 -
         ");
