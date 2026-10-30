@@ -66,14 +66,15 @@ pub async fn builds(
     {
         let gh_token = gh_token.clone();
         set.spawn(async move {
-            let stdlib = jruby_build_properties(&version, &gh_token)
+            let ruby_compat = jruby_build_properties(&version, &gh_token)
                 .await?
                 .ruby_stdlib_version()?;
-            let presence = s3_presence(|target| s3_url_to_check(&version, &stdlib, target)).await?;
+            let presence =
+                s3_presence(|target| s3_url_to_check(&version, &ruby_compat, target)).await?;
             Ok(JRubyBuild {
                 release: JRubyRelease {
                     version,
-                    ruby_compat: RubyDownloadVersion::new(&stdlib)?,
+                    ruby_compat,
                 },
                 base_images: presence.complete_base_images().into_iter().collect(),
             })

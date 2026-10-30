@@ -10,7 +10,7 @@ use fs_err as fs;
 use jruby_executable::github_releases::{self, RELEASES_URL, s3_url_to_check};
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use shared::github::{GitHubToken, GitHubTokenArg};
-use shared::{S3Presence, s3_presence};
+use shared::{RubyDownloadVersion, S3Presence, s3_presence};
 use std::{error::Error, path::PathBuf};
 use tokio::task::JoinSet;
 
@@ -49,7 +49,7 @@ fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec
 async fn resolve_stdlib_version(
     version: JRubyVersion,
     gh_token: GitHubToken,
-) -> Result<(JRubyVersion, String), Box<dyn Error + Send + Sync>> {
+) -> Result<(JRubyVersion, RubyDownloadVersion), Box<dyn Error + Send + Sync>> {
     let stdlib = jruby_build_properties(&version, &gh_token)
         .await
         .and_then(|props| props.ruby_stdlib_version())?;
@@ -60,7 +60,7 @@ async fn resolve_stdlib_version(
 /// supported base image and supported architecture
 async fn check_version_on_s3(
     version: JRubyVersion,
-    ruby_stdlib_version: String,
+    ruby_stdlib_version: RubyDownloadVersion,
 ) -> Result<(JRubyVersion, S3Presence), shared::Error> {
     let presence =
         s3_presence(|target| s3_url_to_check(&version, &ruby_stdlib_version, target)).await?;

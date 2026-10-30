@@ -4,6 +4,7 @@ use bullet_stream::global::print;
 use clap::{Args, Parser, Subcommand};
 use indoc::formatdoc;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
+use shared::RubyDownloadVersion;
 use shared::devcenter::{NewChangelogItem, Status, create_and_report};
 use shared::github::GitHubTokenArg;
 
@@ -51,7 +52,10 @@ struct ChangelogParts {
     content: String,
 }
 
-fn jruby_changelog_parts(version: &JRubyVersion, stdlib_version: &str) -> ChangelogParts {
+fn jruby_changelog_parts(
+    version: &JRubyVersion,
+    stdlib_version: &RubyDownloadVersion,
+) -> ChangelogParts {
     let title = format!("JRuby version {version} is now available");
 
     let content = formatdoc! {"
@@ -69,7 +73,7 @@ fn jruby_changelog_parts(version: &JRubyVersion, stdlib_version: &str) -> Change
 
 fn render_jruby_changelog<W>(
     version: &JRubyVersion,
-    stdlib_version: &str,
+    stdlib_version: &RubyDownloadVersion,
     mut io: W,
 ) -> Result<W, Box<dyn Error>>
 where
@@ -129,16 +133,22 @@ mod test {
     use pretty_assertions::assert_eq;
 
     fn parts(version: &str) -> ChangelogParts {
-        jruby_changelog_parts(&JRubyVersion::parse(version).unwrap(), "3.1.4")
+        jruby_changelog_parts(
+            &JRubyVersion::parse(version).unwrap(),
+            &RubyDownloadVersion::new("3.1.4").unwrap(),
+        )
     }
 
     #[test]
     fn regular_release() {
         let mut io = Vec::new();
 
-        let output =
-            render_jruby_changelog(&JRubyVersion::parse("9.4.7.0").unwrap(), "3.1.4", &mut io)
-                .unwrap();
+        let output = render_jruby_changelog(
+            &JRubyVersion::parse("9.4.7.0").unwrap(),
+            &RubyDownloadVersion::new("3.1.4").unwrap(),
+            &mut io,
+        )
+        .unwrap();
         let actual = String::from_utf8_lossy(output);
         let expected = formatdoc! {"
                 ## JRuby version 9.4.7.0 is now available
