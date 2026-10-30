@@ -252,6 +252,23 @@ jobs:
           grep -q "status=skipped" "$METAFILE"
           test -d ./output
 
+  support_article_tables:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Print support article tables
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cargo run --locked --bin support_article -- print \
+            --minimum-ruby-major-minor 3.1 \
+            --minimum-jruby-major-minor 10.0
+
   check_inventory_urls:
     runs-on: ubuntu-24.04
     if: (!contains(github.event.pull_request.labels.*.name, 'skip inventory check'))

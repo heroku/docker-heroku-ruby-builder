@@ -1,11 +1,10 @@
 //! JRuby releases published on GitHub and their prebuilt binaries on S3.
 
 use crate::JRubyVersion;
-use libherokubuildpack::inventory::artifact::Arch;
 use serde::Deserialize;
 use shared::github::{self, GitHubToken};
 use shared::maybe_err::ResultVec;
-use shared::{BaseImage, build_matrix, parse_url, s3_url};
+use shared::{BuildTarget, RubyDownloadVersion, parse_url, s3_url};
 use std::future::Future;
 use std::path::Path;
 use url::Url;
@@ -106,20 +105,16 @@ pub enum GithubReleaseError {
     CannotParseJrubyVersion(#[from] crate::jruby_version::ParseError),
 }
 
-/// Build the set of S3 URLs where the prebuilt binary for `version` would live
-pub fn s3_urls_to_check(
+/// The S3 URL where the prebuilt binary for `version` would live on `target`
+pub fn s3_url_to_check(
     version: &JRubyVersion,
-    ruby_stdlib_version: &str,
-) -> Vec<(Url, BaseImage, Arch)> {
-    build_matrix()
-        .into_iter()
-        .map(|(base_image, arch)| {
-            let path = Path::new(base_image.name())
-                .join(arch.to_string())
-                .join(format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz"));
-            (s3_url(&path), base_image, arch)
-        })
-        .collect()
+    ruby_stdlib_version: &RubyDownloadVersion,
+    target: &BuildTarget,
+) -> Url {
+    let path = Path::new(target.base_image.name())
+        .join(target.arch.to_string())
+        .join(format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz"));
+    s3_url(&path)
 }
 
 /// List every non-prerelease JRuby version from the GitHub releases API.
@@ -144,13 +139,21 @@ pub async fn fetch_releases(gh_token: &GitHubToken) -> ResultVec<JRubyVersion, R
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::build_matrix;
 
     #[test]
-    fn test_s3_urls_to_check() {
+    fn test_s3_url_to_check() {
         let version = JRubyVersion::parse("9.4.7.0").unwrap();
-        let urls = s3_urls_to_check(&version, "3.1.4")
-            .into_iter()
-            .map(|(url, _, _)| url.to_string())
+        let urls = build_matrix()
+            .iter()
+            .map(|target| {
+                s3_url_to_check(
+                    &version,
+                    &RubyDownloadVersion::new("3.1.4").unwrap(),
+                    target,
+                )
+                .to_string()
+            })
             .collect::<Vec<_>>();
         assert_eq!(urls.len(), 5);
 

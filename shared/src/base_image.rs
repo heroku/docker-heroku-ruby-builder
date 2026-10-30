@@ -1,4 +1,5 @@
 use libherokubuildpack::inventory::artifact::Arch;
+use std::cmp::Ordering;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -14,7 +15,7 @@ static KNOWN_BASE_IMAGES: &[(&str, &str, &[Arch])] = &[
 #[error("Invalid base image {0} must be one of {known}", known = KNOWN_BASE_IMAGES.iter().map(|(name, _, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
 pub struct BaseImageError(String);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BaseImage {
     name: String,
     distro_number: String,
@@ -85,15 +86,71 @@ impl FromStr for BaseImage {
     }
 }
 
-/// Returns all valid (BaseImage, Arch) pairs for building Ruby binaries.
-pub fn build_matrix() -> Vec<(BaseImage, Arch)> {
+/// Every target Ruby binaries are built for.
+pub fn build_matrix() -> Vec<BuildTarget> {
     BaseImage::all()
         .into_iter()
         .flat_map(|base_image| {
-            base_image
-                .archs()
-                .iter()
-                .map(move |arch| (base_image.clone(), *arch))
+            base_image.archs().iter().map(move |arch| BuildTarget {
+                base_image: base_image.clone(),
+                arch: *arch,
+            })
         })
         .collect()
+}
+
+/// One architecture of a base image that Ruby binaries are built for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuildTarget {
+    pub base_image: BaseImage,
+    pub arch: Arch,
+}
+
+impl BuildTarget {
+    /// [`Arch`] doesn't implement [`Ord`], so its name stands in for it.
+    fn sort_key(&self) -> (&BaseImage, String) {
+        (&self.base_image, self.arch.to_string())
+    }
+}
+
+/// Orders by base image, then by architecture name.
+impl Ord for BuildTarget {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.sort_key().cmp(&other.sort_key())
+    }
+}
+
+impl PartialOrd for BuildTarget {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn build_targets_order_by_base_image_then_arch() {
+        let target = |name: &str, arch| BuildTarget {
+            base_image: BaseImage::new(name).unwrap(),
+            arch,
+        };
+        let targets = BTreeSet::from([
+            target("heroku-24", Arch::Arm64),
+            target("heroku-24", Arch::Amd64),
+            target("heroku-22", Arch::Amd64),
+            target("heroku-24", Arch::Arm64),
+        ]);
+
+        assert_eq!(
+            targets.into_iter().collect::<Vec<_>>(),
+            vec![
+                target("heroku-22", Arch::Amd64),
+                target("heroku-24", Arch::Amd64),
+                target("heroku-24", Arch::Arm64),
+            ]
+        );
+    }
 }
