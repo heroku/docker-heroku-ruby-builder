@@ -9,12 +9,12 @@ pub mod ruby_table;
 #[derive(Debug, thiserror::Error)]
 pub enum CheckError {
     #[error(transparent)]
-    S3(#[from] shared::Error),
+    Shared(#[from] shared::Error),
 
     #[error(transparent)]
     JRubyProperties(#[from] jruby_executable::Error),
 
-    #[error("S3 check task failed: {0}")]
+    #[error("Check task failed: {0}")]
     Task(#[from] tokio::task::JoinError),
 }
 
