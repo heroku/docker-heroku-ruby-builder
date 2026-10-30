@@ -6,7 +6,7 @@ pub use jruby_version::JRubyVersion;
 
 use reqwest::Url;
 use shared::github::{self, GitHubToken};
-use shared::parse_url;
+use shared::{RubyDownloadVersion, parse_url};
 
 /// Short: This struct parses a file based on the input jruby version to determine
 /// what Ruby version it targets.
@@ -75,11 +75,17 @@ pub enum Error {
 
     #[error("Failed to parse Java properties {0}")]
     InvalidProperties(#[from] java_properties::PropertiesError),
+
+    #[error("Invalid `version.ruby` in {url}: {source}")]
+    InvalidStdlibVersion {
+        url: Url,
+        source: Box<shared::Error>,
+    },
 }
 
 impl BuildProperties {
-    pub fn ruby_stdlib_version(&self) -> Result<String, Error> {
-        java_properties::read(&self.body[..])
+    pub fn ruby_stdlib_version(&self) -> Result<RubyDownloadVersion, Error> {
+        let version = java_properties::read(&self.body[..])
             .map_err(Error::InvalidProperties)
             .map(|properties| {
                 properties
@@ -91,7 +97,11 @@ impl BuildProperties {
                 body: std::str::from_utf8(&self.body)
                     .expect("UTF8 encoded java properties file from")
                     .to_owned(),
-            })
+            })?;
+        RubyDownloadVersion::new(version).map_err(|source| Error::InvalidStdlibVersion {
+            url: self.url.clone(),
+            source: Box::new(source),
+        })
     }
 }
 
@@ -153,7 +163,23 @@ mod test {
             url: parse_url("https://example.com").unwrap(),
         };
 
-        assert_eq!(properties.ruby_stdlib_version().unwrap(), "3.1.4");
+        assert_eq!(
+            properties.ruby_stdlib_version().unwrap().to_string(),
+            "3.1.4"
+        );
+    }
+
+    #[test]
+    fn test_jruby_stdlib_version_names_the_release_when_invalid() {
+        let properties = BuildProperties {
+            body: b"version.ruby=4.0\n".to_vec(),
+            url: build_properties_url(&JRubyVersion::parse("10.2.0.0").unwrap()),
+        };
+
+        let error = properties.ruby_stdlib_version().unwrap_err().to_string();
+
+        assert!(error.contains("version.ruby"), "{error}");
+        assert!(error.contains("ref=10.2.0.0"), "{error}");
     }
 
     #[test]

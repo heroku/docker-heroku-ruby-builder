@@ -4,7 +4,7 @@ use crate::JRubyVersion;
 use serde::Deserialize;
 use shared::github::{self, GitHubToken};
 use shared::maybe_err::ResultVec;
-use shared::{BuildTarget, parse_url, s3_url};
+use shared::{BuildTarget, RubyDownloadVersion, parse_url, s3_url};
 use std::future::Future;
 use std::path::Path;
 use url::Url;
@@ -108,7 +108,7 @@ pub enum GithubReleaseError {
 /// The S3 URL where the prebuilt binary for `version` would live on `target`
 pub fn s3_url_to_check(
     version: &JRubyVersion,
-    ruby_stdlib_version: &str,
+    ruby_stdlib_version: &RubyDownloadVersion,
     target: &BuildTarget,
 ) -> Url {
     let path = Path::new(target.base_image.name())
@@ -146,7 +146,14 @@ mod tests {
         let version = JRubyVersion::parse("9.4.7.0").unwrap();
         let urls = build_matrix()
             .iter()
-            .map(|target| s3_url_to_check(&version, "3.1.4", target).to_string())
+            .map(|target| {
+                s3_url_to_check(
+                    &version,
+                    &RubyDownloadVersion::new("3.1.4").unwrap(),
+                    target,
+                )
+                .to_string()
+            })
             .collect::<Vec<_>>();
         assert_eq!(urls.len(), 5);
 
