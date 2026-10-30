@@ -126,6 +126,8 @@ async fn generate(args: TableArgs) -> Result<Tables, BoxError> {
 }
 
 async fn print_tables(args: PrintArgs) -> Result<(), BoxError> {
+    print::h1("Heroku Ruby Support reference");
+
     let tables = generate(args.tables).await?;
     let ruby = tables.ruby.render()?;
     let jruby = tables.jruby.render()?;
@@ -143,7 +145,6 @@ async fn print_tables(args: PrintArgs) -> Result<(), BoxError> {
 
 #[tokio::main]
 async fn main() {
-    print::h1("Heroku Ruby Support reference");
     let cli = Cli::parse();
     let result = match cli.command {
         Command::Print(args) => print_tables(args).await,
