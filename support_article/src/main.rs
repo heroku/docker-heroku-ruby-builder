@@ -33,7 +33,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Print the generated table HTML to stdout.
+    /// Print the generated table HTML.
     Print(PrintArgs),
 }
 
@@ -185,7 +185,7 @@ mod tests {
         Usage: support_article <COMMAND>
 
         Commands:
-          print  Print the generated table HTML to stdout
+          print  Print the generated table HTML
           help   Print this message or the help of the given subcommand(s)
 
         Options:
@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn get_print_help() {
         insta::assert_snapshot!(shared::help(Cli::command(), &["print"]), @r"
-        Print the generated table HTML to stdout
+        Print the generated table HTML
 
         Usage: support_article print --gh-token <TOKEN> --minimum-ruby-major-minor <MINIMUM_RUBY_MAJOR_MINOR> --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR>
 
