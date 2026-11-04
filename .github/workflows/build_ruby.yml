@@ -47,7 +47,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Cargo build
-        run: cargo build --locked
+        run: cargo build --locked --bin ruby_changelog
       - name: Output CHANGELOG
         run: |
             set -euo pipefail
@@ -76,7 +76,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Cargo build
-        run: cargo build --locked
+        run: cargo build --locked --bin ruby_build --bin ruby_check
       - name: Build Ruby
         id: build
         run: |
@@ -115,7 +115,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Cargo build
-        run: cargo build --locked
+        run: cargo build --locked --bin ruby_changelog
       - name: Create Dev Center changelog
         run: |
           set -euo pipefail
