@@ -7,6 +7,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_PROFILE_DEV_DEBUG: 0
+
 jobs:
   shellcheck:
     runs-on: ubuntu-24.04

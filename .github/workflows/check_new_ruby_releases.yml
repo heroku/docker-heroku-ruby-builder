@@ -16,6 +16,9 @@ permissions:
   contents: read
   actions: write
 
+env:
+  CARGO_PROFILE_DEV_DEBUG: 0
+
 jobs:
   check-releases:
     runs-on: pub-hk-ubuntu-24.04-ip # `gh workflow run` needs to be in an IP allow list
