@@ -35,6 +35,7 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: "us-east-1"
   S3_BUCKET: "heroku-buildpack-ruby"
+  CARGO_PROFILE_DEV_DEBUG: 0
 
 jobs:
   changelog:
