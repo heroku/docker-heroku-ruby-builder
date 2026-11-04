@@ -78,7 +78,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Cargo build (to make test logs shorter)
-        run: cargo build --locked
+        run: cargo build --locked --bin ruby_changelog --bin ruby_build --bin ruby_check
       - name: Output CHANGELOG
         run: cargo run --locked --bin ruby_changelog -- print --version "${{matrix.version}}"
       - name: Build Ruby
@@ -127,7 +127,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Cargo build (to make test logs shorter)
-        run: cargo build --locked
+        run: cargo build --locked --bin jruby_changelog --bin jruby_build --bin jruby_check
       - name: Output CHANGELOG
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -166,7 +166,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Cargo build
-        run: cargo build --locked
+        run: cargo build --locked --bin ruby_build
       - name: "on-conflict=skip: skips when S3 URL exists"
         run: |
           set -euo pipefail
@@ -212,7 +212,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Cargo build
-        run: cargo build --locked
+        run: cargo build --locked --bin jruby_build
       - name: "on-conflict=skip: skips when S3 URL exists"
         env:
           GITHUB_TOKEN: ${{ github.token }}
