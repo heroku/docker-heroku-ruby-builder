@@ -27,6 +27,10 @@ on:
           default: false
           required: false
 
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.ruby_version }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
