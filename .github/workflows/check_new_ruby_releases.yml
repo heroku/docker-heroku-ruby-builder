@@ -27,7 +27,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Cargo build
-        run: cargo build --locked
+        run: cargo build --locked --bin ruby_release_check
       - name: Check for missing Ruby versions
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -69,7 +69,7 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Cargo build
-        run: cargo build --locked
+        run: cargo build --locked --bin jruby_release_check
       - name: Check for missing JRuby versions
         env:
           GITHUB_TOKEN: ${{ github.token }}
