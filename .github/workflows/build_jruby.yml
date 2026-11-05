@@ -44,6 +44,7 @@ env:
 jobs:
   changelog:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -67,6 +68,7 @@ jobs:
 
   build-and-upload:
     runs-on: pub-hk-ubuntu-24.04-xlarge
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -109,6 +111,7 @@ jobs:
 
   create-changelog:
     needs: build-and-upload
+    timeout-minutes: 10
     if: ${{ success() && !inputs.dry_run && inputs.publish_changelog }}
     runs-on: ubuntu-24.04
     env:
