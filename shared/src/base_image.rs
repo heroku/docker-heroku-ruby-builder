@@ -17,10 +17,10 @@ pub struct BaseImageError(String);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BaseImage {
-    /// e.g. `heroku-26`
-    name: String,
     /// e.g. `26`
     distro_number: usize,
+    /// e.g. `heroku-26`
+    name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -132,6 +132,19 @@ impl PartialOrd for BuildTarget {
 mod test {
     use super::*;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn base_images_sort_by_distro_number() {
+        let heroku_98 = BaseImage {
+            name: "heroku-98".to_owned(),
+            distro_number: 98,
+        };
+        let heroku_100 = BaseImage {
+            name: "heroku-100".to_owned(),
+            distro_number: 100,
+        };
+        assert!(heroku_98 < heroku_100);
+    }
 
     #[test]
     fn build_targets_order_by_base_image_then_arch() {
