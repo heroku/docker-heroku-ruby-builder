@@ -5,10 +5,10 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-static KNOWN_BASE_IMAGES: &[(&str, &str, &[Arch])] = &[
-    ("heroku-22", "22", &[Arch::Amd64]),
-    ("heroku-24", "24", &[Arch::Amd64, Arch::Arm64]),
-    ("heroku-26", "26", &[Arch::Amd64, Arch::Arm64]),
+static KNOWN_BASE_IMAGES: &[(&str, usize, &[Arch])] = &[
+    ("heroku-22", 22, &[Arch::Amd64]),
+    ("heroku-24", 24, &[Arch::Amd64, Arch::Arm64]),
+    ("heroku-26", 26, &[Arch::Amd64, Arch::Arm64]),
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -17,8 +17,10 @@ pub struct BaseImageError(String);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BaseImage {
+    /// e.g. `heroku-26`
     name: String,
-    distro_number: String,
+    /// e.g. `26`
+    distro_number: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -31,7 +33,7 @@ impl BaseImage {
             .find(|&&(name, _, _)| name == s)
             .map(|&(name, version, _)| Self {
                 name: name.to_owned(),
-                distro_number: version.to_owned(),
+                distro_number: version,
             })
             .ok_or_else(|| BaseImageError(s.to_owned()))
     }
@@ -73,8 +75,8 @@ impl BaseImage {
         &self.name
     }
 
-    pub fn distro_number(&self) -> &str {
-        &self.distro_number
+    pub fn distro_number(&self) -> usize {
+        self.distro_number
     }
 }
 
