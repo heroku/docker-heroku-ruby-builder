@@ -6,6 +6,7 @@
 //! four segments to keep its own version distinct from the Ruby version it
 //! implements (e.g. JRuby `9.4.7.0` implements Ruby `3.1.x`).
 
+use shared::MajorMinor;
 use std::fmt;
 use winnow::Parser;
 use winnow::ascii::dec_uint;
@@ -56,6 +57,15 @@ impl JRubyVersion {
     /// `FromStr`; delegates to it, so there is a single parsing implementation.
     pub fn parse(s: &str) -> Result<Self, ParseError> {
         s.parse()
+    }
+}
+
+impl From<&JRubyVersion> for MajorMinor {
+    fn from(version: &JRubyVersion) -> Self {
+        MajorMinor {
+            major: version.major,
+            minor: version.minor,
+        }
     }
 }
 
@@ -133,6 +143,7 @@ mod tests {
         assert_eq!(v.minor, 4);
         assert_eq!(v.patch, 7);
         assert_eq!(v.extra, 0);
+        assert_eq!(MajorMinor::from(&v), MajorMinor { major: 9, minor: 4 });
     }
 
     #[test]

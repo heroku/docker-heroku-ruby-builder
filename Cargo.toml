@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["jruby_executable", "ruby_executable", "shared"]
+members = ["jruby_executable", "ruby_executable", "shared", "support_article"]
 
 [workspace.package]
 edition = "2024"
@@ -30,6 +30,7 @@ libherokubuildpack = { version = "0.32", default-features = false, features = [
     "inventory",
     "inventory-sha2",
 ] }
+minijinja = "3"
 winnow = "1.0"
 pretty_assertions = "1"
 regex = "1"

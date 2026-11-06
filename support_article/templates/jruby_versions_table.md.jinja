@@ -1,0 +1,33 @@
+<table>
+  <thead>
+    <tr>
+      <th>JRuby series</th>
+      {%- for base_image in base_images %}
+        <th>{{ base_image }}</th>
+      {%- endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {%- for row in rows %}
+      <tr>
+        <td>{{ row.major_minor }}</td>
+        {%- for release in row.releases %}
+          <td>{{ release or "-" }}</td>
+        {%- endfor %}
+      </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+
+To use a JRuby version, specify it in your `Gemfile`. For example:
+
+```ruby
+# Gemfile
+ruby '{{ example.ruby_compat }}', engine: 'jruby', engine_version: '{{ example.version }}'
+```
+
+Then, with that JRuby version installed locally, update your `Gemfile.lock` by running:
+
+```term
+$ bundle update --ruby
+```

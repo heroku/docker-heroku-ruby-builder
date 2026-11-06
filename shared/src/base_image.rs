@@ -1,23 +1,26 @@
 use libherokubuildpack::inventory::artifact::Arch;
+use std::cmp::Ordering;
 use std::fmt::Display;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-static KNOWN_BASE_IMAGES: &[(&str, &str, &[Arch])] = &[
-    ("heroku-22", "22", &[Arch::Amd64]),
-    ("heroku-24", "24", &[Arch::Amd64, Arch::Arm64]),
-    ("heroku-26", "26", &[Arch::Amd64, Arch::Arm64]),
+static KNOWN_BASE_IMAGES: &[(&str, usize, &[Arch])] = &[
+    ("heroku-22", 22, &[Arch::Amd64]),
+    ("heroku-24", 24, &[Arch::Amd64, Arch::Arm64]),
+    ("heroku-26", 26, &[Arch::Amd64, Arch::Arm64]),
 ];
 
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid base image {0} must be one of {known}", known = KNOWN_BASE_IMAGES.iter().map(|(name, _, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
 pub struct BaseImageError(String);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BaseImage {
+    /// e.g. `26`
+    distro_number: usize,
+    /// e.g. `heroku-26`
     name: String,
-    distro_number: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -30,7 +33,7 @@ impl BaseImage {
             .find(|&&(name, _, _)| name == s)
             .map(|&(name, version, _)| Self {
                 name: name.to_owned(),
-                distro_number: version.to_owned(),
+                distro_number: version,
             })
             .ok_or_else(|| BaseImageError(s.to_owned()))
     }
@@ -72,8 +75,8 @@ impl BaseImage {
         &self.name
     }
 
-    pub fn distro_number(&self) -> &str {
-        &self.distro_number
+    pub fn distro_number(&self) -> usize {
+        self.distro_number
     }
 }
 
@@ -85,15 +88,84 @@ impl FromStr for BaseImage {
     }
 }
 
-/// Returns all valid (BaseImage, Arch) pairs for building Ruby binaries.
-pub fn build_matrix() -> Vec<(BaseImage, Arch)> {
+/// Every target Ruby binaries are built for.
+pub fn build_matrix() -> Vec<BuildTarget> {
     BaseImage::all()
         .into_iter()
         .flat_map(|base_image| {
-            base_image
-                .archs()
-                .iter()
-                .map(move |arch| (base_image.clone(), *arch))
+            base_image.archs().iter().map(move |arch| BuildTarget {
+                base_image: base_image.clone(),
+                arch: *arch,
+            })
         })
         .collect()
+}
+
+/// One architecture of a base image that Ruby binaries are built for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuildTarget {
+    pub base_image: BaseImage,
+    pub arch: Arch,
+}
+
+impl BuildTarget {
+    /// [`Arch`] doesn't implement [`Ord`], so its name stands in for it.
+    fn sort_key(&self) -> (&BaseImage, String) {
+        (&self.base_image, self.arch.to_string())
+    }
+}
+
+/// Orders by base image, then by architecture name.
+impl Ord for BuildTarget {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.sort_key().cmp(&other.sort_key())
+    }
+}
+
+impl PartialOrd for BuildTarget {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn base_images_sort_by_distro_number() {
+        let heroku_98 = BaseImage {
+            name: "heroku-98".to_owned(),
+            distro_number: 98,
+        };
+        let heroku_100 = BaseImage {
+            name: "heroku-100".to_owned(),
+            distro_number: 100,
+        };
+        assert!(heroku_98 < heroku_100);
+    }
+
+    #[test]
+    fn build_targets_order_by_base_image_then_arch() {
+        let target = |name: &str, arch| BuildTarget {
+            base_image: BaseImage::new(name).unwrap(),
+            arch,
+        };
+        let targets = BTreeSet::from([
+            target("heroku-24", Arch::Arm64),
+            target("heroku-24", Arch::Amd64),
+            target("heroku-22", Arch::Amd64),
+            target("heroku-24", Arch::Arm64),
+        ]);
+
+        assert_eq!(
+            targets.into_iter().collect::<Vec<_>>(),
+            vec![
+                target("heroku-22", Arch::Amd64),
+                target("heroku-24", Arch::Amd64),
+                target("heroku-24", Arch::Arm64),
+            ]
+        );
+    }
 }

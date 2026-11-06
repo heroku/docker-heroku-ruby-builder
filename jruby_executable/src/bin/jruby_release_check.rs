@@ -7,10 +7,10 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use jruby_executable::github_releases::{self, RELEASES_URL, s3_urls_to_check};
+use jruby_executable::github_releases::{self, RELEASES_URL, s3_url_to_check};
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use shared::github::{GitHubToken, GitHubTokenArg};
-use shared::{S3Presence, s3_presence};
+use shared::{RubyDownloadVersion, S3Presence, s3_presence};
 use std::{error::Error, path::PathBuf};
 use tokio::task::JoinSet;
 
@@ -49,7 +49,7 @@ fn retain_releases_gte(releases: &[JRubyVersion], minimum: &JRubyVersion) -> Vec
 async fn resolve_stdlib_version(
     version: JRubyVersion,
     gh_token: GitHubToken,
-) -> Result<(JRubyVersion, String), Box<dyn Error + Send + Sync>> {
+) -> Result<(JRubyVersion, RubyDownloadVersion), Box<dyn Error + Send + Sync>> {
     let stdlib = jruby_build_properties(&version, &gh_token)
         .await
         .and_then(|props| props.ruby_stdlib_version())?;
@@ -60,9 +60,10 @@ async fn resolve_stdlib_version(
 /// supported base image and supported architecture
 async fn check_version_on_s3(
     version: JRubyVersion,
-    ruby_stdlib_version: String,
+    ruby_stdlib_version: RubyDownloadVersion,
 ) -> Result<(JRubyVersion, S3Presence), shared::Error> {
-    let presence = s3_presence(s3_urls_to_check(&version, &ruby_stdlib_version)).await?;
+    let presence =
+        s3_presence(|target| s3_url_to_check(&version, &ruby_stdlib_version, target)).await?;
     Ok((version, presence))
 }
 
@@ -143,20 +144,20 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
     let mut versions_to_build = Vec::new();
     while let Some(result) = s3_set.join_next().await {
         match result {
-            Ok(Ok((version, S3Presence { missing, .. }))) if missing.is_empty() => {
+            Ok(Ok((version, presence))) if presence.missing().next().is_none() => {
                 if errors.is_empty() {
                     print::sub_bullet(format!("{version}: all binaries present"));
                 }
             }
-            Ok(Ok((version, S3Presence { missing, .. }))) => {
+            Ok(Ok((version, presence))) => {
+                let missing = presence
+                    .missing()
+                    .map(|target| format!("{}/{}", target.base_image.name(), target.arch))
+                    .collect::<Vec<_>>();
                 print::sub_bullet(format!(
                     "{version}: missing {} base image(s): {}",
                     missing.len(),
-                    missing
-                        .iter()
-                        .map(|(image, arch)| format!("{}/{}", image.name(), arch))
-                        .collect::<Vec<_>>()
-                        .join(", ")
+                    missing.join(", ")
                 ));
                 versions_to_build.push(version);
             }

@@ -1,17 +1,43 @@
 use crate::Error;
+use std::cmp::Ordering;
 use std::fmt::Display;
 use std::str::FromStr;
 use winnow::Parser;
 use winnow::ascii::dec_uint;
 use winnow::token::literal;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(into = "String", try_from = "String")]
 pub struct RubyDownloadVersion {
     pub major: u32,
     pub minor: u32,
     pub patch: u32,
     pub rest: String,
+}
+
+impl RubyDownloadVersion {
+    fn sort_key(&self) -> (u32, u32, u32, bool, &str) {
+        (
+            self.major,
+            self.minor,
+            self.patch,
+            self.rest.is_empty(),
+            &self.rest,
+        )
+    }
+}
+
+/// Orders by `major.minor.patch`. Within a patch, prereleases sort before the release.
+impl Ord for RubyDownloadVersion {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.sort_key().cmp(&other.sort_key())
+    }
+}
+
+impl PartialOrd for RubyDownloadVersion {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl From<RubyDownloadVersion> for String {
@@ -111,6 +137,17 @@ mod test {
     use serde::Serialize;
 
     use super::*;
+
+    #[test]
+    fn orders_numerically_with_prereleases_before_the_release() {
+        let mut versions = ["3.10.0", "3.4.0", "3.4.0-rc1", "3.4.0-preview2", "3.9.1"]
+            .map(|v| RubyDownloadVersion::new(v).unwrap());
+        versions.sort();
+        assert_eq!(
+            versions.map(|v| v.to_string()),
+            ["3.4.0-preview2", "3.4.0-rc1", "3.4.0", "3.9.1", "3.10.0"]
+        );
+    }
 
     #[test]
     fn test_pre_version_serialization() {

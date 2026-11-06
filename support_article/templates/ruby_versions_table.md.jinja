@@ -1,0 +1,33 @@
+<table>
+  <thead>
+    <tr>
+      <th>Ruby series</th>
+      {%- for base_image in base_images %}
+        <th>{{ base_image }}</th>
+      {%- endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {%- for row in rows %}
+      <tr{% if row.style %} style="{{ row.style }}"{% endif %}>
+        <td>{{ row.major_minor }}{{ row.label }}</td>
+        {%- for version in row.versions %}
+          <td>{{ version or "-" }}</td>
+        {%- endfor %}
+      </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+
+To use a Ruby version, specify it in your `Gemfile`. For example:
+
+```ruby
+# Gemfile
+ruby '{{ example }}'
+```
+
+Then, with that Ruby version installed locally, update your `Gemfile.lock` by running:
+
+```term
+$ bundle update --ruby
+```
