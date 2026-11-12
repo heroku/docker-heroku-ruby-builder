@@ -41,6 +41,10 @@ debugflags=-g ./configure "${configure_opts[@]}" --prefix /tmp/compiled
 make -j"$(nproc)"
 make install
 
+# Drop DWARF but keep the symbol table so `rb_bug` crash reports still name C functions
+find /tmp/compiled -type f \( -name '*.so' -o -name '*.so.*' -o -name '*.o' -o -path '/tmp/compiled/bin/ruby' \) \
+    -exec strip --strip-debug {} +
+
 # Compress and store the compiled ruby
 cd /tmp/compiled
 tar -czf "$OUT_TAR" .
