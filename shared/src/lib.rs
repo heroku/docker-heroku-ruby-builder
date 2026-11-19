@@ -62,8 +62,8 @@ pub use major_minor::{MajorMinor, MajorMinorError};
 pub static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 pub use inventory_help::{
     ArtifactMetadata, RubyArtifact, RubyInventory, artifact_is_different,
-    artifact_same_url_different_checksum, atomic_inventory_update, inventory_check,
-    sha256_from_path,
+    artifact_same_url_different_checksum, atomic_inventory_update, sha256_from_path,
+    verify_checksums,
 };
 
 /// Appends the given string after the filename and before the `ends_with`

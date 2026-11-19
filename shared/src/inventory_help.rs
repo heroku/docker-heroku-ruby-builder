@@ -18,38 +18,15 @@ pub struct ArtifactMetadata {
     pub distro_version: DistroVersion,
 }
 
+/// ⁉️😄⁉️ - both inventory files share one type, even though JRuby versions are in it
 pub type RubyInventory = Inventory<GemVersion, Sha256, ArtifactMetadata>;
 
 pub type RubyArtifact = inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>;
 
-/// ```no_run
-/// use shared::inventory_check;
-///
-/// let contents = r#"
-/// [[artifacts]]
-/// version = "9.4.8.0"
-/// os = "linux"
-/// arch = "amd64"
-/// url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.8.0.tgz"
-/// checksum = "sha256:815b31d2b204a524bf74aabae341bf85353add4d1128d5d276d08fa5e8ff3c39"
-///
-/// [artifacts.metadata]
-/// timestamp = "2024-07-24T16:17:35.341413Z"
-/// distro_version = "24.04"
-/// "#;
-/// tokio::runtime::Runtime::new().unwrap().block_on(inventory_check(contents)).unwrap();
-/// ```
-pub async fn inventory_check(contents: &str) -> Result<(), Error> {
-    if contents.trim().is_empty() {
-        return Ok(());
-    }
-
-    let inventory = contents
-        .parse::<RubyInventory>()
-        .map_err(|e| Error::Other(format!("Could not parse inventory. Error: {e}")))?;
-
+/// ⁉️😄⁉️ - cost: downloads every artifact passed in, so callers pass only new entries
+pub async fn verify_checksums(artifacts: Vec<RubyArtifact>) -> Result<(), Error> {
     let mut set = tokio::task::JoinSet::new();
-    for artifact in inventory.artifacts {
+    for artifact in artifacts {
         set.spawn(async move {
             let temp = tempfile::tempdir().map_err(|e| format!("Error {e}"))?;
             let path = temp.path().join("file.tar");
