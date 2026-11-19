@@ -50,6 +50,7 @@ mod base_image;
 pub mod devcenter;
 mod download_ruby_version;
 pub mod github;
+pub mod inventory_format;
 mod inventory_help;
 mod major_minor;
 pub mod maybe_err;

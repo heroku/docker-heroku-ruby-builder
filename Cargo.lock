@@ -1700,6 +1700,7 @@ dependencies = [
  "indoc",
  "insta",
  "libherokubuildpack",
+ "pretty_assertions",
  "regex",
  "reqwest",
  "serde",

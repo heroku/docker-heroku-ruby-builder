@@ -35,4 +35,5 @@ url = { workspace = true }
 [dev-dependencies]
 indoc = "2"
 insta = { workspace = true }
+pretty_assertions = { workspace = true }
 tiny_http = "0.12"
