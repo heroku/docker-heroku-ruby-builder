@@ -85,7 +85,7 @@ impl BranchStatus {
     fn from_status(input: &str) -> Result<BranchStatus, UnknownBranchStatus> {
         match input {
             "normal maintenance" => Ok(BranchStatus::NormalMaintenance),
-            "security maintenance" => Ok(BranchStatus::SecurityMaintenance),
+            "security maintenance" | "legacy maintenance" => Ok(BranchStatus::SecurityMaintenance),
             "eol" => Ok(BranchStatus::Eol),
             "preview" => Ok(BranchStatus::Preview),
             _ => Err(UnknownBranchStatus(input.to_string())),
@@ -217,6 +217,8 @@ mod tests {
             - name: 4.0
               status: normal maintenance
             - name: 3.3
+              status: legacy maintenance
+            - name: 3.2
               status: security maintenance
             - name: \"3.10\"
               status: eol
@@ -235,6 +237,10 @@ mod tests {
                 ),
                 (
                     MajorMinor { major: 3, minor: 3 },
+                    BranchStatus::SecurityMaintenance
+                ),
+                (
+                    MajorMinor { major: 3, minor: 2 },
                     BranchStatus::SecurityMaintenance
                 ),
                 (
