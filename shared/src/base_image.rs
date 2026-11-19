@@ -26,7 +26,19 @@ pub struct BaseImage {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DistroVersion(String);
 
+impl Display for DistroVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl BaseImage {
+    pub fn from_distro_version(distro_version: &DistroVersion) -> Option<BaseImage> {
+        BaseImage::all()
+            .into_iter()
+            .find(|base_image| &base_image.distro_version() == distro_version)
+    }
+
     pub fn new(s: &str) -> Result<Self, BaseImageError> {
         KNOWN_BASE_IMAGES
             .iter()
@@ -144,6 +156,20 @@ mod test {
             distro_number: 100,
         };
         assert!(heroku_98 < heroku_100);
+    }
+
+    #[test]
+    fn base_image_round_trips_through_distro_version() {
+        for base_image in BaseImage::all() {
+            assert_eq!(
+                BaseImage::from_distro_version(&base_image.distro_version()),
+                Some(base_image)
+            );
+        }
+        assert_eq!(
+            BaseImage::from_distro_version(&DistroVersion("20.04".to_owned())),
+            None
+        );
     }
 
     #[test]
