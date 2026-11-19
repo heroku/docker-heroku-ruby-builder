@@ -18,6 +18,10 @@ pub struct ArtifactMetadata {
     pub distro_version: DistroVersion,
 }
 
+pub type RubyInventory = Inventory<GemVersion, Sha256, ArtifactMetadata>;
+
+pub type RubyArtifact = inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>;
+
 /// ```no_run
 /// use shared::inventory_check;
 ///
@@ -41,7 +45,7 @@ pub async fn inventory_check(contents: &str) -> Result<(), Error> {
     }
 
     let inventory = contents
-        .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
+        .parse::<RubyInventory>()
         .map_err(|e| Error::Other(format!("Could not parse inventory. Error: {e}")))?;
 
     let mut set = tokio::task::JoinSet::new();
@@ -124,9 +128,7 @@ where
 
 pub fn atomic_inventory_update<F>(path: &Path, f: F) -> Result<(), Box<dyn std::error::Error>>
 where
-    F: FnOnce(
-        &mut Inventory<GemVersion, Sha256, ArtifactMetadata>,
-    ) -> Result<(), Box<dyn std::error::Error>>,
+    F: FnOnce(&mut RubyInventory) -> Result<(), Box<dyn std::error::Error>>,
 {
     atomic_file_contents(path, |file, contents| {
         let mut inventory = parse_inventory(contents)?;
@@ -136,16 +138,14 @@ where
     })
 }
 
-fn parse_inventory(
-    contents: &str,
-) -> Result<Inventory<GemVersion, Sha256, ArtifactMetadata>, Error> {
+fn parse_inventory(contents: &str) -> Result<RubyInventory, Error> {
     if contents.trim().is_empty() {
         Ok(Inventory {
             artifacts: Vec::new(),
         })
     } else {
         contents
-            .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
+            .parse::<RubyInventory>()
             .map_err(|e| Error::Other(format!("Error {e} parsing inventory:\n{contents}")))
     }
 }
@@ -188,8 +188,8 @@ where
 /// While unlikely, it's still possible. If we didn't guard against this case, then it could break people's builds who are relying on the old checksum
 /// no not change.
 pub fn artifact_same_url_different_checksum(
-    a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-    b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
+    a: &RubyArtifact,
+    b: &RubyArtifact,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if a.url == b.url && a.checksum != b.checksum {
         Err(format!(
@@ -204,10 +204,7 @@ pub fn artifact_same_url_different_checksum(
     }
 }
 
-pub fn artifact_is_different(
-    a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-    b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-) -> bool {
+pub fn artifact_is_different(a: &RubyArtifact, b: &RubyArtifact) -> bool {
     a.version != b.version
         || a.arch != b.arch
         || a.metadata.distro_version != b.metadata.distro_version
