@@ -6,7 +6,7 @@ use gem_version::GemVersion;
 use libherokubuildpack::inventory::ParseInventoryError;
 use libherokubuildpack::inventory::artifact::{Arch, Os};
 use std::cmp::Reverse;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display, Formatter};
 
 /// ⁉️😄⁉️ - the uniqueness invariant this key enforces is not visible from the struct
@@ -55,6 +55,12 @@ pub enum InventoryFormatError {
 
     #[error("Inventory is not in canonical form. Expected:\n{expected}")]
     NotCanonical { expected: String },
+
+    #[error("{0}: removed, but inventory entries are only ever added")]
+    Removed(ArtifactKey),
+
+    #[error("{0}: changed, but inventory entries are only ever added")]
+    Changed(ArtifactKey),
 }
 
 pub fn artifact_key(artifact: &RubyArtifact) -> Result<ArtifactKey, InventoryFormatError> {
@@ -138,6 +144,27 @@ pub fn check_inventory_format(contents: &str) -> Result<RubyInventory, Inventory
     } else {
         Err(InventoryFormatError::NotCanonical { expected })
     }
+}
+
+/// ⁉️😄⁉️ - append-only rule: why a removed or changed entry is an error, not a diff
+pub fn added_artifacts(
+    base: &RubyInventory,
+    new: &RubyInventory,
+) -> Result<Vec<RubyArtifact>, InventoryFormatError> {
+    let mut new_by_key = new
+        .artifacts
+        .iter()
+        .map(|artifact| artifact_key(artifact).map(|key| (key, artifact)))
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    for artifact in &base.artifacts {
+        let key = artifact_key(artifact)?;
+        match new_by_key.remove(&key) {
+            None => return Err(InventoryFormatError::Removed(key)),
+            Some(kept) if kept != artifact => return Err(InventoryFormatError::Changed(key)),
+            Some(_) => {}
+        }
+    }
+    Ok(new_by_key.into_values().cloned().collect())
 }
 
 #[cfg(test)]
@@ -328,5 +355,52 @@ mod tests {
         "#})
         .unwrap_err();
         assert!(matches!(error, InventoryFormatError::Parse(_)));
+    }
+
+    #[test]
+    fn added_artifacts_lists_only_new_entries() {
+        let base = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        let new = inventory(vec![
+            artifact("3.4.1", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ]);
+        let added = added_artifacts(&base, &new)
+            .unwrap()
+            .iter()
+            .map(|artifact| artifact_key(artifact).unwrap().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            added,
+            vec!["3.4.0 on heroku-24 (arm64)", "3.4.1 on heroku-24 (amd64)"]
+        );
+    }
+
+    #[test]
+    fn added_artifacts_rejects_a_removed_entry() {
+        let base = inventory(vec![
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ]);
+        let new = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        assert_eq!(
+            added_artifacts(&base, &new).unwrap_err().to_string(),
+            "3.4.0 on heroku-24 (arm64): removed, but inventory entries are only ever added"
+        );
+    }
+
+    #[test]
+    fn added_artifacts_rejects_a_changed_entry() {
+        let base = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        let mut changed = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        changed.checksum =
+            "sha256:7bebeee1b9128bdbb290331b813fa01cf43e30cd0098286f7de011796cb8eee5"
+                .parse()
+                .unwrap();
+        let new = inventory(vec![changed]);
+        assert_eq!(
+            added_artifacts(&base, &new).unwrap_err().to_string(),
+            "3.4.0 on heroku-24 (amd64): changed, but inventory entries are only ever added"
+        );
     }
 }

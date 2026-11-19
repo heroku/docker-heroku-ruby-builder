@@ -12,7 +12,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ArtifactMetadata {
     pub timestamp: DateTime<Utc>,
     pub distro_version: DistroVersion,
