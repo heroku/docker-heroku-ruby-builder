@@ -17,7 +17,7 @@ struct Args {
     new: PathBuf,
 
     /// ⁉️😄⁉️ - CLI help for `--allow-inventory-change`
-    #[arg(long)]
+    #[arg(long, env = "ALLOW_INVENTORY_CHANGE")]
     allow_inventory_change: bool,
 }
 
@@ -73,7 +73,7 @@ mod tests {
         Options:
               --old <OLD>               ⁉️😄⁉️ - CLI help for `--old`
               --new <NEW>               ⁉️😄⁉️ - CLI help for `--new`
-              --allow-inventory-change  ⁉️😄⁉️ - CLI help for `--allow-inventory-change`
+              --allow-inventory-change  ⁉️😄⁉️ - CLI help for `--allow-inventory-change` [env: ALLOW_INVENTORY_CHANGE=]
           -h, --help                    Print help
         ");
     }
