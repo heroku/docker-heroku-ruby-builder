@@ -1,0 +1,132 @@
+name: Sync inventory
+run-name: "Sync ${{ inputs.runtime }} inventory${{ !inputs.open_pr && ' (no PR)' || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime:
+        description: "The inventory to sync"
+        type: choice
+        options:
+          - ruby
+          - jruby
+        required: true
+      open_pr:
+        description: "Open or update a PR when the inventory changes"
+        type: boolean
+        default: true
+        required: false
+  workflow_call:
+    inputs:
+      runtime:
+        type: string
+        required: true
+      open_pr:
+        type: boolean
+        default: true
+        required: false
+      trigger_builds:
+        type: boolean
+        default: false
+        required: false
+    secrets:
+      LINGUIST_GH_PRIVATE_KEY:
+        required: false
+
+permissions:
+  contents: read
+  actions: write
+
+env:
+  CARGO_PROFILE_DEV_DEBUG: 0
+
+jobs:
+  sync:
+    runs-on: pub-hk-ubuntu-24.04-ip # `gh workflow run` needs to be in an IP allow list
+    timeout-minutes: 30
+    concurrency:
+      group: sync-inventory-${{ inputs.runtime }}
+      cancel-in-progress: false
+    steps:
+      - name: Get token for GH application (Linguist)
+        if: inputs.open_pr
+        uses: actions/create-github-app-token@v3
+        id: generate-token
+        with:
+          app-id: ${{ vars.LINGUIST_GH_APP_ID }}
+          private-key: ${{ secrets.LINGUIST_GH_PRIVATE_KEY }}
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          token: ${{ steps.generate-token.outputs.token || github.token }}
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Cargo build
+        run: cargo build --locked
+      - name: Sync inventory with S3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUNTIME: ${{ inputs.runtime }}
+        run: |
+          set -euo pipefail
+          case "$RUNTIME" in
+            ruby)
+              cargo run --locked --bin ruby_release_check -- \
+                --minimum-version 3.2.1 \
+                --inventory-minimum-version 3.1.0 \
+                --inventory ruby_inventory.toml \
+                --output versions.json \
+                2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            jruby)
+              cargo run --locked --bin jruby_release_check -- \
+                --minimum-version 9.4.7.0 \
+                --inventory-minimum-version 9.2.17.0 \
+                --inventory jruby_inventory.toml \
+                --output versions.json \
+                2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo "Unknown runtime: $RUNTIME" >&2
+              exit 1
+              ;;
+          esac
+      - name: Trigger builds for missing versions
+        # Generating the versions list can partially succeed: some versions
+        # resolve while others fail. `!cancelled()` lets this step run even when
+        # the check step failed, so the versions that did succeed still get
+        # dispatched. The job's overall status stays failed so we know to look.
+        if: ${{ !cancelled() && inputs.trigger_builds && hashFiles('versions.json') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUNTIME: ${{ inputs.runtime }}
+        run: |
+          VERSIONS=$(jq -r '.[]' versions.json)
+          if [ -z "$VERSIONS" ]; then
+            echo "No versions to build"
+            exit 0
+          fi
+          echo "$VERSIONS" | while IFS= read -r version; do
+            echo "Triggering build for $RUNTIME $version"
+            gh workflow run "build_${RUNTIME}.yml" \
+              -f "${RUNTIME}_version=$version" \
+              -f on_conflict=skip \
+              -f publish_changelog=true
+          done
+      - name: Create or update pull request
+        if: ${{ !cancelled() && inputs.open_pr }}
+        uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8 # v8.1.2
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+          add-paths: ${{ inputs.runtime }}_inventory.toml
+          branch: inventory-sync/${{ inputs.runtime }}
+          delete-branch: true
+          title: Add ${{ inputs.runtime }} builds on S3 to the inventory
+          body: |
+            Artifacts for builds on S3 that `${{ inputs.runtime }}_inventory.toml` does not list.
+          commit-message: Add ${{ inputs.runtime }} builds on S3 to the inventory
+          committer: ${{ vars.LINGUIST_GH_APP_USERNAME }} <${{ vars.LINGUIST_GH_APP_EMAIL }}>
+          author: ${{ vars.LINGUIST_GH_APP_USERNAME }} <${{ vars.LINGUIST_GH_APP_EMAIL }}>
