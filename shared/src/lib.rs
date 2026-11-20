@@ -53,10 +53,12 @@ pub mod github;
 mod inventory_help;
 mod major_minor;
 pub mod maybe_err;
+mod non_empty;
 
 pub use base_image::{BaseImage, BuildTarget, UnknownDistroVersion, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
 pub use major_minor::{MajorMinor, MajorMinorError};
+pub use non_empty::{NonEmpty, NonEmptyError};
 
 pub static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 pub use inventory_help::{ArtifactMetadata, inventory_check, sha256_from_path};
