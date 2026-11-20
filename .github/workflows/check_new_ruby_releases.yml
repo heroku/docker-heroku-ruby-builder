@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-          description: "Print what would be triggered without actually dispatching builds"
+          description: "Sync the inventories without dispatching builds or opening PRs"
           type: boolean
           default: false
           required: false
@@ -18,96 +18,23 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}
-  cancel-in-progress: true
-
-env:
-  CARGO_PROFILE_DEV_DEBUG: 0
+  cancel-in-progress: false
 
 jobs:
-  check-releases:
-    runs-on: pub-hk-ubuntu-24.04-ip # `gh workflow run` needs to be in an IP allow list
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Update Rust toolchain
-        run: rustup update
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - name: Cargo build
-        run: cargo build --locked
-      - name: Check for missing Ruby versions
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          cargo run --locked --bin ruby_release_check -- \
-            --minimum-version 3.2.1 \
-            --inventory-minimum-version 3.1.0 \
-            --inventory ruby_inventory.toml \
-            --output versions.json \
-            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Trigger builds for missing versions
-        # Generating the versions list can partially succeed: some versions
-        # resolve while others fail. `!cancelled()` lets this step run even when
-        # the check step failed, so the versions that did succeed still get
-        # dispatched. The job's overall status stays failed so we know to look.
-        if: ${{ !cancelled() && !inputs.dry_run }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSIONS=$(jq -r '.[]' versions.json)
-          if [ -z "$VERSIONS" ]; then
-            echo "No versions to build"
-            exit 0
-          fi
-          echo "$VERSIONS" | while IFS= read -r version; do
-            echo "Triggering build for Ruby $version"
-            gh workflow run build_ruby.yml \
-              -f ruby_version="$version" \
-              -f on_conflict=skip \
-              -f publish_changelog=true
-          done
+  sync-ruby:
+    uses: ./.github/workflows/sync_inventory.yml
+    secrets:
+      LINGUIST_GH_PRIVATE_KEY: ${{ secrets.LINGUIST_GH_PRIVATE_KEY }}
+    with:
+      runtime: ruby
+      open_pr: ${{ !inputs.dry_run }}
+      trigger_builds: ${{ !inputs.dry_run }}
 
-  check-jruby-releases:
-    runs-on: pub-hk-ubuntu-24.04-ip # `gh workflow run` needs to be in an IP allow list
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Update Rust toolchain
-        run: rustup update
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-      - name: Cargo build
-        run: cargo build --locked
-      - name: Check for missing JRuby versions
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          cargo run --locked --bin jruby_release_check -- \
-            --minimum-version 9.4.7.0 \
-            --inventory-minimum-version 9.2.17.0 \
-            --inventory jruby_inventory.toml \
-            --output jruby_versions.json \
-            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Trigger builds for missing versions
-        # Generating the versions list can partially succeed: some versions
-        # resolve while others fail. `!cancelled()` lets this step run even when
-        # the check step failed, so the versions that did succeed still get
-        # dispatched. The job's overall status stays failed so we know to look.
-        if: ${{ !cancelled() && !inputs.dry_run }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          VERSIONS=$(jq -r '.[]' jruby_versions.json)
-          if [ -z "$VERSIONS" ]; then
-            echo "No JRuby versions to build"
-            exit 0
-          fi
-          echo "$VERSIONS" | while IFS= read -r version; do
-            echo "Triggering build for JRuby $version"
-            gh workflow run build_jruby.yml \
-              -f jruby_version="$version" \
-              -f on_conflict=skip \
-              -f publish_changelog=true
-          done
+  sync-jruby:
+    uses: ./.github/workflows/sync_inventory.yml
+    secrets:
+      LINGUIST_GH_PRIVATE_KEY: ${{ secrets.LINGUIST_GH_PRIVATE_KEY }}
+    with:
+      runtime: jruby
+      open_pr: ${{ !inputs.dry_run }}
+      trigger_builds: ${{ !inputs.dry_run }}
