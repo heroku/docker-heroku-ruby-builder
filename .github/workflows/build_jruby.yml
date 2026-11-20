@@ -135,14 +135,14 @@ jobs:
             --status published \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
-  # # TODO: Pass data from prior jobs to generate one single inventory file
-  # #       before generating a PR.
-  # after-build-and-upload:
-  #   needs: build-and-upload
-  #   runs-on: pub-hk-ubuntu-24.04-ip
-  #   steps:
-  #     - name: Update Jruby inventory file locally
-  #       uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
-  #       with:
-  #         path: jruby_inventory.toml
-  #         title: "Add JRuby ${{inputs.jruby_version}} to inventory"
+  sync-inventory:
+    needs: [build-and-upload, create-changelog]
+    if: ${{ !cancelled() && !inputs.dry_run }}
+    uses: ./.github/workflows/sync_inventory.yml
+    secrets:
+      LINGUIST_GH_PRIVATE_KEY: ${{ secrets.LINGUIST_GH_PRIVATE_KEY }}
+    permissions:
+      contents: read
+      actions: write
+    with:
+      runtime: jruby
