@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use fs_err::{self as fs, File, PathExt};
 use fun_run::CommandWithName;
 use libherokubuildpack::inventory::artifact::Arch;
@@ -160,6 +161,17 @@ pub enum Error {
         source: std::io::Error,
     },
 
+    #[error("{url} has no Last-Modified header")]
+    MissingLastModified { url: Box<Url> },
+
+    #[error("{url} has Last-Modified {value:?}, which is not an RFC 2822 date")]
+    InvalidLastModified {
+        url: Box<Url>,
+        value: String,
+        #[source]
+        source: chrono::ParseError,
+    },
+
     #[error("S3 check task failed: {0}")]
     S3CheckTask(#[source] tokio::task::JoinError),
 
@@ -278,10 +290,17 @@ pub async fn s3_presence(url_for: impl Fn(&BuildTarget) -> Url) -> Result<S3Pres
 
 /// Performs an HTTP HEAD request to check if a URL returns a successful status.
 pub async fn s3_url_exists(url: Url) -> Result<bool, Error> {
-    with_retries(|| s3_url_exists_inner(url.clone())).await
+    s3_last_modified(url)
+        .await
+        .map(|last_modified| last_modified.is_some())
 }
 
-async fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
+/// ⁉️😄⁉️ - why the upload time is used as the inventory timestamp, and when it is `None`
+pub async fn s3_last_modified(url: Url) -> Result<Option<DateTime<Utc>>, Error> {
+    with_retries(|| s3_last_modified_inner(url.clone())).await
+}
+
+async fn s3_last_modified_inner(url: Url) -> Result<Option<DateTime<Utc>>, Error> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
@@ -292,8 +311,23 @@ async fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
         .await
         .map_err(Error::FailedRequest)?;
     match response.status() {
-        status if status.is_success() => Ok(true),
-        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(false),
+        status if status.is_success() => {
+            let value = response
+                .headers()
+                .get(reqwest::header::LAST_MODIFIED)
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| Error::MissingLastModified {
+                    url: Box::new(url.clone()),
+                })?;
+            DateTime::parse_from_rfc2822(value)
+                .map(|time| Some(time.with_timezone(&Utc)))
+                .map_err(|source| Error::InvalidLastModified {
+                    url: Box::new(url),
+                    value: value.to_owned(),
+                    source,
+                })
+        }
+        reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::FORBIDDEN => Ok(None),
         status => Err(Error::Other(format!(
             "Unexpected status {status} checking {url}"
         ))),
@@ -608,6 +642,36 @@ mod test {
         file.read_to_string(&mut contents).unwrap();
 
         assert_eq!(contents, "Hello, world!");
+    }
+
+    fn serve_once(response: Response<std::io::Empty>) -> Url {
+        let server = Server::http("127.0.0.1:0").unwrap();
+        let url = parse_url(&format!("http://{}/ruby.tgz", server.server_addr())).unwrap();
+        thread::spawn(move || {
+            let _ = server.recv().unwrap().respond(response);
+        });
+        url
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn s3_last_modified_reads_the_header() {
+        let url = serve_once(
+            Response::empty(200).with_header(
+                "Last-Modified: Wed, 03 Apr 2024 14:40:03 GMT"
+                    .parse::<tiny_http::Header>()
+                    .unwrap(),
+            ),
+        );
+        assert_eq!(
+            s3_last_modified(url).await.unwrap(),
+            Some("2024-04-03T14:40:03Z".parse().unwrap())
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn s3_last_modified_is_none_when_forbidden() {
+        let url = serve_once(Response::empty(403));
+        assert_eq!(s3_last_modified(url).await.unwrap(), None);
     }
 
     #[tokio::test(flavor = "multi_thread")]
