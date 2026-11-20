@@ -1,0 +1,2232 @@
+[[artifacts]]
+version = "10.1.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-4.0.9-jruby-10.1.3.0-50e656f.tgz"
+checksum = "sha256:50e656f7ca7b1a2f51dfdb9d64dcb02338f07feb123e8e45543221fccb48e978"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:21Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.1.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-4.0.9-jruby-10.1.3.0-7b19be7.tgz"
+checksum = "sha256:7b19be712e5ed8c48103ccc12b8c0a16bedad3aed9b7d6e23bbb795722f319e4"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:51Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.1.3.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-4.0.9-jruby-10.1.3.0-7b19be7.tgz"
+checksum = "sha256:7b19be712e5ed8c48103ccc12b8c0a16bedad3aed9b7d6e23bbb795722f319e4"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:51Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.1.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-4.0.9-jruby-10.1.3.0-8088328.tgz"
+checksum = "sha256:80883286bd67ddce1231c6bddd885b34ffbf93b6c12ca04e2ec908828c86e03c"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:38Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.1.3.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-4.0.9-jruby-10.1.3.0-8088328.tgz"
+checksum = "sha256:80883286bd67ddce1231c6bddd885b34ffbf93b6c12ca04e2ec908828c86e03c"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:38Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.1.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-4.0.0-jruby-10.1.2.0-713bb7c.tgz"
+checksum = "sha256:713bb7c6c518e35924bcd1686dc549deeaabce426c5d06ebb553a139a92ac56a"
+
+[artifacts.metadata]
+timestamp = "2026-09-21T22:20:24Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.1.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-4.0.0-jruby-10.1.2.0-713bb7c.tgz"
+checksum = "sha256:713bb7c6c518e35924bcd1686dc549deeaabce426c5d06ebb553a139a92ac56a"
+
+[artifacts.metadata]
+timestamp = "2026-09-21T22:20:26Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.1.2.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-4.0.0-jruby-10.1.2.0-713bb7c.tgz"
+checksum = "sha256:713bb7c6c518e35924bcd1686dc549deeaabce426c5d06ebb553a139a92ac56a"
+
+[artifacts.metadata]
+timestamp = "2026-09-21T22:20:26Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.1.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-4.0.0-jruby-10.1.2.0-248b42a.tgz"
+checksum = "sha256:248b42a1c0d62461e7e4782d5fd002c4538eca45647a6db62f7d058b4151388f"
+
+[artifacts.metadata]
+timestamp = "2026-09-21T22:20:26Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.1.2.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-4.0.0-jruby-10.1.2.0-248b42a.tgz"
+checksum = "sha256:248b42a1c0d62461e7e4782d5fd002c4538eca45647a6db62f7d058b4151388f"
+
+[artifacts.metadata]
+timestamp = "2026-09-21T22:20:26Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.1.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-4.0.0-jruby-10.1.1.0-f33d8ce.tgz"
+checksum = "sha256:f33d8ce7cd2a5947feeef2dd4e06c3c4b1e06bf764dc51f0a5416a95c84046d7"
+
+[artifacts.metadata]
+timestamp = "2026-07-22T18:35:05Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.1.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-4.0.0-jruby-10.1.1.0-d7ce862.tgz"
+checksum = "sha256:d7ce862fea523fba0203ca84646c29435ffc761ee2fcd622e8f3744a48d88c4a"
+
+[artifacts.metadata]
+timestamp = "2026-07-22T18:35:05Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.1.1.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-4.0.0-jruby-10.1.1.0-d7ce862.tgz"
+checksum = "sha256:d7ce862fea523fba0203ca84646c29435ffc761ee2fcd622e8f3744a48d88c4a"
+
+[artifacts.metadata]
+timestamp = "2026-07-22T18:35:05Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.1.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-4.0.0-jruby-10.1.1.0-ed5d5bc.tgz"
+checksum = "sha256:ed5d5bc428da0c32b515bbd1f28e166b4677e64c5201ac70836be51f14715f2a"
+
+[artifacts.metadata]
+timestamp = "2026-07-22T18:35:26Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.1.1.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-4.0.0-jruby-10.1.1.0-ed5d5bc.tgz"
+checksum = "sha256:ed5d5bc428da0c32b515bbd1f28e166b4677e64c5201ac70836be51f14715f2a"
+
+[artifacts.metadata]
+timestamp = "2026-07-22T18:35:26Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.1.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-4.0.0-jruby-10.1.0.0-fdf8ed6.tgz"
+checksum = "sha256:fdf8ed67a330fde50c2a1f1cb1e54698690753eb2b2455c310b45172f5b283bd"
+
+[artifacts.metadata]
+timestamp = "2026-04-21T14:11:15Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.1.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-4.0.0-jruby-10.1.0.0-2f2a929.tgz"
+checksum = "sha256:2f2a9290ba0490f300f0c63997db65de8cd03db077d3e86a7d450fbc80b796a9"
+
+[artifacts.metadata]
+timestamp = "2026-04-21T14:12:59Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.1.0.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-4.0.0-jruby-10.1.0.0-2f2a929.tgz"
+checksum = "sha256:2f2a9290ba0490f300f0c63997db65de8cd03db077d3e86a7d450fbc80b796a9"
+
+[artifacts.metadata]
+timestamp = "2026-04-21T14:12:59Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.1.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-4.0.0-jruby-10.1.0.0-188e2c3.tgz"
+checksum = "sha256:188e2c3402bf799d2ac189682404582e346cec4845798c3be93a92a6c66d6b44"
+
+[artifacts.metadata]
+timestamp = "2026-04-21T14:12:46Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.1.0.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-4.0.0-jruby-10.1.0.0-188e2c3.tgz"
+checksum = "sha256:188e2c3402bf799d2ac189682404582e346cec4845798c3be93a92a6c66d6b44"
+
+[artifacts.metadata]
+timestamp = "2026-04-21T14:12:46Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.8.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.12-jruby-10.0.8.0-7c8a67c.tgz"
+checksum = "sha256:7c8a67ce13917995bccd929ee7d54876876621f10754542b75ae4b479645a55d"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:28Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.8.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.12-jruby-10.0.8.0-40d9cfc.tgz"
+checksum = "sha256:40d9cfc4d3862ed6b3eb7ec7979be70cfb75c5f95bd74f14d7b87e1ad9031dab"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:37Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.8.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.12-jruby-10.0.8.0-40d9cfc.tgz"
+checksum = "sha256:40d9cfc4d3862ed6b3eb7ec7979be70cfb75c5f95bd74f14d7b87e1ad9031dab"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:37Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.8.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.12-jruby-10.0.8.0-5626092.tgz"
+checksum = "sha256:5626092eb7a3ed8512629c1a17fdd1e15b6cb72c32eeec8d1cba02b73b730e52"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:31Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.8.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.12-jruby-10.0.8.0-5626092.tgz"
+checksum = "sha256:5626092eb7a3ed8512629c1a17fdd1e15b6cb72c32eeec8d1cba02b73b730e52"
+
+[artifacts.metadata]
+timestamp = "2026-11-05T18:17:31Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.7.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.5-jruby-10.0.7.0-19d0786.tgz"
+checksum = "sha256:19d0786b37c40c3da03de4ddb4169d5fbf8e427d6c799efbfcd54cd167e3547c"
+
+[artifacts.metadata]
+timestamp = "2026-09-22T00:48:21Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.7.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.7.0-831e75e.tgz"
+checksum = "sha256:831e75e1d560c2808683e962dcb0cf79baae3b2d6c3efd80f906531a2064426b"
+
+[artifacts.metadata]
+timestamp = "2026-09-22T00:48:30Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.7.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.7.0-831e75e.tgz"
+checksum = "sha256:831e75e1d560c2808683e962dcb0cf79baae3b2d6c3efd80f906531a2064426b"
+
+[artifacts.metadata]
+timestamp = "2026-09-22T00:48:30Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.7.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.7.0-5a63987.tgz"
+checksum = "sha256:5a6398795c252d9a2f2343c1d669db7cf7f3b694cbf3250df28392e6ba173582"
+
+[artifacts.metadata]
+timestamp = "2026-09-22T00:46:50Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.7.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.7.0-5a63987.tgz"
+checksum = "sha256:5a6398795c252d9a2f2343c1d669db7cf7f3b694cbf3250df28392e6ba173582"
+
+[artifacts.metadata]
+timestamp = "2026-09-22T00:46:50Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.6.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.5-jruby-10.0.6.0-57f81c2.tgz"
+checksum = "sha256:57f81c282f78a3b1c32592b75fcf2ac705a8b46aaaacea1c1b7d700aae180c71"
+
+[artifacts.metadata]
+timestamp = "2026-06-11T19:23:22Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.6.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.6.0-17cce41.tgz"
+checksum = "sha256:17cce4190abf44b3b7b8c3793b52e9a0f17bdd55f303c7c06ea868b08f44cf74"
+
+[artifacts.metadata]
+timestamp = "2026-06-11T19:21:51Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.6.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.6.0-17cce41.tgz"
+checksum = "sha256:17cce4190abf44b3b7b8c3793b52e9a0f17bdd55f303c7c06ea868b08f44cf74"
+
+[artifacts.metadata]
+timestamp = "2026-06-11T19:21:51Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.6.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.6.0-0c7e556.tgz"
+checksum = "sha256:0c7e5564833c05a469faf02d0fab847265a62cb4b0ce772fa3cf30f042451571"
+
+[artifacts.metadata]
+timestamp = "2026-06-11T19:23:09Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.6.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.6.0-0c7e556.tgz"
+checksum = "sha256:0c7e5564833c05a469faf02d0fab847265a62cb4b0ce772fa3cf30f042451571"
+
+[artifacts.metadata]
+timestamp = "2026-06-11T19:23:09Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.5.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.5-jruby-10.0.5.0-9cda783.tgz"
+checksum = "sha256:9cda78318d66bfbfab0ff2193a17c00fdac50150881354031459996f37b9781e"
+
+[artifacts.metadata]
+timestamp = "2026-04-08T14:50:57Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.5.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.5.0-2db11bf.tgz"
+checksum = "sha256:2db11bfca7e944b81b452f444e726680e0a6400e9de809dee5f1bd685ce96320"
+
+[artifacts.metadata]
+timestamp = "2026-04-08T14:50:58Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.5.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.5.0-2db11bf.tgz"
+checksum = "sha256:2db11bfca7e944b81b452f444e726680e0a6400e9de809dee5f1bd685ce96320"
+
+[artifacts.metadata]
+timestamp = "2026-04-08T14:50:58Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.5.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.5.0-c8cc635.tgz"
+checksum = "sha256:c8cc63511fe808177a30d7741428efdda5a577409a83793c006b8d34aac87cf3"
+
+[artifacts.metadata]
+timestamp = "2026-04-08T14:50:27Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.5.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.5.0-c8cc635.tgz"
+checksum = "sha256:c8cc63511fe808177a30d7741428efdda5a577409a83793c006b8d34aac87cf3"
+
+[artifacts.metadata]
+timestamp = "2026-04-08T14:50:27Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.4.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.5-jruby-10.0.4.0-8abeb1c.tgz"
+checksum = "sha256:8abeb1c6dcf3aeccc98d6e334265d6f38bd3ce3eb1ef5144d057d9772560ce6a"
+
+[artifacts.metadata]
+timestamp = "2026-03-06T13:12:05Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.4.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.4.0-d9e0199.tgz"
+checksum = "sha256:d9e019979387effde9116e4037c7fb64983db49ac01a4e7121204d39d6f5733a"
+
+[artifacts.metadata]
+timestamp = "2026-03-06T13:10:56Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.4.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.4.0-d9e0199.tgz"
+checksum = "sha256:d9e019979387effde9116e4037c7fb64983db49ac01a4e7121204d39d6f5733a"
+
+[artifacts.metadata]
+timestamp = "2026-03-06T13:10:56Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.4.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.4.0-c1d1d27.tgz"
+checksum = "sha256:c1d1d2796cd907e85165e242d23576b7233ef576d4ce9e80fd6da478a53255e5"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:54Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.4.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.4.0-c1d1d27.tgz"
+checksum = "sha256:c1d1d2796cd907e85165e242d23576b7233ef576d4ce9e80fd6da478a53255e5"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:54Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.5-jruby-10.0.3.0-9af9365.tgz"
+checksum = "sha256:9af936535b2d347463158f16ac901266951d280260cb183dc6c5ec526417d00f"
+
+[artifacts.metadata]
+timestamp = "2026-02-03T01:30:32Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.3.0-f78a07a.tgz"
+checksum = "sha256:f78a07a0bd592f50387b0195d4650402778a3d9844b9f69a11997c4bb67a4935"
+
+[artifacts.metadata]
+timestamp = "2026-02-03T01:30:33Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.3.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.5-jruby-10.0.3.0-f78a07a.tgz"
+checksum = "sha256:f78a07a0bd592f50387b0195d4650402778a3d9844b9f69a11997c4bb67a4935"
+
+[artifacts.metadata]
+timestamp = "2026-02-03T01:30:33Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.3.0-3ed2df0.tgz"
+checksum = "sha256:3ed2df0ff4cae3a377e232bb2491d2b082fc048a1ba2962c5cf91ec474b4b18d"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:48Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.3.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.5-jruby-10.0.3.0-3ed2df0.tgz"
+checksum = "sha256:3ed2df0ff4cae3a377e232bb2491d2b082fc048a1ba2962c5cf91ec474b4b18d"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:48Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.2-jruby-10.0.2.0-67a2139.tgz"
+checksum = "sha256:67a213966bf670eb0042faef36d63df6494b52a8eda8017e76ac480bcd75e286"
+
+[artifacts.metadata]
+timestamp = "2025-08-07T19:28:43Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.2-jruby-10.0.2.0-f69bccb.tgz"
+checksum = "sha256:f69bccb173234e8dc24327322adf75f19c30df2d9d42175783e29f7fb75d5074"
+
+[artifacts.metadata]
+timestamp = "2025-08-07T19:30:05Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.2.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.2-jruby-10.0.2.0-f69bccb.tgz"
+checksum = "sha256:f69bccb173234e8dc24327322adf75f19c30df2d9d42175783e29f7fb75d5074"
+
+[artifacts.metadata]
+timestamp = "2025-08-07T19:30:05Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.2-jruby-10.0.2.0-503753a.tgz"
+checksum = "sha256:503753acad7ee4065501fb5bd764f7481581dcd75d35248244c621f18ef2fae1"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:35Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.2.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.2-jruby-10.0.2.0-503753a.tgz"
+checksum = "sha256:503753acad7ee4065501fb5bd764f7481581dcd75d35248244c621f18ef2fae1"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:35Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.2-jruby-10.0.1.0-04af680.tgz"
+checksum = "sha256:04af68009f4370367adb252a41f95e3247b47aa2491f4de6bbaede4d6dc33b84"
+
+[artifacts.metadata]
+timestamp = "2025-07-18T19:08:31Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.2-jruby-10.0.1.0-7d2d6ac.tgz"
+checksum = "sha256:7d2d6acc43b61c0d950baade4080f2af1e9255b1ea72131077e19b3828e0bd65"
+
+[artifacts.metadata]
+timestamp = "2025-07-18T19:07:39Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.1.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.2-jruby-10.0.1.0-7d2d6ac.tgz"
+checksum = "sha256:7d2d6acc43b61c0d950baade4080f2af1e9255b1ea72131077e19b3828e0bd65"
+
+[artifacts.metadata]
+timestamp = "2025-07-18T19:07:39Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.2-jruby-10.0.1.0-617c350.tgz"
+checksum = "sha256:617c350121ccb8bae4af3b866d169680e61443488a3306fb996128e976055669"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:50Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.1.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.2-jruby-10.0.1.0-617c350.tgz"
+checksum = "sha256:617c350121ccb8bae4af3b866d169680e61443488a3306fb996128e976055669"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:50Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.0.1"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.2-jruby-10.0.0.1-0258b09.tgz"
+checksum = "sha256:0258b09c7ee01ea8c672a3b9024f269c66a994eab0b20e9eb082b4859a4cb05d"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:59Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.0.1"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.2-jruby-10.0.0.1-4c39309.tgz"
+checksum = "sha256:4c39309fe580cc8fb89efd19bb83ceb4284cec4240687c87883043ded57c741c"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:38Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.0.1"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.2-jruby-10.0.0.1-4c39309.tgz"
+checksum = "sha256:4c39309fe580cc8fb89efd19bb83ceb4284cec4240687c87883043ded57c741c"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:38Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.0.1"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.2-jruby-10.0.0.1-9df43e4.tgz"
+checksum = "sha256:9df43e440ed1712a5a29650c6475809f51d879f669a0a88a6d33213c4fe91fed"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:21Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.0.1"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.2-jruby-10.0.0.1-9df43e4.tgz"
+checksum = "sha256:9df43e440ed1712a5a29650c6475809f51d879f669a0a88a6d33213c4fe91fed"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:21Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.4.2-jruby-10.0.0.0-34a6231.tgz"
+checksum = "sha256:34a62318f1c7ab04a0cfc627c33e23603fc9cd6910e63e0a815d7983c9df117a"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:45Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "10.0.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.2-jruby-10.0.0.0-19a5dcd.tgz"
+checksum = "sha256:19a5dcd4d3b58f00aecd4122bccb4e277c56c51e7b9a623885e72e6ae6de5069"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:32Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.0.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.4.2-jruby-10.0.0.0-19a5dcd.tgz"
+checksum = "sha256:19a5dcd4d3b58f00aecd4122bccb4e277c56c51e7b9a623885e72e6ae6de5069"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:32Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "10.0.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.2-jruby-10.0.0.0-9bb0ed6.tgz"
+checksum = "sha256:9bb0ed65b4f95a647865826967d73bec1b60826e88773c8233ff4d89036d21e5"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:36Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "10.0.0.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.4.2-jruby-10.0.0.0-9bb0ed6.tgz"
+checksum = "sha256:9bb0ed65b4f95a647865826967d73bec1b60826e88773c8233ff4d89036d21e5"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:36Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.15.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.7-jruby-9.4.15.0-853d6dd.tgz"
+checksum = "sha256:853d6ddba5eecd6dc1c4ea2136e1eed687b0861cfe0e13103f907ac26cd6a9c8"
+
+[artifacts.metadata]
+timestamp = "2026-06-08T21:07:59Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.15.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.7-jruby-9.4.15.0-6bfe9c0.tgz"
+checksum = "sha256:6bfe9c01b29f59b3b59727c46c37b270e992953c870239533f54f85b1a2a99ad"
+
+[artifacts.metadata]
+timestamp = "2026-06-08T21:07:55Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.15.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.7-jruby-9.4.15.0-6bfe9c0.tgz"
+checksum = "sha256:6bfe9c01b29f59b3b59727c46c37b270e992953c870239533f54f85b1a2a99ad"
+
+[artifacts.metadata]
+timestamp = "2026-06-08T21:07:55Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.15.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.7-jruby-9.4.15.0-ea487c6.tgz"
+checksum = "sha256:ea487c687769da4837dfdf0a3884e3bdd8015cd05798a2ad9b82e550deec9345"
+
+[artifacts.metadata]
+timestamp = "2026-06-08T21:08:15Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.15.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.7-jruby-9.4.15.0-ea487c6.tgz"
+checksum = "sha256:ea487c687769da4837dfdf0a3884e3bdd8015cd05798a2ad9b82e550deec9345"
+
+[artifacts.metadata]
+timestamp = "2026-06-08T21:08:15Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.14.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.7-jruby-9.4.14.0-c250701.tgz"
+checksum = "sha256:c25070132991d9b863d9cac91d23b6418878f1dc09b949b4227d93f460999595"
+
+[artifacts.metadata]
+timestamp = "2025-10-09T23:01:54Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.14.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.7-jruby-9.4.14.0-ebdec67.tgz"
+checksum = "sha256:ebdec67b4774d109aae1b04915cfa442ad74774136807d8c485618a86e878d88"
+
+[artifacts.metadata]
+timestamp = "2025-10-09T23:00:07Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.14.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.7-jruby-9.4.14.0-ebdec67.tgz"
+checksum = "sha256:ebdec67b4774d109aae1b04915cfa442ad74774136807d8c485618a86e878d88"
+
+[artifacts.metadata]
+timestamp = "2025-10-09T23:00:07Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.14.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.7-jruby-9.4.14.0-c5670fa.tgz"
+checksum = "sha256:c5670fab59f3c18fd6390ed06bbc74c0ec0222109a41ee2844d07eed97aa4bf2"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:40Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.14.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.7-jruby-9.4.14.0-c5670fa.tgz"
+checksum = "sha256:c5670fab59f3c18fd6390ed06bbc74c0ec0222109a41ee2844d07eed97aa4bf2"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:40Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.13.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.13.0-8d17872.tgz"
+checksum = "sha256:8d17872b20aecf1c55a898e620c6be560e3111fd9938de20e5bfbf0362cad699"
+
+[artifacts.metadata]
+timestamp = "2025-06-13T17:34:18Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.13.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.13.0-0d8a173.tgz"
+checksum = "sha256:0d8a173d0b2aaa43ae7563aa508d56103f6cb859ee9c58d69a9874de3542b48d"
+
+[artifacts.metadata]
+timestamp = "2025-06-13T17:33:33Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.13.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.13.0-0d8a173.tgz"
+checksum = "sha256:0d8a173d0b2aaa43ae7563aa508d56103f6cb859ee9c58d69a9874de3542b48d"
+
+[artifacts.metadata]
+timestamp = "2025-06-13T17:33:33Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.13.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.13.0-6b25424.tgz"
+checksum = "sha256:6b254242747266440c7ada1bf2b59715136d3217f325d5c53717a74ad94e63e6"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:40Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.13.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.13.0-6b25424.tgz"
+checksum = "sha256:6b254242747266440c7ada1bf2b59715136d3217f325d5c53717a74ad94e63e6"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:40Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.12.1"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.12.1-264bf10.tgz"
+checksum = "sha256:264bf10ee321843d04ad7f1739b92373722961fa1465092b8e6460a0dd9893e6"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:11Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.12.1"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.12.1-3c95239.tgz"
+checksum = "sha256:3c95239c5f53fdc1d22c53a878cd6f0070ed0cb642ad10182af144531927c787"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:01:06Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.12.1"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.12.1-3c95239.tgz"
+checksum = "sha256:3c95239c5f53fdc1d22c53a878cd6f0070ed0cb642ad10182af144531927c787"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:01:06Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.12.1"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.12.1-819932b.tgz"
+checksum = "sha256:819932b9210ad997361d47740a7bcebab442a8015cab39774f7be746c772652f"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:29Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.12.1"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.12.1-819932b.tgz"
+checksum = "sha256:819932b9210ad997361d47740a7bcebab442a8015cab39774f7be746c772652f"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:29Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.12.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.12.0-0c9e6a0.tgz"
+checksum = "sha256:0c9e6a06922544ec3eb6032a914ee9b160d479194b3e07a9cba8656b000f4baf"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:01Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.12.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.12.0-5b449b0.tgz"
+checksum = "sha256:5b449b0cd029f17c09149e63fb3cc518c567d02af02424384d7dd2cc8f896f26"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:26Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.12.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.12.0-5b449b0.tgz"
+checksum = "sha256:5b449b0cd029f17c09149e63fb3cc518c567d02af02424384d7dd2cc8f896f26"
+
+[artifacts.metadata]
+timestamp = "2025-05-08T01:00:26Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.12.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.12.0-9bd7866.tgz"
+checksum = "sha256:9bd7866175e62f3529368fcf6b48e8b8ce9244185a9646efff60d7da3bf3dc17"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:19Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.12.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.12.0-9bd7866.tgz"
+checksum = "sha256:9bd7866175e62f3529368fcf6b48e8b8ce9244185a9646efff60d7da3bf3dc17"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:19Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.11.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.11.0-6b7289e.tgz"
+checksum = "sha256:6b7289e6c9e847ded885a6b722c22ee771404070cfe6f1fb771e38b839bdf7cf"
+
+[artifacts.metadata]
+timestamp = "2025-01-30T09:21:22Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.11.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.11.0-ca4195c.tgz"
+checksum = "sha256:ca4195cf255e86b76df93b96b7fafb49af89b101e49de1fda7292bd856f886d5"
+
+[artifacts.metadata]
+timestamp = "2025-01-30T09:21:02Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.11.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.11.0-ca4195c.tgz"
+checksum = "sha256:ca4195cf255e86b76df93b96b7fafb49af89b101e49de1fda7292bd856f886d5"
+
+[artifacts.metadata]
+timestamp = "2025-01-30T09:21:02Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.11.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.11.0-3e5cb65.tgz"
+checksum = "sha256:3e5cb65813b4079e31a97b1bb19c79ee0f3b1578f4bc24a9b7e2f23b6af4f51e"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:15Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.11.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.11.0-3e5cb65.tgz"
+checksum = "sha256:3e5cb65813b4079e31a97b1bb19c79ee0f3b1578f4bc24a9b7e2f23b6af4f51e"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:15Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.10.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.10.0-066bb98.tgz"
+checksum = "sha256:066bb98f20bdc25783b15122aa6389677a148d70712ece17714026ceed67c6d0"
+
+[artifacts.metadata]
+timestamp = "2025-01-23T20:07:23Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.10.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.10.0-01fe4d7.tgz"
+checksum = "sha256:01fe4d7a0762613e7f315656f0ec0d234c76859cf103946c1c362871ae000b6e"
+
+[artifacts.metadata]
+timestamp = "2025-01-23T20:08:42Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.10.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.10.0-01fe4d7.tgz"
+checksum = "sha256:01fe4d7a0762613e7f315656f0ec0d234c76859cf103946c1c362871ae000b6e"
+
+[artifacts.metadata]
+timestamp = "2025-01-23T20:08:42Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.10.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.10.0-8c14817.tgz"
+checksum = "sha256:8c148174d70aca2a3d58f3cac9c8164ad6380b6ecd9e747199d385e3e579cf36"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:21Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.10.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.10.0-8c14817.tgz"
+checksum = "sha256:8c148174d70aca2a3d58f3cac9c8164ad6380b6ecd9e747199d385e3e579cf36"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:21Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.9.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.9.0-5952d82.tgz"
+checksum = "sha256:5952d82e22662f6b80d4fe5d01cc8e64e5cd3f209cd1420cce2f3f02f9636e0a"
+
+[artifacts.metadata]
+timestamp = "2024-11-06T16:26:28Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.9.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.9.0-ec79818.tgz"
+checksum = "sha256:ec798182d6191e14bc1ebd36ec24bbabbe9a6c51968988dd74f0304ac6e19e3e"
+
+[artifacts.metadata]
+timestamp = "2024-11-06T16:25:06Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.9.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.9.0-ec79818.tgz"
+checksum = "sha256:ec798182d6191e14bc1ebd36ec24bbabbe9a6c51968988dd74f0304ac6e19e3e"
+
+[artifacts.metadata]
+timestamp = "2024-11-06T16:25:06Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.9.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.9.0-b017466.tgz"
+checksum = "sha256:b0174663595b29fee104fd4c9bb0464bb6dd99795c62b4268cca16bfdcc6b434"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:24Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.9.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.9.0-b017466.tgz"
+checksum = "sha256:b0174663595b29fee104fd4c9bb0464bb6dd99795c62b4268cca16bfdcc6b434"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:24Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.8.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.8.0.tgz"
+checksum = "sha256:7369f4a0ffd3fe5c1071f8b789bb1f6af03ae5b1bf85a067b08f41bddc923550"
+
+[artifacts.metadata]
+timestamp = "2024-07-03T16:43:37Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.8.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.8.0.tgz"
+checksum = "sha256:815b31d2b204a524bf74aabae341bf85353add4d1128d5d276d08fa5e8ff3c39"
+
+[artifacts.metadata]
+timestamp = "2024-07-03T16:41:22Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.8.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.8.0.tgz"
+checksum = "sha256:815b31d2b204a524bf74aabae341bf85353add4d1128d5d276d08fa5e8ff3c39"
+
+[artifacts.metadata]
+timestamp = "2024-07-03T16:41:22Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.8.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.8.0-1b4c933.tgz"
+checksum = "sha256:1b4c9333189524f0e2c4a7428c480fa44628bebe4cd5f94c2eec7264a3b5e7e8"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:19Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.8.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.8.0-1b4c933.tgz"
+checksum = "sha256:1b4c9333189524f0e2c4a7428c480fa44628bebe4cd5f94c2eec7264a3b5e7e8"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:19Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.7.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.7.0.tgz"
+checksum = "sha256:146581a08d98c46b1395c61407fa45a3d66c437a4939cdc9d1fce45c4adc7b1c"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:42:30Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.7.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.7.0.tgz"
+checksum = "sha256:2448a380d22f8107799848025b3957c200efb24dcd0cfc17852b4fd4ccbc1550"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:41:44Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.7.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.7.0.tgz"
+checksum = "sha256:2448a380d22f8107799848025b3957c200efb24dcd0cfc17852b4fd4ccbc1550"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:41:44Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.7.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.7.0-707db90.tgz"
+checksum = "sha256:707db90dc2fc99469c48f059d537b5a028059798d51add3d96c90847cfdd919c"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:24Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.7.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.7.0-707db90.tgz"
+checksum = "sha256:707db90dc2fc99469c48f059d537b5a028059798d51add3d96c90847cfdd919c"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:24Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.6.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.6.0.tgz"
+checksum = "sha256:61427eafd4eca15e173ef3ed60060104b01e708724f7f8c6e19a1f26edbe0f3b"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:41:59Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.6.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.6.0.tgz"
+checksum = "sha256:20160b0ca02f765b361598057e5b2337658ac35d59054cf47aafc286cb19c4cf"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:41:29Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.6.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.6.0.tgz"
+checksum = "sha256:20160b0ca02f765b361598057e5b2337658ac35d59054cf47aafc286cb19c4cf"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:41:29Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.6.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.6.0-f95dc02.tgz"
+checksum = "sha256:f95dc024bbf611799f9e7def3f34c8eb172e6324d6d9ea01d1947bb1df473a16"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:33Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.6.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.6.0-f95dc02.tgz"
+checksum = "sha256:f95dc024bbf611799f9e7def3f34c8eb172e6324d6d9ea01d1947bb1df473a16"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:33Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.5.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.5.0.tgz"
+checksum = "sha256:faaa6e20c03c4e8615460823da50917ffd239c5dca0726481e73d540ac098e13"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:41:09Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.5.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.5.0.tgz"
+checksum = "sha256:a7193941d9e78e7ec549b0ff5bfab5e226974adf5e2b2aad0ddbbd1cb0e9e7fe"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:40:49Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.5.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.5.0.tgz"
+checksum = "sha256:a7193941d9e78e7ec549b0ff5bfab5e226974adf5e2b2aad0ddbbd1cb0e9e7fe"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:40:49Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.5.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.5.0-145c982.tgz"
+checksum = "sha256:145c982e1e3828f9bb665a65943b2a5b05d4abfbe3347a0655ceef761a2ed097"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:10Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.5.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.5.0-145c982.tgz"
+checksum = "sha256:145c982e1e3828f9bb665a65943b2a5b05d4abfbe3347a0655ceef761a2ed097"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:10Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.4.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.4.0.tgz"
+checksum = "sha256:a0063aa0801fedf428f592348ff76af85871795c925900ca691b83a265d4195a"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:40:34Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.4.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.4.0.tgz"
+checksum = "sha256:a0063aa0801fedf428f592348ff76af85871795c925900ca691b83a265d4195a"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:40:34Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.4.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.4.0.tgz"
+checksum = "sha256:a0063aa0801fedf428f592348ff76af85871795c925900ca691b83a265d4195a"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:40:34Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.4.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.4.0-2c1ed61.tgz"
+checksum = "sha256:2c1ed61ddffbc6e99f09ed07bf0e6552b5aa921cc73f530daacc902caa89188b"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:10Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.4.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.4.0-2c1ed61.tgz"
+checksum = "sha256:2c1ed61ddffbc6e99f09ed07bf0e6552b5aa921cc73f530daacc902caa89188b"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:10Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.4-jruby-9.4.3.0.tgz"
+checksum = "sha256:8bedd4e0ce8526890de5e61aa7b104ef663543e29a147ecc093b81bb99cc4a6c"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:41:56Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.3.0.tgz"
+checksum = "sha256:762c1d9bdb420ed2a10722b0823cc1253aebdbfa1bfa0047f39df107506f3f80"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:46:29Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.3.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.3.0.tgz"
+checksum = "sha256:762c1d9bdb420ed2a10722b0823cc1253aebdbfa1bfa0047f39df107506f3f80"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:46:29Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.3.0-1af46d5.tgz"
+checksum = "sha256:1af46d50e8a85418da8b4aeae471bb41f456b7f9c9bde84371a27f44b65547ce"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:06Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.3.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.4-jruby-9.4.3.0-1af46d5.tgz"
+checksum = "sha256:1af46d50e8a85418da8b4aeae471bb41f456b7f9c9bde84371a27f44b65547ce"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:06Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.0-jruby-9.4.2.0.tgz"
+checksum = "sha256:c882d12413a57c0dea8a495a4d596298c140ed3d3e7169d61fec6cf3d93aa2c4"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:39:47Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.0-jruby-9.4.2.0.tgz"
+checksum = "sha256:6dcc34c3f12f6a8302fd7d9376963445c8b45ba99d4a1a8e19ae7fb6ecc03990"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:39:04Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.2.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.0-jruby-9.4.2.0.tgz"
+checksum = "sha256:6dcc34c3f12f6a8302fd7d9376963445c8b45ba99d4a1a8e19ae7fb6ecc03990"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:39:04Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.0-jruby-9.4.2.0-7a65f0f.tgz"
+checksum = "sha256:7a65f0f49c94485c4670b0a5d5f87cfb9b416435243e08c3cd9d574d922d128a"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:33Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.2.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.0-jruby-9.4.2.0-7a65f0f.tgz"
+checksum = "sha256:7a65f0f49c94485c4670b0a5d5f87cfb9b416435243e08c3cd9d574d922d128a"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:28:33Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.0-jruby-9.4.1.0.tgz"
+checksum = "sha256:9771af03bada225d55aebe257936e374482775d5e38ab582266d8f8713970495"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:39:28Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.0-jruby-9.4.1.0.tgz"
+checksum = "sha256:eb92c6c3f7901efb65e0f9482c29ab96bfe0ac7bf03f218a0adecf0e925aed99"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:38:56Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.1.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.0-jruby-9.4.1.0.tgz"
+checksum = "sha256:eb92c6c3f7901efb65e0f9482c29ab96bfe0ac7bf03f218a0adecf0e925aed99"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:38:56Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.0-jruby-9.4.1.0-551b877.tgz"
+checksum = "sha256:551b8771865264f42bc8cd2b67339dca5a811a9a57320dd9ad45210395fd0aa2"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:26:36Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.1.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.0-jruby-9.4.1.0-551b877.tgz"
+checksum = "sha256:551b8771865264f42bc8cd2b67339dca5a811a9a57320dd9ad45210395fd0aa2"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:26:36Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-3.1.0-jruby-9.4.0.0.tgz"
+checksum = "sha256:4acd7279add18b14caacc8ad478d822bbb4404e95a9f81fbb5fb999b49339eb4"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:38:07Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.4.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.0-jruby-9.4.0.0.tgz"
+checksum = "sha256:ac61f2c951c2a4e50edac3be52f9654f80edd73e2d970e0cba98ca6e109ad32c"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:38:35Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.0.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.0-jruby-9.4.0.0.tgz"
+checksum = "sha256:ac61f2c951c2a4e50edac3be52f9654f80edd73e2d970e0cba98ca6e109ad32c"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T20:38:35Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.4.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.0-jruby-9.4.0.0-0a7caee.tgz"
+checksum = "sha256:0a7caee5ea3a0959a89c69c055700a50788e2879f7b80a84ef1e7e4d616b8827"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:26:51Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.4.0.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-26/ruby-3.1.0-jruby-9.4.0.0-0a7caee.tgz"
+checksum = "sha256:0a7caee5ea3a0959a89c69c055700a50788e2879f7b80a84ef1e7e4d616b8827"
+
+[artifacts.metadata]
+timestamp = "2026-04-22T17:26:51Z"
+distro_version = "26.04"
+
+[[artifacts]]
+version = "9.3.15.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.15.0.tgz"
+checksum = "sha256:abef69260b7f619bf5b878bcc28c9ead96a794a34c7e109d2414236f84f9053f"
+
+[artifacts.metadata]
+timestamp = "2024-06-28T15:42:41Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.15.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.15.0.tgz"
+checksum = "sha256:2d14cdc4f22d103fec6e6653feb7e7ace58c46e5a270944f38fa4445c4893c0e"
+
+[artifacts.metadata]
+timestamp = "2024-06-28T15:41:00Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.15.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.15.0.tgz"
+checksum = "sha256:2d14cdc4f22d103fec6e6653feb7e7ace58c46e5a270944f38fa4445c4893c0e"
+
+[artifacts.metadata]
+timestamp = "2024-06-28T15:41:00Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.14.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.14.0.tgz"
+checksum = "sha256:9eebdfc544471273fcbedc7e20ea40ea095d0046e359c4b00cc9245954a6eb51"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:26:39Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.14.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.14.0.tgz"
+checksum = "sha256:ed2e2c2757bbac3ae5d3788874c81108a9777b66b4767844ea64cb71cad28f3c"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:25:59Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.14.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.14.0.tgz"
+checksum = "sha256:ed2e2c2757bbac3ae5d3788874c81108a9777b66b4767844ea64cb71cad28f3c"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:25:59Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.13.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.13.0.tgz"
+checksum = "sha256:761ec2e23660124391648ebb0b4248f1f12a3f395df07a4fcac8fa5ddc2b01cf"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:25:30Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.13.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.13.0.tgz"
+checksum = "sha256:e10d66d38428cad8b96f22a74a0033e41dcd6ba9001b1d5986fc812cf1ae2475"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:33:50Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.13.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.13.0.tgz"
+checksum = "sha256:e10d66d38428cad8b96f22a74a0033e41dcd6ba9001b1d5986fc812cf1ae2475"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:33:50Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.11.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.11.0.tgz"
+checksum = "sha256:3a07247a581db06ae836b381fb53c91cb771aacc35a29380a344f5b5f4a0c004"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:28:20Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.11.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.11.0.tgz"
+checksum = "sha256:399ce3f2b310ad532f7c24631715e1e607a382e0ee2cfdec16bb7daa88194959"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:24:45Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.11.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.11.0.tgz"
+checksum = "sha256:399ce3f2b310ad532f7c24631715e1e607a382e0ee2cfdec16bb7daa88194959"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:24:45Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.10.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.10.0.tgz"
+checksum = "sha256:fef77c0f8b8aa2ac2997ef77a951a1393480295e79bd949b7805ee212371ee61"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:23:55Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.10.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.10.0.tgz"
+checksum = "sha256:00082a442d3e633687c4270c4a6860079a4cdba15a332894ba955abd25eaea74"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:24:36Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.10.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.10.0.tgz"
+checksum = "sha256:00082a442d3e633687c4270c4a6860079a4cdba15a332894ba955abd25eaea74"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:24:36Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.9.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.9.0.tgz"
+checksum = "sha256:ce8c0218cdc5a2ec7c07d100c6e20a483cffccd229d95d2ea7ab7918f8089747"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:23:20Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.9.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.9.0.tgz"
+checksum = "sha256:f5861ec1e3a561acd57b84f8413bddc006c8b40dfabfe0f69487e29e6b83727b"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:24:16Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.9.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.9.0.tgz"
+checksum = "sha256:f5861ec1e3a561acd57b84f8413bddc006c8b40dfabfe0f69487e29e6b83727b"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:24:16Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.8.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.8.0.tgz"
+checksum = "sha256:56a4ddd16c638a4a1eab3a8b0386d610cb3e57c00dbf971a6c9b312cdc515243"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:22:59Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.8.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.8.0.tgz"
+checksum = "sha256:eb7b9d85b9c12374fb246a5012eed87ae90324e55030b8aecf490d845dce348a"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:23:30Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.8.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.8.0.tgz"
+checksum = "sha256:eb7b9d85b9c12374fb246a5012eed87ae90324e55030b8aecf490d845dce348a"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:23:30Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.7.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.7.0.tgz"
+checksum = "sha256:34b47c83efec182a2ed44e56319e4d1482b1c93f701d790d02709713328ca36b"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:21:50Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.7.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.7.0.tgz"
+checksum = "sha256:acfb6c070d856cebdadc87c1722e58aaf55d38874fd72d885576aeb16ca0ad8e"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:21:35Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.7.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.7.0.tgz"
+checksum = "sha256:acfb6c070d856cebdadc87c1722e58aaf55d38874fd72d885576aeb16ca0ad8e"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:21:35Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.6.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.6.0.tgz"
+checksum = "sha256:2b15a9ae73607226e765a523e737fc55abb4789e827e941e9485183773ac8c22"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:23:21Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.6.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.6.0.tgz"
+checksum = "sha256:13573451b193f5030ba231bb6b048344e9a123744b9f5b34be417036d7018c8b"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:21:21Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.6.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.6.0.tgz"
+checksum = "sha256:13573451b193f5030ba231bb6b048344e9a123744b9f5b34be417036d7018c8b"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:21:21Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.4.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.4.0.tgz"
+checksum = "sha256:47b8512bc85c0e7df84333a2b5cadb821cf55dd3dfff02b5209cce6b155c2b0b"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:58Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.4.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.4.0.tgz"
+checksum = "sha256:fda369c506a9549a29b95e89342d06a6d08be8cb67967c0ebac99289480fe180"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:20:52Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.4.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.4.0.tgz"
+checksum = "sha256:fda369c506a9549a29b95e89342d06a6d08be8cb67967c0ebac99289480fe180"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:20:52Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.3.0.tgz"
+checksum = "sha256:d35aef016111b1a6fc62b869ba7da68c85c3b202a2f8f93be97a34825b253afb"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:20:09Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.3.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.3.0.tgz"
+checksum = "sha256:8e4a8a35280745c25d99f7a0b471d4918c2d4908358280215ff10c084be4a96b"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:30Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.3.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.3.0.tgz"
+checksum = "sha256:8e4a8a35280745c25d99f7a0b471d4918c2d4908358280215ff10c084be4a96b"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:30Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.2.0.tgz"
+checksum = "sha256:0c667b83f2517699090de4b873bc1e673b1695ae4d9be261dc3d1c29dc2633c3"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:43Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.2.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.2.0.tgz"
+checksum = "sha256:a9569af81a41b98dc23dac0a50deb8f07ace4c062301269340108fe5bbe6104a"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:27Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.2.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.2.0.tgz"
+checksum = "sha256:a9569af81a41b98dc23dac0a50deb8f07ace4c062301269340108fe5bbe6104a"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:27Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.1.0.tgz"
+checksum = "sha256:06e3469d59418c576a46cce3ef904c2d40ff7197f08a74f2b6597fe587b3f1ac"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:18:55Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.1.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.1.0.tgz"
+checksum = "sha256:121e1ece04ab9c20329d997b22e6302877aca50fa634277bcc4513fcde161c24"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:34Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.1.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.1.0.tgz"
+checksum = "sha256:121e1ece04ab9c20329d997b22e6302877aca50fa634277bcc4513fcde161c24"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:34Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.6.8-jruby-9.3.0.0.tgz"
+checksum = "sha256:db4818f1e9bed11e933382ea86c9176c97d9dba3e57d7f41857c97596a436963"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:18:27Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.3.0.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.0.0.tgz"
+checksum = "sha256:b1604e85fadf5c6a69587aeec7fa177f997c292d634fdfbb576a93ae57d78615"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:36Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.3.0.0"
+os = "linux"
+arch = "arm64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-2.6.8-jruby-9.3.0.0.tgz"
+checksum = "sha256:b1604e85fadf5c6a69587aeec7fa177f997c292d634fdfbb576a93ae57d78615"
+
+[artifacts.metadata]
+timestamp = "2024-05-23T21:19:36Z"
+distro_version = "24.04"
+
+[[artifacts]]
+version = "9.2.21.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.5.8-jruby-9.2.21.0.tgz"
+checksum = "sha256:e32b5400cfbc1de1f2579502ce9df2cb40c235ef525232b68e152bf39986cb85"
+
+[artifacts.metadata]
+timestamp = "2022-06-30T19:46:36Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.2.20.1"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.5.8-jruby-9.2.20.1.tgz"
+checksum = "sha256:d7c56d5fc5f67596f9551b254eac2675dba6f0bece27fe37f24fcb7945fea764"
+
+[artifacts.metadata]
+timestamp = "2022-03-28T20:49:11Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.2.20.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.5.8-jruby-9.2.20.0.tgz"
+checksum = "sha256:6de02033ab12903242026bdbb517b8b0ac236648c9142eb6732450e7fa8dd3a0"
+
+[artifacts.metadata]
+timestamp = "2022-03-28T20:47:31Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.2.19.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.5.8-jruby-9.2.19.0.tgz"
+checksum = "sha256:37710e09cd4baa7ff4e15dc7412bf47c3f81f395e1b3f5c3a18db8eb29961238"
+
+[artifacts.metadata]
+timestamp = "2022-03-28T20:45:54Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.2.18.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.5.8-jruby-9.2.18.0.tgz"
+checksum = "sha256:ace8f2d16b6830d1b68c8437beaf33a090ac061eadddcb53636aa969cee9bdd6"
+
+[artifacts.metadata]
+timestamp = "2022-03-28T20:44:33Z"
+distro_version = "22.04"
+
+[[artifacts]]
+version = "9.2.17.0"
+os = "linux"
+arch = "amd64"
+url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-22/ruby-2.5.8-jruby-9.2.17.0.tgz"
+checksum = "sha256:14ccc2ba80b65c17cc3aa3ffa422d0cee5a48837ecc70c5c53a7335d59bc4eb0"
+
+[artifacts.metadata]
+timestamp = "2022-03-28T20:42:52Z"
+distro_version = "22.04"
