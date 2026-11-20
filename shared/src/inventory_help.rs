@@ -10,7 +10,7 @@ use sha2::Sha256;
 use std::io::Read;
 use std::path::Path;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ArtifactMetadata {
     pub timestamp: DateTime<Utc>,
     pub distro_version: DistroVersion,
