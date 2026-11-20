@@ -54,7 +54,7 @@ mod inventory_help;
 mod major_minor;
 pub mod maybe_err;
 
-pub use base_image::{BaseImage, BuildTarget, build_matrix};
+pub use base_image::{BaseImage, BuildTarget, UnknownDistroVersion, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
 pub use major_minor::{MajorMinor, MajorMinorError};
 

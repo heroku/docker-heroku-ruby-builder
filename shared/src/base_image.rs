@@ -15,6 +15,10 @@ static KNOWN_BASE_IMAGES: &[(&str, usize, &[Arch])] = &[
 #[error("Invalid base image {0} must be one of {known}", known = KNOWN_BASE_IMAGES.iter().map(|(name, _, _)| format!("'{name}'")).collect::<Vec<_>>().join(", "))]
 pub struct BaseImageError(String);
 
+#[derive(Debug, thiserror::Error)]
+#[error("distro_version {0} is not a known base image")]
+pub struct UnknownDistroVersion(pub DistroVersion);
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BaseImage {
     /// e.g. `26`
@@ -86,6 +90,17 @@ impl BaseImage {
     }
 }
 
+impl TryFrom<&DistroVersion> for BaseImage {
+    type Error = UnknownDistroVersion;
+
+    fn try_from(distro_version: &DistroVersion) -> Result<Self, Self::Error> {
+        BaseImage::all()
+            .into_iter()
+            .find(|base_image| &base_image.distro_version() == distro_version)
+            .ok_or_else(|| UnknownDistroVersion(distro_version.clone()))
+    }
+}
+
 impl FromStr for BaseImage {
     type Err = BaseImageError;
 
@@ -150,6 +165,22 @@ mod test {
             distro_number: 100,
         };
         assert!(heroku_98 < heroku_100);
+    }
+
+    #[test]
+    fn base_image_round_trips_through_distro_version() {
+        for base_image in BaseImage::all() {
+            assert_eq!(
+                BaseImage::try_from(&base_image.distro_version()).unwrap(),
+                base_image
+            );
+        }
+        assert_eq!(
+            BaseImage::try_from(&DistroVersion("20.04".to_owned()))
+                .unwrap_err()
+                .to_string(),
+            "distro_version 20.04 is not a known base image"
+        );
     }
 
     #[test]
