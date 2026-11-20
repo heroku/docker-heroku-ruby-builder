@@ -293,33 +293,72 @@ pub fn changes(old: &RubyInventory, new: &RubyInventory) -> Option<NonEmpty<Inve
     NonEmpty::try_from(found).ok()
 }
 
-/// ```no_run
-/// use shared::inventory_check;
-///
-/// let contents = r#"
-/// [[artifacts]]
-/// version = "9.4.8.0"
-/// os = "linux"
-/// arch = "amd64"
-/// url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.8.0.tgz"
-/// checksum = "sha256:815b31d2b204a524bf74aabae341bf85353add4d1128d5d276d08fa5e8ff3c39"
-///
-/// [artifacts.metadata]
-/// timestamp = "2024-07-24T16:17:35.341413Z"
-/// distro_version = "24.04"
-/// "#;
-/// tokio::runtime::Runtime::new().unwrap().block_on(inventory_check(contents)).unwrap();
-/// ```
-pub async fn inventory_check(contents: &str) -> Result<(), Error> {
-    if contents.trim().is_empty() {
-        return Ok(());
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AllowedChanges {
+    AddOnly,
+    Any,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum InventoryCheckError {
+    #[error("old inventory: {0}")]
+    Old(#[source] InventoryError),
+
+    #[error("new inventory: {0}")]
+    New(#[source] InventoryError),
+
+    #[error(
+        "Expected the inventory change to only add artifacts, but it also removes or replaces some:\n{}\n\nPass `--allow-inventory-change` (the `allow inventory change` PR label) to allow this.",
+        unexpected.iter().map(|change| format!("- {change}")).collect::<Vec<_>>().join("\n")
+    )]
+    UnexpectedChanges {
+        unexpected: NonEmpty<InventoryChange>,
+    },
+
+    #[error(transparent)]
+    Checksum(Error),
+}
+
+/// ⁉️😄⁉️ - what is checked, and which artifacts get downloaded
+pub async fn inventory_check(
+    old: &str,
+    new: &str,
+    allowed: AllowedChanges,
+) -> Result<Option<NonEmpty<InventoryChange>>, InventoryCheckError> {
+    let old = old
+        .parse::<RubyInventory>()
+        .map_err(InventoryCheckError::Old)?;
+    let new = new
+        .parse::<RubyInventory>()
+        .map_err(InventoryCheckError::New)?;
+    let Some(changes) = changes(&old, &new) else {
+        return Ok(None);
+    };
+
+    if allowed == AllowedChanges::AddOnly {
+        let unexpected = changes
+            .iter()
+            .filter(|change| !matches!(change, InventoryChange::Added(_)))
+            .cloned()
+            .collect::<Vec<_>>();
+        if let Ok(unexpected) = NonEmpty::try_from(unexpected) {
+            return Err(InventoryCheckError::UnexpectedChanges { unexpected });
+        }
     }
 
-    let inventory = contents
-        .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
-        .map_err(|e| Error::Other(format!("Could not parse inventory. Error: {e}")))?;
-
-    verify_checksums(inventory.artifacts.iter()).await
+    verify_checksums(
+        changes
+            .iter()
+            .filter_map(|change| match change {
+                InventoryChange::Added(artifact) => Some(artifact),
+                InventoryChange::Replaced { new, .. } => Some(&**new),
+                InventoryChange::Removed(_) => None,
+            })
+            .map(Deref::deref),
+    )
+    .await
+    .map_err(InventoryCheckError::Checksum)?;
+    Ok(Some(changes))
 }
 
 /// ⁉️😄⁉️ - cost: downloads every artifact it is given
@@ -624,6 +663,64 @@ mod test {
                 "removed 3.4.0 on heroku-24 (arm64)",
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn check_with_no_changes_downloads_nothing() {
+        let contents = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]).to_string();
+        let changes = inventory_check(&contents, &contents, AllowedChanges::AddOnly)
+            .await
+            .unwrap();
+        assert!(changes.is_none());
+    }
+
+    #[tokio::test]
+    async fn check_rejects_removed_and_replaced_artifacts_before_downloading() {
+        let old = inventory(vec![
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ])
+        .to_string();
+        let mut rebuilt = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        rebuilt.url = format!("{S3_BASE_URL}/heroku-24/amd64/ruby-3.4.0-7bebeee.tgz");
+        let new = inventory(vec![rebuilt]).to_string();
+        let error = inventory_check(&old, &new, AllowedChanges::AddOnly)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            indoc::indoc! {"
+                Expected the inventory change to only add artifacts, but it also removes or replaces some:
+                - replaced 3.4.0 on heroku-24 (amd64)
+                - removed 3.4.0 on heroku-24 (arm64)
+
+                Pass `--allow-inventory-change` (the `allow inventory change` PR label) to allow this."}
+        );
+    }
+
+    #[tokio::test]
+    async fn check_allows_removal_when_any_change_is_allowed() {
+        let old = inventory(vec![
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ])
+        .to_string();
+        let new = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]).to_string();
+        let changes = inventory_check(&old, &new, AllowedChanges::Any)
+            .await
+            .unwrap();
+        assert_eq!(
+            change_keys(changes),
+            vec!["removed 3.4.0 on heroku-24 (arm64)"]
+        );
+    }
+
+    #[tokio::test]
+    async fn check_names_which_inventory_failed_to_parse() {
+        let error = inventory_check("", "artifacts = []\n", AllowedChanges::AddOnly)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, InventoryCheckError::Old(_)));
     }
 
     #[test]
