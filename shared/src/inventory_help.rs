@@ -319,33 +319,111 @@ pub fn changes(old: &RubyInventory, new: &RubyInventory) -> Option<NonEmpty<Inve
     NonEmpty::try_from(found).ok()
 }
 
-/// ```no_run
-/// use shared::inventory_check;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AllowedChanges {
+    AddOnly,
+    Any,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum InventoryCheckError {
+    #[error("old inventory: {0}")]
+    Old(#[source] InventoryError),
+
+    #[error("new inventory: {0}")]
+    New(#[source] InventoryError),
+
+    #[error(
+        "Expected the inventory change to only add artifacts, but it also removes or replaces some:\n{}\n\nPass `--allow-inventory-change` (the `allow inventory change` PR label) to allow this.",
+        unexpected.iter().map(|change| format!("- {change}")).collect::<Vec<_>>().join("\n")
+    )]
+    UnexpectedChanges {
+        unexpected: NonEmpty<InventoryChange>,
+    },
+
+    #[error(transparent)]
+    Checksum(Error),
+}
+
+/// Validate an inventory change before merge
 ///
-/// let contents = r#"
-/// [[artifacts]]
-/// version = "9.4.8.0"
-/// os = "linux"
-/// arch = "amd64"
-/// url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.8.0.tgz"
-/// checksum = "sha256:815b31d2b204a524bf74aabae341bf85353add4d1128d5d276d08fa5e8ff3c39"
+/// This is used in automation to preserve the integrity of an inventory file e.g. `ruby_inventory.toml`.
+/// Added entries are checked by downloading and validating their checksums. Existing entries are
+/// assumed to have valid checksums.
 ///
-/// [artifacts.metadata]
-/// timestamp = "2024-07-24T16:17:35.341413Z"
-/// distro_version = "24.04"
-/// "#;
-/// tokio::runtime::Runtime::new().unwrap().block_on(inventory_check(contents)).unwrap();
-/// ```
-pub async fn inventory_check(contents: &str) -> Result<(), Error> {
-    if contents.trim().is_empty() {
-        return Ok(());
+/// - [`AllowedChanges::AddOnly`]: Errors on removals or changes. This is an automation guard so that a network outage
+///   doesn't result in an inventory accidentally removing valid artifacts from the inventory.
+/// - [`AllowedChanges::Any`]: Removals are allowed. Changes are validated for correctness.
+///
+/// See [`InventoryCheckError`] for other error conditions
+pub async fn inventory_check(
+    old: &str,
+    new: &str,
+    allowed: AllowedChanges,
+) -> Result<Option<NonEmpty<InventoryChange>>, NonEmpty<InventoryCheckError>> {
+    let Some(ChangeReview {
+        changes,
+        mut errors,
+    }) = review_changes(old, new, allowed)?
+    else {
+        return Ok(None);
+    };
+
+    if let Err(error) = verify_checksums(artifacts_to_verify(&changes).map(Deref::deref)).await {
+        errors.push(InventoryCheckError::Checksum(error));
     }
 
-    let inventory = contents
-        .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
-        .map_err(|e| Error::Other(format!("Could not parse inventory. Error: {e}")))?;
+    match NonEmpty::try_from(errors) {
+        Ok(errors) => Err(errors),
+        Err(_) => Ok(Some(changes)),
+    }
+}
 
-    verify_checksums(inventory.artifacts.iter()).await
+#[derive(Debug)]
+struct ChangeReview {
+    changes: NonEmpty<InventoryChange>,
+    errors: Vec<InventoryCheckError>,
+}
+
+fn review_changes(
+    old: &str,
+    new: &str,
+    allowed: AllowedChanges,
+) -> Result<Option<ChangeReview>, NonEmpty<InventoryCheckError>> {
+    let (old, new) = match (old.parse::<RubyInventory>(), new.parse::<RubyInventory>()) {
+        (Ok(old), Ok(new)) => (old, new),
+        (Err(old), Ok(_)) => return Err(NonEmpty::new(InventoryCheckError::Old(old))),
+        (Ok(_), Err(new)) => return Err(NonEmpty::new(InventoryCheckError::New(new))),
+        (Err(old), Err(new)) => {
+            let mut errors = NonEmpty::new(InventoryCheckError::Old(old));
+            errors.push(InventoryCheckError::New(new));
+            return Err(errors);
+        }
+    };
+    let Some(changes) = changes(&old, &new) else {
+        return Ok(None);
+    };
+
+    let mut errors = Vec::new();
+    if allowed == AllowedChanges::AddOnly {
+        let unexpected = changes
+            .iter()
+            .filter(|change| !matches!(change, InventoryChange::Added(_)))
+            .cloned()
+            .collect::<Vec<_>>();
+        if let Ok(unexpected) = NonEmpty::try_from(unexpected) {
+            errors.push(InventoryCheckError::UnexpectedChanges { unexpected });
+        }
+    }
+    Ok(Some(ChangeReview { changes, errors }))
+}
+
+fn artifacts_to_verify(changes: &NonEmpty<InventoryChange>) -> impl Iterator<Item = &RubyArtifact> {
+    changes.iter().filter_map(|change| match change {
+        InventoryChange::Added(artifact) => Some(artifact),
+        InventoryChange::Replaced { new, .. } => Some(new.as_ref()),
+        InventoryChange::Removed(_) => None,
+    })
 }
 
 /// Download each artifact, generate its checksum, error if the value differs from the provided inventory.
@@ -649,6 +727,97 @@ mod test {
                 "removed 3.4.0 on heroku-24 (arm64)",
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn check_with_no_changes_downloads_nothing() {
+        let contents = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]).to_string();
+        let changes = inventory_check(&contents, &contents, AllowedChanges::AddOnly)
+            .await
+            .unwrap();
+        assert!(changes.is_none());
+    }
+
+    fn review_keys(review: &ChangeReview) -> Vec<String> {
+        review.changes.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn review_reports_removed_and_replaced_artifacts_with_the_changes() {
+        let old = inventory(vec![
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ])
+        .to_string();
+        let mut rebuilt = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        rebuilt.url = format!("{S3_BASE_URL}/heroku-24/amd64/ruby-3.4.0-7bebeee.tgz");
+        let new = inventory(vec![rebuilt, artifact("3.4.1", "heroku-24", Arch::Amd64)]).to_string();
+        let review = review_changes(&old, &new, AllowedChanges::AddOnly)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            review_keys(&review),
+            vec![
+                "added 3.4.1 on heroku-24 (amd64)",
+                "replaced 3.4.0 on heroku-24 (amd64)",
+                "removed 3.4.0 on heroku-24 (arm64)",
+            ]
+        );
+        assert_eq!(
+            review
+                .errors
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            vec![indoc::indoc! {"
+                Expected the inventory change to only add artifacts, but it also removes or replaces some:
+                - replaced 3.4.0 on heroku-24 (amd64)
+                - removed 3.4.0 on heroku-24 (arm64)
+
+                Pass `--allow-inventory-change` (the `allow inventory change` PR label) to allow this."}]
+        );
+        assert_eq!(
+            artifacts_to_verify(&review.changes)
+                .map(|artifact| artifact.key().to_string())
+                .collect::<Vec<_>>(),
+            vec!["3.4.1 on heroku-24 (amd64)", "3.4.0 on heroku-24 (amd64)"]
+        );
+    }
+
+    #[test]
+    fn review_allows_removal_when_any_change_is_allowed() {
+        let old = inventory(vec![
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ])
+        .to_string();
+        let new = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]).to_string();
+        let review = review_changes(&old, &new, AllowedChanges::Any)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            review_keys(&review),
+            vec!["removed 3.4.0 on heroku-24 (arm64)"]
+        );
+        assert!(review.errors.is_empty());
+        assert_eq!(artifacts_to_verify(&review.changes).count(), 0);
+    }
+
+    #[tokio::test]
+    async fn check_names_which_inventory_failed_to_parse() {
+        let errors = inventory_check("", "artifacts = []\n", AllowedChanges::AddOnly)
+            .await
+            .unwrap_err();
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(errors.first(), InventoryCheckError::Old(_)));
+    }
+
+    #[test]
+    fn review_reports_both_inventories_when_neither_parses() {
+        let errors = review_changes("", "", AllowedChanges::AddOnly).unwrap_err();
+        assert_eq!(errors.len(), 2);
+        assert!(matches!(errors[0], InventoryCheckError::Old(_)));
+        assert!(matches!(errors[1], InventoryCheckError::New(_)));
     }
 
     #[test]
