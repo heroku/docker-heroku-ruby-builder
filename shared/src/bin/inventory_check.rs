@@ -17,7 +17,7 @@ struct Args {
     new: PathBuf,
 
     /// By default only additions are allowed. Set this flag to allow deletions or modifications.
-    #[arg(long)]
+    #[arg(long, env = "ALLOW_INVENTORY_CHANGE")]
     allow_inventory_change: bool,
 }
 
@@ -71,7 +71,7 @@ mod tests {
         Options:
               --old <OLD>               Path to the inventory file to compare against
               --new <NEW>               Path to the new inventory file
-              --allow-inventory-change  By default only additions are allowed. Set this flag to allow deletions or modifications
+              --allow-inventory-change  By default only additions are allowed. Set this flag to allow deletions or modifications [env: ALLOW_INVENTORY_CHANGE=]
           -h, --help                    Print help
         ");
     }
