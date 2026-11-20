@@ -6,16 +6,14 @@
 
 use bullet_stream::global::print;
 use clap::{Args, Parser, Subcommand};
+use fs_err as fs;
 use indoc::formatdoc;
-use jruby_executable::github_releases;
-use ruby_executable::ruby_lang::{
-    BRANCHES_URL, RELEASES_URL, ruby_lang_branches, ruby_lang_versions,
-};
-use shared::MajorMinor;
+use ruby_executable::ruby_lang::{BRANCHES_URL, ruby_lang_branches};
 use shared::github::{self, GitHubTokenArg};
-use shared::maybe_err::ResultVec;
+use shared::inventory_format::parse_inventory;
+use shared::{MajorMinor, RubyInventory};
 use std::error::Error;
-use std::fmt::Display;
+use std::path::{Path, PathBuf};
 use support_article::jruby_table::{self, JRubyTable};
 use support_article::ruby_table::{self, RubyTable};
 
@@ -49,6 +47,14 @@ struct TableArgs {
     /// Oldest JRuby `MAJOR.MINOR` line to list, such as `9.4`.
     #[arg(long)]
     minimum_jruby_major_minor: MajorMinor,
+
+    /// Inventory file that lists the Ruby builds.
+    #[arg(long, default_value = "ruby_inventory.toml")]
+    ruby_inventory: PathBuf,
+
+    /// Inventory file that lists the JRuby builds.
+    #[arg(long, default_value = "jruby_inventory.toml")]
+    jruby_inventory: PathBuf,
 }
 
 #[derive(Args, Debug)]
@@ -57,66 +63,39 @@ struct PrintArgs {
     tables: TableArgs,
 }
 
-/// Every value, or one error listing every failure.
-fn all_ok<T, E: Display>(results: ResultVec<T, E>, what: &str) -> Result<Vec<T>, String> {
-    let mut errors: Vec<E> = Vec::new();
-    let values = results.unwrap_drain_errs(&mut errors);
-    if errors.is_empty() {
-        Ok(values)
-    } else {
-        Err(format!(
-            "Failed reading {what}:\n{}",
-            errors
-                .iter()
-                .map(|error| format!("- {error}"))
-                .collect::<Vec<_>>()
-                .join("\n")
-        ))
-    }
-}
-
 struct Tables {
     ruby: RubyTable,
     jruby: JRubyTable,
 }
 
-/// Builds the tables from upstream release data and S3.
-///
-/// Requests are retried. One that still fails stops the run.
+fn read_inventory(path: &Path) -> Result<RubyInventory, BoxError> {
+    Ok(parse_inventory(&fs::read_to_string(path)?)?)
+}
+
+/// Builds the tables from the inventory files and the upstream Ruby branch status.
 async fn generate(args: TableArgs) -> Result<Tables, BoxError> {
-    let gh_token = &args.github.token;
-    print::bullet(format!("Fetching {}", *RELEASES_URL));
-    let releases = all_ok(
-        ruby_lang_versions(
-            github::get_raw_with_retry(&RELEASES_URL, gh_token)
-                .await?
-                .body,
-        ),
-        "Ruby releases",
-    )?;
     print::bullet(format!("Fetching {}", *BRANCHES_URL));
     let branches = ruby_lang_branches(
-        github::get_raw_with_retry(&BRANCHES_URL, gh_token)
+        github::get_raw_with_retry(&BRANCHES_URL, &args.github.token)
             .await?
             .body,
     )?;
 
-    print::bullet("Checking S3 for Ruby builds");
-    let ruby_builds = ruby_table::builds(&releases, args.minimum_ruby_major_minor).await?;
+    print::bullet(format!("Reading {}", args.ruby_inventory.display()));
+    let ruby_builds = ruby_table::builds(
+        &read_inventory(&args.ruby_inventory)?,
+        args.minimum_ruby_major_minor,
+    )?;
     let ruby = RubyTable::new(&branches, &ruby_builds, args.minimum_ruby_major_minor)?;
     for row in &ruby.rows {
         print::sub_bullet(format!("{} ({:?})", row.major_minor, row.lifecycle));
     }
 
-    print::bullet(format!("Fetching {}", *github_releases::RELEASES_URL));
-    let jruby_releases = all_ok(
-        github_releases::fetch_releases(gh_token).await,
-        "JRuby releases",
+    print::bullet(format!("Reading {}", args.jruby_inventory.display()));
+    let jruby_builds = jruby_table::builds(
+        &read_inventory(&args.jruby_inventory)?,
+        args.minimum_jruby_major_minor,
     )?;
-
-    print::bullet("Checking S3 for JRuby builds");
-    let jruby_builds =
-        jruby_table::builds(&jruby_releases, args.minimum_jruby_major_minor, gh_token).await?;
     let jruby = JRubyTable::new(&jruby_builds, args.minimum_jruby_major_minor)?;
     for row in &jruby.rows {
         print::sub_bullet(row.major_minor.to_string());
@@ -164,19 +143,6 @@ async fn main() {
 mod tests {
     use super::*;
     use clap::CommandFactory;
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn all_ok_lists_every_failure() {
-        let results: ResultVec<u32, String> =
-            vec![Ok(1), Err("bad".to_string()), Err("worse".to_string())]
-                .into_iter()
-                .collect();
-        assert_eq!(
-            all_ok(results, "numbers"),
-            Err("Failed reading numbers:\n- bad\n- worse".to_string())
-        );
-    }
 
     #[test]
     fn get_help() {
@@ -199,7 +165,7 @@ mod tests {
         insta::assert_snapshot!(shared::help(Cli::command(), &["print"]), @r"
         Print the generated table HTML
 
-        Usage: support_article print --gh-token <TOKEN> --minimum-ruby-major-minor <MINIMUM_RUBY_MAJOR_MINOR> --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR>
+        Usage: support_article print [OPTIONS] --gh-token <TOKEN> --minimum-ruby-major-minor <MINIMUM_RUBY_MAJOR_MINOR> --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR>
 
         Options:
               --gh-token <TOKEN>
@@ -208,6 +174,10 @@ mod tests {
                   Oldest Ruby `MAJOR.MINOR` line to list, such as `3.1`
               --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR>
                   Oldest JRuby `MAJOR.MINOR` line to list, such as `9.4`
+              --ruby-inventory <RUBY_INVENTORY>
+                  Inventory file that lists the Ruby builds [default: ruby_inventory.toml]
+              --jruby-inventory <JRUBY_INVENTORY>
+                  Inventory file that lists the JRuby builds [default: jruby_inventory.toml]
           -h, --help
                   Print help
         ");

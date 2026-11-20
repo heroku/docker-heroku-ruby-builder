@@ -1,14 +1,12 @@
 //! One row per JRuby `MAJOR.MINOR` line, newest first, with the newest release available on each base image.
 
-use crate::{CheckError, join_all};
-use jruby_executable::github_releases::s3_url_to_check;
-use jruby_executable::{JRubyVersion, jruby_build_properties};
+use crate::{CheckError, complete_base_images};
+use jruby_executable::JRubyVersion;
 use minijinja::{Value, context};
-use shared::github::GitHubToken;
-use shared::{BaseImage, MajorMinor, RubyDownloadVersion, s3_presence};
+use shared::{BaseImage, MajorMinor, RubyArtifact, RubyDownloadVersion, RubyInventory, parse_url};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display, Formatter};
-use tokio::task::JoinSet;
+use std::str::FromStr;
 
 /// A JRuby version and the Ruby standard library version it implements.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,35 +50,41 @@ pub struct EmptyTable {
     pub floor: MajorMinor,
 }
 
-/// Checks S3 for every release at or above `floor`.
-pub async fn builds(
-    releases: &[JRubyVersion],
-    floor: MajorMinor,
-    gh_token: &GitHubToken,
-) -> Result<Vec<JRubyBuild>, CheckError> {
-    let mut set = JoinSet::new();
-    for version in releases
-        .iter()
-        .filter(|version| MajorMinor::from(*version) >= floor)
-        .cloned()
-    {
-        let gh_token = gh_token.clone();
-        set.spawn(async move {
-            let ruby_compat = jruby_build_properties(&version, &gh_token)
-                .await?
-                .ruby_stdlib_version()?;
-            let presence =
-                s3_presence(|target| s3_url_to_check(&version, &ruby_compat, target)).await?;
-            Ok(JRubyBuild {
-                release: JRubyRelease {
-                    version,
-                    ruby_compat,
-                },
-                base_images: presence.complete_base_images().into_iter().collect(),
-            })
-        });
+/// Every release in `inventory` at or above `floor`.
+pub fn builds(inventory: &RubyInventory, floor: MajorMinor) -> Result<Vec<JRubyBuild>, CheckError> {
+    let mut ruby_compat = BTreeMap::new();
+    for artifact in &inventory.artifacts {
+        ruby_compat
+            .entry(artifact.version.clone())
+            .or_insert(ruby_compat_from_url(artifact)?);
     }
-    join_all(set).await
+    let mut builds = Vec::new();
+    for (version, base_images) in complete_base_images(inventory)? {
+        let jruby_version = JRubyVersion::from_str(&version.to_string())?;
+        if MajorMinor::from(&jruby_version) >= floor {
+            builds.push(JRubyBuild {
+                release: JRubyRelease {
+                    version: jruby_version,
+                    ruby_compat: ruby_compat[&version].clone(),
+                },
+                base_images,
+            });
+        }
+    }
+    Ok(builds)
+}
+
+/// ⁉️😄⁉️ - why the stdlib version comes from the file name, and who writes that name
+fn ruby_compat_from_url(artifact: &RubyArtifact) -> Result<RubyDownloadVersion, CheckError> {
+    let url = parse_url(&artifact.url)?;
+    let stdlib = url
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .and_then(|name| name.strip_prefix("ruby-"))
+        .and_then(|rest| rest.split_once("-jruby-"))
+        .map(|(stdlib, _)| stdlib.to_owned())
+        .ok_or_else(|| CheckError::NotAJRubyUrl(url.clone()))?;
+    Ok(RubyDownloadVersion::new(stdlib)?)
 }
 
 impl JRubyTable {
@@ -168,7 +172,9 @@ impl JRubyTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use libherokubuildpack::inventory::artifact::Arch;
     use pretty_assertions::assert_eq;
+    use shared::S3_BASE_URL;
 
     fn build(version: &str, base_images: &[&str]) -> JRubyBuild {
         JRubyBuild {
@@ -181,6 +187,35 @@ mod tests {
                 .map(|name| BaseImage::new(name).unwrap())
                 .collect(),
         }
+    }
+
+    #[test]
+    fn builds_reads_the_stdlib_version_from_the_inventory_url() {
+        let mut inventory = crate::tests::inventory(&[
+            ("10.0.2.0", "heroku-24", Arch::Amd64),
+            ("10.0.2.0", "heroku-24", Arch::Arm64),
+            ("9.3.15.0", "heroku-24", Arch::Amd64),
+            ("9.3.15.0", "heroku-24", Arch::Arm64),
+        ]);
+        for artifact in &mut inventory.artifacts {
+            artifact.url = format!(
+                "{S3_BASE_URL}/heroku-24/ruby-3.4.5-jruby-{}-abcdef0.tgz",
+                artifact.version
+            );
+        }
+        assert_eq!(
+            builds(&inventory, "9.4".parse().unwrap()).unwrap(),
+            vec![with_ruby_compat("3.4.5", build("10.0.2.0", &["heroku-24"]))]
+        );
+    }
+
+    #[test]
+    fn builds_rejects_a_url_without_a_stdlib_version() {
+        let inventory = crate::tests::inventory(&[("10.0.2.0", "heroku-24", Arch::Amd64)]);
+        assert!(matches!(
+            builds(&inventory, "9.4".parse().unwrap()),
+            Err(CheckError::NotAJRubyUrl(_))
+        ));
     }
 
     fn with_ruby_compat(ruby_compat: &str, mut build: JRubyBuild) -> JRubyBuild {

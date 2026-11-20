@@ -1,17 +1,11 @@
 //! One row per Ruby `MAJOR.MINOR` line, newest first, with the newest release available on each base image.
 
-use crate::{CheckError, join_all};
+use crate::{CheckError, complete_base_images};
 use minijinja::{Value, context};
 use ruby_executable::ruby_lang::BranchStatus;
-use shared::{
-    BaseImage, BuildTarget, MajorMinor, RubyDownloadVersion, output_ruby_tar_path, s3_presence,
-    s3_url,
-};
+use shared::{BaseImage, MajorMinor, RubyDownloadVersion, RubyInventory};
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
-use tokio::task::JoinSet;
-use url::Url;
 
 /// Upstream maintenance status of a Ruby line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,41 +44,19 @@ pub struct EmptyTable {
     pub floor: MajorMinor,
 }
 
-/// Where `version` lives on S3 for `target`.
-///
-/// `heroku-22` is checked at its legacy path without an architecture directory. Older `heroku-22` builds exist only
-/// there.
-fn tar_url(version: &RubyDownloadVersion, target: &BuildTarget) -> Url {
-    let base_image = &target.base_image;
-    let arch_dir = (!base_image.has_legacy_path()).then_some(&target.arch);
-    s3_url(&output_ruby_tar_path(
-        Path::new(""),
-        version,
-        base_image,
-        arch_dir,
-    ))
-}
-
-/// Checks S3 for every stable release at or above `floor`.
-pub async fn builds(
-    releases: &[RubyDownloadVersion],
-    floor: MajorMinor,
-) -> Result<Vec<RubyBuild>, CheckError> {
-    let mut set = JoinSet::new();
-    for version in releases
-        .iter()
-        .filter(|version| version.is_prerelease().is_none() && MajorMinor::from(*version) >= floor)
-        .cloned()
-    {
-        set.spawn(async move {
-            let presence = s3_presence(|target| tar_url(&version, target)).await?;
-            Ok(RubyBuild {
+/// Every stable release in `inventory` at or above `floor`.
+pub fn builds(inventory: &RubyInventory, floor: MajorMinor) -> Result<Vec<RubyBuild>, CheckError> {
+    let mut builds = Vec::new();
+    for (version, base_images) in complete_base_images(inventory)? {
+        let version = RubyDownloadVersion::new(version.to_string())?;
+        if version.is_prerelease().is_none() && MajorMinor::from(&version) >= floor {
+            builds.push(RubyBuild {
                 version,
-                base_images: presence.complete_base_images().into_iter().collect(),
-            })
-        });
+                base_images,
+            });
+        }
     }
-    join_all(set).await
+    Ok(builds)
 }
 
 impl RubyTable {
@@ -192,8 +164,9 @@ impl RubyTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::inventory;
+    use libherokubuildpack::inventory::artifact::Arch;
     use pretty_assertions::assert_eq;
-    use shared::build_matrix;
 
     fn branch(name: &str, status: BranchStatus) -> (MajorMinor, BranchStatus) {
         (name.parse().unwrap(), status)
@@ -234,24 +207,24 @@ mod tests {
     }
 
     #[test]
-    fn checks_heroku_22_at_the_legacy_path_and_other_base_images_per_arch() {
-        let paths = build_matrix()
-            .iter()
-            .map(|target| tar_url(&version("8.1.2"), target).path().to_string())
-            .collect::<Vec<_>>();
-
-        for expected in [
-            "/heroku-22/ruby-8.1.2.tgz",
-            "/heroku-24/amd64/ruby-8.1.2.tgz",
-            "/heroku-24/arm64/ruby-8.1.2.tgz",
-        ] {
-            assert!(paths.contains(&expected.to_string()), "{paths:?}");
-        }
-        assert!(
-            !paths
-                .iter()
-                .any(|path| path.starts_with("/heroku-22/amd64")),
-            "{paths:?}"
+    fn builds_lists_base_images_with_every_arch_in_the_inventory() {
+        let inventory = inventory(&[
+            ("3.4.7", "heroku-22", Arch::Amd64),
+            ("3.4.7", "heroku-24", Arch::Amd64),
+            ("3.4.7", "heroku-24", Arch::Arm64),
+            ("3.4.8", "heroku-24", Arch::Amd64),
+            ("3.0.7", "heroku-22", Arch::Amd64),
+            ("4.0.0.preview1", "heroku-24", Arch::Amd64),
+            ("4.0.0.preview1", "heroku-24", Arch::Arm64),
+        ]);
+        let mut builds = builds(&inventory, "3.1".parse().unwrap()).unwrap();
+        builds.sort_by(|a, b| a.version.cmp(&b.version));
+        assert_eq!(
+            builds,
+            vec![
+                build("3.4.7", &["heroku-22", "heroku-24"]),
+                build("3.4.8", &[]),
+            ]
         );
     }
 

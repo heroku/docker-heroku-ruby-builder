@@ -6,8 +6,11 @@ rust-version.workspace = true
 [dependencies]
 bullet_stream = { workspace = true }
 clap = { workspace = true }
+fs-err = { workspace = true }
+gem_version = { workspace = true }
 indoc = { workspace = true }
 jruby_executable = { path = "../jruby_executable" }
+libherokubuildpack = { workspace = true }
 minijinja = { workspace = true }
 ruby_executable = { path = "../ruby_executable" }
 shared = { workspace = true }

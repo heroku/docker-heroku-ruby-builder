@@ -1789,9 +1789,12 @@ version = "0.0.0"
 dependencies = [
  "bullet_stream",
  "clap",
+ "fs-err",
+ "gem_version",
  "indoc",
  "insta",
  "jruby_executable",
+ "libherokubuildpack",
  "minijinja",
  "pretty_assertions",
  "ruby_executable",
