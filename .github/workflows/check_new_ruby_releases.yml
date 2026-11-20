@@ -42,6 +42,8 @@ jobs:
         run: |
           cargo run --locked --bin ruby_release_check -- \
             --minimum-version 3.2.1 \
+            --inventory-minimum-version 3.1.0 \
+            --inventory ruby_inventory.toml \
             --output versions.json \
             2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Trigger builds for missing versions
