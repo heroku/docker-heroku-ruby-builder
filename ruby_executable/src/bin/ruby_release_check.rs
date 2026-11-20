@@ -1,29 +1,42 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
+use gem_version::GemVersion;
 use reqwest::Url;
 use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
-use shared::maybe_err::ResultVec;
-use shared::{BuildTarget, RubyDownloadVersion, output_ruby_tar_path, s3_presence, s3_url};
+use shared::inventory_format::{ArtifactKey, parse_inventory};
+use shared::inventory_sync::{SyncReport, Wanted, sync_inventory_file};
+use shared::{BuildTarget, RubyDownloadVersion, build_matrix, output_ruby_tar_path, s3_url};
+use std::collections::BTreeMap;
+use std::str::FromStr;
 use std::{
     error::Error,
     path::{Path, PathBuf},
 };
-use tokio::task::JoinSet;
 #[derive(Parser, Debug)]
-#[command(about = "Check for Ruby releases missing from Heroku S3")]
+#[command(
+    about = "Add Ruby releases on Heroku S3 to the inventory, and list the ones missing from S3"
+)]
 struct Args {
     #[command(flatten)]
     github: GitHubTokenArg,
 
-    /// Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked.
+    /// Minimum Ruby version to build (e.g. 3.2.0). Releases >= this version missing from S3 are written to `--output`.
     #[arg(long = "minimum-version", required = true)]
     minimum_version: RubyDownloadVersion,
 
     /// Path to write JSON output file containing versions that need builds
     #[arg(long = "output", required = true)]
     output: PathBuf,
+
+    /// Inventory file to add every release found on S3 to
+    #[arg(long = "inventory", required = true)]
+    inventory: PathBuf,
+
+    /// Oldest version to look for on S3 (e.g. 3.1.0). Older releases are not added to the inventory.
+    #[arg(long = "inventory-minimum-version", required = true)]
+    inventory_minimum_version: RubyDownloadVersion,
 }
 
 fn version_gte(version: &RubyDownloadVersion, minimum: &RubyDownloadVersion) -> bool {
@@ -32,42 +45,48 @@ fn version_gte(version: &RubyDownloadVersion, minimum: &RubyDownloadVersion) -> 
     version_tuple >= minimum_tuple
 }
 
-fn retain_releases_gte(
-    releases: &[RubyDownloadVersion],
-    minimum: &RubyDownloadVersion,
-) -> Vec<RubyDownloadVersion> {
-    releases
-        .iter()
-        .filter(|version| version_gte(version, minimum))
-        .cloned()
-        .collect()
-}
-
-fn tar_url(version: &RubyDownloadVersion, target: &BuildTarget) -> Url {
+fn tar_url(version: &RubyDownloadVersion, target: &BuildTarget, arch_dir: bool) -> Url {
     s3_url(&output_ruby_tar_path(
         Path::new(""),
         version,
         &target.base_image,
-        Some(&target.arch),
+        arch_dir.then_some(&target.arch),
     ))
 }
 
-async fn check_version_on_s3(
-    version: RubyDownloadVersion,
-) -> Result<(RubyDownloadVersion, Vec<String>), shared::Error> {
-    let missing = s3_presence(|target| tar_url(&version, target))
-        .await?
-        .missing()
-        .map(|target| format!("{}/{}", target.base_image, target.arch))
-        .collect();
-    Ok((version, missing))
+fn wanted(version: &RubyDownloadVersion) -> Result<Vec<Wanted>, gem_version::VersionError> {
+    let gem_version = GemVersion::from_str(&version.bundler_format())?;
+    Ok(build_matrix()
+        .into_iter()
+        .map(|target| {
+            let mut urls = vec![tar_url(version, &target, true)];
+            if target.base_image.has_legacy_path() {
+                urls.push(tar_url(version, &target, false));
+            }
+            Wanted {
+                key: ArtifactKey {
+                    version: gem_version.clone(),
+                    target,
+                },
+                urls,
+            }
+        })
+        .collect())
 }
 
-async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
+async fn call(args: Args) -> Vec<Box<dyn Error>> {
     print::h2("Checking for new Ruby releases");
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
+    let mut inventory = match fs::read_to_string(&args.inventory)
+        .map_err(Box::<dyn Error>::from)
+        .and_then(|contents| parse_inventory(&contents).map_err(Box::<dyn Error>::from))
+    {
+        Ok(inventory) => inventory,
+        Err(error) => return vec![error],
+    };
+
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
     let releases = match github::get_raw_with_retry(&RELEASES_URL, &args.github.token).await {
         Ok(response) => ruby_lang_versions(response.body).unwrap_drain_errs(&mut errors),
@@ -78,35 +97,52 @@ async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
     };
     print::bullet(format!("Found {} total releases", releases.len()));
 
-    let versions_to_check = retain_releases_gte(&releases, &args.minimum_version);
-
-    print::bullet(format!(
-        "Checking {} versions on S3",
-        versions_to_check.len()
-    ));
-
-    let mut set = JoinSet::new();
-    for version in versions_to_check {
-        set.spawn(check_version_on_s3(version));
+    let mut by_gem_version = BTreeMap::new();
+    let mut all_wanted = Vec::new();
+    for version in releases
+        .into_iter()
+        .filter(|version| version_gte(version, &args.inventory_minimum_version))
+    {
+        match wanted(&version) {
+            Ok(wanted) => {
+                by_gem_version.insert(wanted[0].key.version.clone(), version);
+                all_wanted.extend(wanted);
+            }
+            Err(error) => errors.push(Box::new(error)),
+        }
     }
 
-    let mut versions_to_build = Vec::new();
-    while let Some(result) = set.join_next().await {
-        match result {
-            Ok(Ok((version, missing))) => {
-                if missing.is_empty() {
-                    print::sub_bullet(format!("{version}: all binaries present"));
-                } else {
-                    print::sub_bullet(format!(
-                        "{version}: missing {} combo(s): {}",
-                        missing.len(),
-                        missing.join(", ")
-                    ));
-                    versions_to_build.push(version);
-                }
+    print::bullet(format!(
+        "Looking up {} builds on S3 that the inventory does not list",
+        all_wanted.len()
+    ));
+    let report = match sync_inventory_file(&args.inventory, &mut inventory, all_wanted).await {
+        Ok(report) => report,
+        Err(error) => {
+            errors.push(error.into());
+            SyncReport::default()
+        }
+    };
+    for key in &report.added {
+        print::sub_bullet(format!("Added {key}"));
+    }
+    errors.extend(
+        report
+            .errors
+            .into_iter()
+            .map(|error| Box::new(error) as Box<dyn Error>),
+    );
+
+    let mut versions_to_build = Vec::<RubyDownloadVersion>::new();
+    for key in &report.missing {
+        let Some(version) = by_gem_version.get(&key.version) else {
+            continue;
+        };
+        if version_gte(version, &args.minimum_version) {
+            print::sub_bullet(format!("Missing {key}"));
+            if versions_to_build.last() != Some(version) {
+                versions_to_build.push(version.clone());
             }
-            Ok(Err(e)) => errors.push(e.into()),
-            Err(e) => errors.push(e.into()),
         }
     }
 
@@ -125,17 +161,13 @@ async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
             print::sub_bullet(format!("{version}"));
         }
     }
-    errors.into_iter().map(Result::Err).collect()
+    errors
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-    let errors: Vec<_> = call(args)
-        .await
-        .into_iter()
-        .filter_map(Result::err)
-        .collect();
+    let errors = call(args).await;
 
     if errors.is_empty() {
         print::bullet("done");
@@ -194,34 +226,23 @@ mod tests {
     }
 
     #[test]
-    fn test_retain_releases_gte() {
-        let releases = vec![
-            RubyDownloadVersion::new("3.4.1").unwrap(),
-            RubyDownloadVersion::new("3.3.7").unwrap(),
-            RubyDownloadVersion::new("3.2.0").unwrap(),
-            RubyDownloadVersion::new("3.1.5").unwrap(),
-            RubyDownloadVersion::new("2.7.8").unwrap(),
-        ];
-        let min = RubyDownloadVersion::new("3.2.0").unwrap();
-        let filtered = retain_releases_gte(&releases, &min);
-        let names: Vec<String> = filtered.iter().map(|v| v.to_string()).collect();
-        assert_eq!(vec!["3.4.1", "3.3.7", "3.2.0"], names);
-    }
-
-    #[test]
     fn get_help() {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
-        Check for Ruby releases missing from Heroku S3
+        Add Ruby releases on Heroku S3 to the inventory, and list the ones missing from S3
 
-        Usage: ruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+        Usage: ruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT> --inventory <INVENTORY> --inventory-minimum-version <INVENTORY_MINIMUM_VERSION>
 
         Options:
               --gh-token <TOKEN>
                   GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
               --minimum-version <MINIMUM_VERSION>
-                  Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked
+                  Minimum Ruby version to build (e.g. 3.2.0). Releases >= this version missing from S3 are written to `--output`
               --output <OUTPUT>
                   Path to write JSON output file containing versions that need builds
+              --inventory <INVENTORY>
+                  Inventory file to add every release found on S3 to
+              --inventory-minimum-version <INVENTORY_MINIMUM_VERSION>
+                  Oldest version to look for on S3 (e.g. 3.1.0). Older releases are not added to the inventory
           -h, --help
                   Print help
         ");
