@@ -319,8 +319,15 @@ pub async fn inventory_check(contents: &str) -> Result<(), Error> {
         .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
         .map_err(|e| Error::Other(format!("Could not parse inventory. Error: {e}")))?;
 
+    verify_checksums(inventory.artifacts.iter()).await
+}
+
+/// ⁉️😄⁉️ - cost: downloads every artifact it is given
+pub async fn verify_checksums<'a>(
+    artifacts: impl IntoIterator<Item = &'a InventoryArtifact>,
+) -> Result<(), Error> {
     let mut set = tokio::task::JoinSet::new();
-    for artifact in inventory.artifacts {
+    for artifact in artifacts.into_iter().cloned() {
         set.spawn(async move {
             let temp = tempfile::tempdir().map_err(|e| format!("Error {e}"))?;
             let path = temp.path().join("file.tar");
