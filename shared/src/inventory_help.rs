@@ -15,6 +15,7 @@ use sha2::Sha256;
 use sha2::digest::Output;
 use std::cmp::{Ordering, Reverse};
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::fmt::{self, Display, Formatter};
 use std::io::Read;
 use std::ops::Deref;
@@ -191,18 +192,30 @@ pub struct RubyInventory(BTreeMap<ArtifactKey, RubyArtifact>);
 
 impl RubyInventory {
     pub fn new(artifacts: Vec<RubyArtifact>) -> Result<Self, InventoryError> {
-        let mut map = BTreeMap::new();
+        let mut inventory = Self::default();
         for artifact in artifacts {
-            let key = artifact.key();
-            if map.insert(key.clone(), artifact).is_some() {
-                return Err(InventoryError::Duplicate(key));
-            }
+            inventory.insert(artifact)?;
         }
-        Ok(Self(map))
+        Ok(inventory)
     }
 
     pub fn artifacts(&self) -> impl ExactSizeIterator<Item = &RubyArtifact> {
         self.0.values()
+    }
+
+    pub fn contains(&self, key: &ArtifactKey) -> bool {
+        self.0.contains_key(key)
+    }
+
+    /// ⁉️😄⁉️ - why every artifact goes through here
+    pub fn insert(&mut self, artifact: RubyArtifact) -> Result<(), InventoryError> {
+        match self.0.entry(artifact.key()) {
+            Entry::Occupied(entry) => Err(InventoryError::Duplicate(entry.key().clone())),
+            Entry::Vacant(entry) => {
+                entry.insert(artifact);
+                Ok(())
+            }
+        }
     }
 }
 
@@ -698,6 +711,39 @@ mod test {
         broken.url = "not a url".to_owned();
         let error = RubyArtifact::try_from(broken).unwrap_err();
         assert!(matches!(error, ArtifactError::InvalidUrl { .. }));
+    }
+
+    #[test]
+    fn insert_keeps_the_order() {
+        let mut inventory = inventory(vec![
+            artifact("3.4.1", "heroku-24", Arch::Amd64),
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+        ]);
+        let added = RubyArtifact::try_from(artifact("3.4.0", "heroku-22", Arch::Amd64)).unwrap();
+        let key = added.key();
+        inventory.insert(added).unwrap();
+        assert!(inventory.contains(&key));
+        assert_eq!(
+            keys(&inventory),
+            vec![
+                "3.4.1 on heroku-24 (amd64)",
+                "3.4.0 on heroku-22 (amd64)",
+                "3.3.0 on heroku-24 (amd64)",
+            ]
+        );
+    }
+
+    #[test]
+    fn insert_rejects_a_listed_key() {
+        let mut inventory = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        let error = inventory
+            .insert(RubyArtifact::try_from(artifact("3.4.0", "heroku-24", Arch::Amd64)).unwrap())
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "3.4.0 on heroku-24 (amd64): listed more than once"
+        );
+        assert_eq!(inventory.artifacts().len(), 1);
     }
 
     #[test]
