@@ -42,6 +42,8 @@ jobs:
         run: |
           cargo run --locked --bin ruby_release_check -- \
             --minimum-version 3.2.1 \
+            --inventory-minimum-version 3.1.0 \
+            --inventory ruby_inventory.toml \
             --output versions.json \
             2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Trigger builds for missing versions
@@ -84,6 +86,8 @@ jobs:
         run: |
           cargo run --locked --bin jruby_release_check -- \
             --minimum-version 9.4.7.0 \
+            --inventory-minimum-version 9.2.17.0 \
+            --inventory jruby_inventory.toml \
             --output jruby_versions.json \
             2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Trigger builds for missing versions
