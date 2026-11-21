@@ -52,6 +52,7 @@ pub mod devcenter;
 mod download_ruby_version;
 pub mod github;
 mod inventory_help;
+pub mod inventory_sync;
 mod major_minor;
 pub mod maybe_err;
 mod non_empty;
@@ -171,6 +172,15 @@ pub enum Error {
         #[source]
         source: chrono::ParseError,
     },
+
+    #[error("{0} does not end in a .tgz file name")]
+    NotATarballUrl(Url),
+
+    #[error(transparent)]
+    Artifact(Box<crate::ArtifactError>),
+
+    #[error("Hashing task failed: {0}")]
+    HashTask(#[source] tokio::task::JoinError),
 
     #[error("S3 check task failed: {0}")]
     S3CheckTask(#[source] tokio::task::JoinError),
