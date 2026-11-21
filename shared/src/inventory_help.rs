@@ -1,7 +1,7 @@
 use crate::base_image::{DistroVersion, UnknownDistroVersion};
 use crate::{
-    BaseImage, BuildTarget, Error, S3_BASE_URL, TarDownloadPath, UrlParseError, download_tar,
-    parse_url,
+    BaseImage, BuildTarget, Error, NonEmpty, S3_BASE_URL, TarDownloadPath, UrlParseError,
+    download_tar, parse_url,
 };
 use chrono::{DateTime, Utc};
 use fs_err::{self as fs};
@@ -226,6 +226,71 @@ pub enum InventoryError {
 
     #[error("{0}: listed more than once")]
     Duplicate(ArtifactKey),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InventoryChange {
+    Added(RubyArtifact),
+    Removed(RubyArtifact),
+    Replaced {
+        old: Box<RubyArtifact>,
+        new: Box<RubyArtifact>,
+    },
+}
+
+impl InventoryChange {
+    pub fn key(&self) -> &ArtifactKey {
+        match self {
+            Self::Added(artifact) | Self::Removed(artifact) => artifact.key(),
+            Self::Replaced { new, .. } => new.key(),
+        }
+    }
+}
+
+impl Display for InventoryChange {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Added(_) => "added",
+            Self::Removed(_) => "removed",
+            Self::Replaced { .. } => "replaced",
+        };
+        write!(f, "{label} {}", self.key())
+    }
+}
+
+/// ⁉️😄⁉️ - output order: the inventory file order, found in one pass because both inputs are sorted
+pub fn changes(old: &RubyInventory, new: &RubyInventory) -> Option<NonEmpty<InventoryChange>> {
+    let mut old = old.artifacts().iter().peekable();
+    let mut new = new.artifacts().iter().peekable();
+    let mut found = Vec::new();
+    loop {
+        let order = match (old.peek(), new.peek()) {
+            (None, None) => break,
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (Some(o), Some(n)) => o.key().cmp(n.key()),
+        };
+        match order {
+            Ordering::Less => {
+                let removed = old.next().expect("peeked");
+                found.push(InventoryChange::Removed(removed.clone()));
+            }
+            Ordering::Greater => {
+                let added = new.next().expect("peeked");
+                found.push(InventoryChange::Added(added.clone()));
+            }
+            Ordering::Equal => {
+                let (o, n) = (old.next().expect("peeked"), new.next().expect("peeked"));
+                if o != n {
+                    found.push(InventoryChange::Replaced {
+                        old: Box::new(o.clone()),
+                        new: Box::new(n.clone()),
+                    });
+                }
+            }
+        }
+    }
+    NonEmpty::try_from(found).ok()
 }
 
 /// ```no_run
@@ -510,5 +575,64 @@ mod test {
                 .parse::<RubyInventory>()
                 .unwrap_or_else(|error| panic!("{file}: {error}"));
         }
+    }
+
+    fn change_keys(changes: Option<NonEmpty<InventoryChange>>) -> Vec<String> {
+        changes
+            .iter()
+            .flat_map(|changes| changes.iter())
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    #[test]
+    fn same_inventory_has_no_changes() {
+        let old = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        let new = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        assert!(changes(&old, &new).is_none());
+    }
+
+    #[test]
+    fn changes_lists_added_removed_and_replaced_in_inventory_order() {
+        let old = inventory(vec![
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ]);
+        let mut rebuilt = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        rebuilt.checksum =
+            "sha256:7bebeee1b9128bdbb290331b813fa01cf43e30cd0098286f7de011796cb8eee5"
+                .parse()
+                .unwrap();
+        let new = inventory(vec![
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+            rebuilt,
+            artifact("3.4.1", "heroku-24", Arch::Amd64),
+        ]);
+        assert_eq!(
+            change_keys(changes(&old, &new)),
+            vec![
+                "added 3.4.1 on heroku-24 (amd64)",
+                "replaced 3.4.0 on heroku-24 (amd64)",
+                "removed 3.4.0 on heroku-24 (arm64)",
+            ]
+        );
+    }
+
+    #[test]
+    fn changes_lists_artifacts_past_the_end_of_the_other_inventory() {
+        let old = inventory(vec![artifact("3.3.0", "heroku-24", Arch::Amd64)]);
+        let new = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        assert_eq!(
+            change_keys(changes(&old, &new)),
+            vec![
+                "added 3.4.0 on heroku-24 (amd64)",
+                "removed 3.3.0 on heroku-24 (amd64)",
+            ]
+        );
+        assert_eq!(
+            change_keys(changes(&new, &RubyInventory::default())),
+            vec!["removed 3.4.0 on heroku-24 (amd64)"]
+        );
     }
 }
