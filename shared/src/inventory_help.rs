@@ -1,19 +1,181 @@
-use crate::base_image::DistroVersion;
-use crate::{Error, TarDownloadPath, download_tar};
+use crate::base_image::{DistroVersion, UnknownDistroVersion};
+use crate::{
+    BaseImage, BuildTarget, Error, S3_BASE_URL, TarDownloadPath, UrlParseError, download_tar,
+    parse_url,
+};
 use chrono::{DateTime, Utc};
 use fs_err::{self as fs};
 use gem_version::GemVersion;
 use libherokubuildpack::inventory::Inventory;
+use libherokubuildpack::inventory::artifact::{Arch, Artifact, Os};
 use libherokubuildpack::inventory::checksum::Checksum;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::cmp::{Ordering, Reverse};
+use std::fmt::{self, Display, Formatter};
 use std::io::Read;
+use std::ops::Deref;
 use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ArtifactMetadata {
     pub timestamp: DateTime<Utc>,
     pub distro_version: DistroVersion,
+}
+
+type InventoryArtifact = Artifact<GemVersion, Sha256, ArtifactMetadata>;
+
+/// Unique ordered version/target pairs
+///
+/// For example ruby-4.0.10 (version) on Ubuntu 26.04 for ARM (target)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactKey {
+    pub version: GemVersion,
+    pub target: BuildTarget,
+}
+
+/// Sort descending so that larger version numbers are shown first.
+impl Ord for ArtifactKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (Reverse(&self.version), &self.target).cmp(&(Reverse(&other.version), &other.target))
+    }
+}
+
+impl PartialOrd for ArtifactKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Display for ArtifactKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} on {} ({})",
+            self.version, self.target.base_image, self.target.arch
+        )
+    }
+}
+
+/// One checked entry in an inventory file
+///
+/// See [`ArtifactError`] for a list of checks
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RubyArtifact {
+    url: Url,
+    base_image: BaseImage,
+    artifact: InventoryArtifact,
+}
+
+impl RubyArtifact {
+    pub fn url(&self) -> &Url {
+        &self.url
+    }
+
+    pub fn key(&self) -> ArtifactKey {
+        ArtifactKey {
+            version: self.artifact.version.clone(),
+            target: BuildTarget {
+                base_image: self.base_image.clone(),
+                arch: self.artifact.arch,
+            },
+        }
+    }
+}
+
+impl Deref for RubyArtifact {
+    type Target = InventoryArtifact;
+
+    fn deref(&self) -> &Self::Target {
+        &self.artifact
+    }
+}
+
+impl From<RubyArtifact> for InventoryArtifact {
+    fn from(artifact: RubyArtifact) -> Self {
+        artifact.artifact
+    }
+}
+
+impl TryFrom<InventoryArtifact> for RubyArtifact {
+    type Error = ArtifactError;
+
+    fn try_from(artifact: InventoryArtifact) -> Result<Self, Self::Error> {
+        let version = artifact.version.clone();
+        if artifact.os != Os::Linux {
+            return Err(ArtifactError::UnsupportedOs {
+                version,
+                os: artifact.os,
+            });
+        }
+        let base_image =
+            BaseImage::try_from(&artifact.metadata.distro_version).map_err(|source| {
+                ArtifactError::UnknownDistroVersion {
+                    version: version.clone(),
+                    source,
+                }
+            })?;
+        if !base_image.archs().contains(&artifact.arch) {
+            return Err(ArtifactError::UnsupportedArch {
+                version,
+                base_image,
+                arch: artifact.arch,
+            });
+        }
+        let key = ArtifactKey {
+            version,
+            target: BuildTarget {
+                base_image: base_image.clone(),
+                arch: artifact.arch,
+            },
+        };
+        let url = parse_url(&artifact.url).map_err(|source| ArtifactError::InvalidUrl {
+            key: key.clone(),
+            source,
+        })?;
+        let bucket = parse_url(S3_BASE_URL).expect("internal constant should be a valid URL");
+        if url.origin() != bucket.origin() {
+            return Err(ArtifactError::UrlOutsideBucket {
+                key,
+                url: Box::new(url),
+            });
+        }
+        Ok(Self {
+            url,
+            base_image,
+            artifact,
+        })
+    }
+}
+
+/// Conditions that would cause an invalid entry in the inventory file
+#[derive(Debug, thiserror::Error)]
+pub enum ArtifactError {
+    #[error("{version}: unsupported os {os}, expected linux")]
+    UnsupportedOs { version: GemVersion, os: Os },
+
+    #[error("{version}: {source}")]
+    UnknownDistroVersion {
+        version: GemVersion,
+        source: UnknownDistroVersion,
+    },
+
+    #[error("{version}: {base_image} has no {arch} builds")]
+    UnsupportedArch {
+        version: GemVersion,
+        base_image: BaseImage,
+        arch: Arch,
+    },
+
+    #[error("{key}: {source}")]
+    InvalidUrl {
+        key: ArtifactKey,
+        source: UrlParseError,
+    },
+
+    #[error("{key}: url {url} is not under {S3_BASE_URL}")]
+    UrlOutsideBucket { key: ArtifactKey, url: Box<Url> },
 }
 
 /// ```no_run
@@ -122,4 +284,65 @@ where
     }
 
     Ok(digest.finalize_fixed())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn artifact(version: &str, base_image: &str, arch: Arch) -> InventoryArtifact {
+        InventoryArtifact {
+            version: version.parse().unwrap(),
+            os: Os::Linux,
+            arch,
+            url: format!("{S3_BASE_URL}/{base_image}/{arch}/ruby-{version}.tgz"),
+            checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
+                .parse()
+                .unwrap(),
+            metadata: ArtifactMetadata {
+                timestamp: "2026-04-22T16:44:16Z".parse().unwrap(),
+                distro_version: BaseImage::new(base_image).unwrap().distro_version(),
+            },
+        }
+    }
+
+    #[test]
+    fn rejects_arch_not_built_for_base_image() {
+        let mut arm = artifact("3.4.0", "heroku-22", Arch::Amd64);
+        arm.arch = Arch::Arm64;
+        let error = RubyArtifact::try_from(arm).unwrap_err();
+        assert_eq!(error.to_string(), "3.4.0: heroku-22 has no arm64 builds");
+    }
+
+    #[test]
+    fn rejects_darwin() {
+        let mut darwin = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        darwin.os = Os::Darwin;
+        let error = RubyArtifact::try_from(darwin).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "3.4.0: unsupported os darwin, expected linux"
+        );
+    }
+
+    #[test]
+    fn rejects_url_outside_bucket() {
+        let mut elsewhere = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        elsewhere.url = "https://example.com/ruby-3.4.0.tgz".to_owned();
+        let error = RubyArtifact::try_from(elsewhere).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "3.4.0 on heroku-24 (amd64): url https://example.com/ruby-3.4.0.tgz is not under {S3_BASE_URL}"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_url_that_does_not_parse() {
+        let mut broken = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        broken.url = "not a url".to_owned();
+        let error = RubyArtifact::try_from(broken).unwrap_err();
+        assert!(matches!(error, ArtifactError::InvalidUrl { .. }));
+    }
 }
