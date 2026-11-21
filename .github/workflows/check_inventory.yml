@@ -1,0 +1,42 @@
+name: Check inventory
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_PROFILE_DEV_DEBUG: 0
+
+jobs:
+  check_inventory_urls:
+    runs-on: ubuntu-24.04
+    if: (!contains(github.event.pull_request.labels.*.name, 'skip inventory check'))
+    strategy:
+      matrix:
+        inventory: ["jruby_inventory.toml", "ruby_inventory.toml"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Update Rust toolchain
+        run: rustup update
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Read the old inventory
+        run: |
+          set -euo pipefail
+          git show "HEAD^1:${INVENTORY}" > old_inventory.toml
+        env:
+          INVENTORY: ${{ matrix.inventory }}
+      - name: Check inventory
+        env:
+          INVENTORY: ${{ matrix.inventory }}
+          ALLOW_INVENTORY_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'allow inventory change') }}
+        run: |
+          cargo run --locked --bin inventory_check -- \
+            --old old_inventory.toml \
+            --new "${INVENTORY}"

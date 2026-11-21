@@ -1,51 +1,376 @@
-use crate::base_image::DistroVersion;
-use crate::{Error, TarDownloadPath, download_tar};
+use crate::base_image::{DistroVersion, UnknownDistroVersion};
+use crate::{
+    BaseImage, BuildTarget, Error, NonEmpty, S3_BASE_URL, TarDownloadPath, UrlParseError,
+    download_tar, parse_url,
+};
 use chrono::{DateTime, Utc};
 use fs_err::{self as fs};
-use fs2::FileExt;
 use gem_version::GemVersion;
+use libherokubuildpack::inventory::artifact::{Arch, Artifact, Os};
 use libherokubuildpack::inventory::checksum::Checksum;
-use libherokubuildpack::inventory::{self, Inventory};
+use libherokubuildpack::inventory::{Inventory, ParseInventoryError};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::cmp::{Ordering, Reverse};
+use std::collections::BTreeMap;
+use std::fmt::{self, Display, Formatter};
 use std::io::Read;
-use std::io::Write;
+use std::ops::Deref;
 use std::path::Path;
+use std::str::FromStr;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ArtifactMetadata {
     pub timestamp: DateTime<Utc>,
     pub distro_version: DistroVersion,
 }
 
-/// ```no_run
-/// use shared::inventory_check;
-///
-/// let contents = r#"
-/// [[artifacts]]
-/// version = "9.4.8.0"
-/// os = "linux"
-/// arch = "amd64"
-/// url = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com/heroku-24/ruby-3.1.4-jruby-9.4.8.0.tgz"
-/// checksum = "sha256:815b31d2b204a524bf74aabae341bf85353add4d1128d5d276d08fa5e8ff3c39"
-///
-/// [artifacts.metadata]
-/// timestamp = "2024-07-24T16:17:35.341413Z"
-/// distro_version = "24.04"
-/// "#;
-/// tokio::runtime::Runtime::new().unwrap().block_on(inventory_check(contents)).unwrap();
-/// ```
-pub async fn inventory_check(contents: &str) -> Result<(), Error> {
-    if contents.trim().is_empty() {
-        return Ok(());
+type InventoryFile = Inventory<GemVersion, Sha256, ArtifactMetadata>;
+type InventoryArtifact = Artifact<GemVersion, Sha256, ArtifactMetadata>;
+
+/// ⁉️😄⁉️ - what one key identifies, and that an inventory holds each key once
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArtifactKey {
+    pub version: GemVersion,
+    pub target: BuildTarget,
+}
+
+/// ⁉️😄⁉️ - this is the inventory file order: newest version first, then by target
+impl Ord for ArtifactKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (Reverse(&self.version), &self.target).cmp(&(Reverse(&other.version), &other.target))
+    }
+}
+
+impl PartialOrd for ArtifactKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Display for ArtifactKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} on {} ({})",
+            self.version, self.target.base_image, self.target.arch
+        )
+    }
+}
+
+/// ⁉️😄⁉️ - what "valid" means, and why the fields are read only
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RubyArtifact {
+    base_image: BaseImage,
+    artifact: InventoryArtifact,
+}
+
+impl RubyArtifact {
+    pub fn key(&self) -> ArtifactKey {
+        ArtifactKey {
+            version: self.artifact.version.clone(),
+            target: BuildTarget {
+                base_image: self.base_image.clone(),
+                arch: self.artifact.arch,
+            },
+        }
+    }
+}
+
+impl Deref for RubyArtifact {
+    type Target = InventoryArtifact;
+
+    fn deref(&self) -> &Self::Target {
+        &self.artifact
+    }
+}
+
+impl From<RubyArtifact> for InventoryArtifact {
+    fn from(artifact: RubyArtifact) -> Self {
+        artifact.artifact
+    }
+}
+
+impl TryFrom<InventoryArtifact> for RubyArtifact {
+    type Error = ArtifactError;
+
+    fn try_from(artifact: InventoryArtifact) -> Result<Self, Self::Error> {
+        let version = artifact.version.clone();
+        if artifact.os != Os::Linux {
+            return Err(ArtifactError::UnsupportedOs {
+                version,
+                os: artifact.os,
+            });
+        }
+        let base_image =
+            BaseImage::try_from(&artifact.metadata.distro_version).map_err(|source| {
+                ArtifactError::UnknownDistroVersion {
+                    version: version.clone(),
+                    source,
+                }
+            })?;
+        if !base_image.archs().contains(&artifact.arch) {
+            return Err(ArtifactError::UnsupportedArch {
+                version,
+                base_image,
+                arch: artifact.arch,
+            });
+        }
+        let ruby = Self {
+            base_image,
+            artifact,
+        };
+        let url = parse_url(&ruby.url).map_err(|source| ArtifactError::InvalidUrl {
+            key: ruby.key(),
+            source,
+        })?;
+        let bucket = parse_url(S3_BASE_URL).expect("internal constant should be a valid URL");
+        if url.origin() != bucket.origin() {
+            return Err(ArtifactError::UrlOutsideBucket {
+                key: ruby.key(),
+                url: Box::new(url),
+            });
+        }
+        Ok(ruby)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ArtifactError {
+    #[error("{version}: unsupported os {os}, expected linux")]
+    UnsupportedOs { version: GemVersion, os: Os },
+
+    #[error("{version}: {source}")]
+    UnknownDistroVersion {
+        version: GemVersion,
+        source: UnknownDistroVersion,
+    },
+
+    #[error("{version}: {base_image} has no {arch} builds")]
+    UnsupportedArch {
+        version: GemVersion,
+        base_image: BaseImage,
+        arch: Arch,
+    },
+
+    #[error("{key}: {source}")]
+    InvalidUrl {
+        key: ArtifactKey,
+        source: UrlParseError,
+    },
+
+    #[error("{key}: url {url} is not under {S3_BASE_URL}")]
+    UrlOutsideBucket { key: ArtifactKey, url: Box<Url> },
+}
+
+/// ⁉️😄⁉️ - why the order matters: the sync automation must write the same bytes for the same builds
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RubyInventory(BTreeMap<ArtifactKey, RubyArtifact>);
+
+impl RubyInventory {
+    pub fn new(artifacts: Vec<RubyArtifact>) -> Result<Self, InventoryError> {
+        let mut map = BTreeMap::new();
+        for artifact in artifacts {
+            let key = artifact.key();
+            if map.insert(key.clone(), artifact).is_some() {
+                return Err(InventoryError::Duplicate(key));
+            }
+        }
+        Ok(Self(map))
     }
 
-    let inventory = contents
-        .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
-        .map_err(|e| Error::Other(format!("Could not parse inventory. Error: {e}")))?;
+    pub fn artifacts(&self) -> impl ExactSizeIterator<Item = &RubyArtifact> {
+        self.0.values()
+    }
+}
 
+impl TryFrom<InventoryFile> for RubyInventory {
+    type Error = InventoryError;
+
+    fn try_from(inventory: InventoryFile) -> Result<Self, Self::Error> {
+        Self::new(
+            inventory
+                .artifacts
+                .into_iter()
+                .map(RubyArtifact::try_from)
+                .collect::<Result<_, _>>()?,
+        )
+    }
+}
+
+impl FromStr for RubyInventory {
+    type Err = InventoryError;
+
+    fn from_str(contents: &str) -> Result<Self, Self::Err> {
+        Self::try_from(
+            contents
+                .parse::<InventoryFile>()
+                .map_err(InventoryError::Parse)?,
+        )
+    }
+}
+
+impl Display for RubyInventory {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        InventoryFile {
+            artifacts: self.0.values().cloned().map(Into::into).collect(),
+        }
+        .fmt(f)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum InventoryError {
+    #[error("Could not parse inventory: {0}")]
+    Parse(#[source] ParseInventoryError),
+
+    #[error(transparent)]
+    Artifact(#[from] ArtifactError),
+
+    #[error("{0}: listed more than once")]
+    Duplicate(ArtifactKey),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InventoryChange {
+    Added(RubyArtifact),
+    Removed(RubyArtifact),
+    Replaced {
+        old: Box<RubyArtifact>,
+        new: Box<RubyArtifact>,
+    },
+}
+
+impl InventoryChange {
+    pub fn key(&self) -> ArtifactKey {
+        match self {
+            Self::Added(artifact) | Self::Removed(artifact) => artifact.key(),
+            Self::Replaced { new, .. } => new.key(),
+        }
+    }
+}
+
+impl Display for InventoryChange {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Added(_) => "added",
+            Self::Removed(_) => "removed",
+            Self::Replaced { .. } => "replaced",
+        };
+        write!(f, "{label} {}", self.key())
+    }
+}
+
+/// ⁉️😄⁉️ - output order: the inventory file order, found in one pass because both inputs are sorted
+pub fn changes(old: &RubyInventory, new: &RubyInventory) -> Option<NonEmpty<InventoryChange>> {
+    let mut old = old.0.iter().peekable();
+    let mut new = new.0.iter().peekable();
+    let mut found = Vec::new();
+    loop {
+        let order = match (old.peek(), new.peek()) {
+            (None, None) => break,
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (Some((old_key, _)), Some((new_key, _))) => old_key.cmp(new_key),
+        };
+        match order {
+            Ordering::Less => {
+                let (_, removed) = old.next().expect("peeked");
+                found.push(InventoryChange::Removed(removed.clone()));
+            }
+            Ordering::Greater => {
+                let (_, added) = new.next().expect("peeked");
+                found.push(InventoryChange::Added(added.clone()));
+            }
+            Ordering::Equal => {
+                let ((_, o), (_, n)) = (old.next().expect("peeked"), new.next().expect("peeked"));
+                if o != n {
+                    found.push(InventoryChange::Replaced {
+                        old: Box::new(o.clone()),
+                        new: Box::new(n.clone()),
+                    });
+                }
+            }
+        }
+    }
+    NonEmpty::try_from(found).ok()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AllowedChanges {
+    AddOnly,
+    Any,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum InventoryCheckError {
+    #[error("old inventory: {0}")]
+    Old(#[source] InventoryError),
+
+    #[error("new inventory: {0}")]
+    New(#[source] InventoryError),
+
+    #[error(
+        "Expected the inventory change to only add artifacts, but it also removes or replaces some:\n{}\n\nPass `--allow-inventory-change` (the `allow inventory change` PR label) to allow this.",
+        unexpected.iter().map(|change| format!("- {change}")).collect::<Vec<_>>().join("\n")
+    )]
+    UnexpectedChanges {
+        unexpected: NonEmpty<InventoryChange>,
+    },
+
+    #[error(transparent)]
+    Checksum(Error),
+}
+
+/// ⁉️😄⁉️ - what is checked, and which artifacts get downloaded
+pub async fn inventory_check(
+    old: &str,
+    new: &str,
+    allowed: AllowedChanges,
+) -> Result<Option<NonEmpty<InventoryChange>>, InventoryCheckError> {
+    let old = old
+        .parse::<RubyInventory>()
+        .map_err(InventoryCheckError::Old)?;
+    let new = new
+        .parse::<RubyInventory>()
+        .map_err(InventoryCheckError::New)?;
+    let Some(changes) = changes(&old, &new) else {
+        return Ok(None);
+    };
+
+    if allowed == AllowedChanges::AddOnly {
+        let unexpected = changes
+            .iter()
+            .filter(|change| !matches!(change, InventoryChange::Added(_)))
+            .cloned()
+            .collect::<Vec<_>>();
+        if let Ok(unexpected) = NonEmpty::try_from(unexpected) {
+            return Err(InventoryCheckError::UnexpectedChanges { unexpected });
+        }
+    }
+
+    verify_checksums(
+        changes
+            .iter()
+            .filter_map(|change| match change {
+                InventoryChange::Added(artifact) => Some(artifact),
+                InventoryChange::Replaced { new, .. } => Some(&**new),
+                InventoryChange::Removed(_) => None,
+            })
+            .map(Deref::deref),
+    )
+    .await
+    .map_err(InventoryCheckError::Checksum)?;
+    Ok(Some(changes))
+}
+
+/// ⁉️😄⁉️ - cost: downloads every artifact it is given
+pub async fn verify_checksums<'a>(
+    artifacts: impl IntoIterator<Item = &'a InventoryArtifact>,
+) -> Result<(), Error> {
     let mut set = tokio::task::JoinSet::new();
-    for artifact in inventory.artifacts {
+    for artifact in artifacts.into_iter().cloned() {
         set.spawn(async move {
             let temp = tempfile::tempdir().map_err(|e| format!("Error {e}"))?;
             let path = temp.path().join("file.tar");
@@ -94,62 +419,6 @@ pub async fn inventory_check(contents: &str) -> Result<(), Error> {
     }
 }
 
-fn atomic_file_contents<F, T>(path: &Path, f: F) -> Result<T, Box<dyn std::error::Error>>
-where
-    F: FnOnce(&mut std::fs::File, &str) -> Result<T, Box<dyn std::error::Error>>,
-{
-    fs::create_dir_all(
-        path.parent().ok_or_else(|| {
-            Error::Other(format!("Cannot determine parent from {}", path.display()))
-        })?,
-    )
-    .map_err(Error::FsError)?;
-
-    let mut file: std::fs::File = fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(path)?
-        .into();
-    file.lock_exclusive()?;
-    use std::io::Seek;
-
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).map_err(Error::FsError)?;
-    file.rewind()?;
-    let result: Result<T, Box<dyn std::error::Error>> = f(&mut file, &contents);
-    fs2::FileExt::unlock(&file)?;
-    result
-}
-
-pub fn atomic_inventory_update<F>(path: &Path, f: F) -> Result<(), Box<dyn std::error::Error>>
-where
-    F: FnOnce(
-        &mut Inventory<GemVersion, Sha256, ArtifactMetadata>,
-    ) -> Result<(), Box<dyn std::error::Error>>,
-{
-    atomic_file_contents(path, |file, contents| {
-        let mut inventory = parse_inventory(contents)?;
-        f(&mut inventory)?;
-        write!(file, "{inventory}").map_err(Error::FsError)?;
-        Ok(())
-    })
-}
-
-fn parse_inventory(
-    contents: &str,
-) -> Result<Inventory<GemVersion, Sha256, ArtifactMetadata>, Error> {
-    if contents.trim().is_empty() {
-        Ok(Inventory {
-            artifacts: Vec::new(),
-        })
-    } else {
-        contents
-            .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
-            .map_err(|e| Error::Other(format!("Error {e} parsing inventory:\n{contents}")))
-    }
-}
-
 /// Returns the sha256 hash of the file at the given path
 pub fn sha256_from_path(path: &Path) -> Result<String, Error> {
     digest::<Sha256>(fs::File::open(path).map_err(Error::FsError)?)
@@ -182,141 +451,295 @@ where
     Ok(digest.finalize_fixed())
 }
 
-/// Raises an error if the same URL has a different checksum
-///
-/// This protects against the (reasonably) unlikely event that the same version generates a checksum with the same first 7 characters but a net different checksum.
-/// While unlikely, it's still possible. If we didn't guard against this case, then it could break people's builds who are relying on the old checksum
-/// no not change.
-pub fn artifact_same_url_different_checksum(
-    a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-    b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    if a.url == b.url && a.checksum != b.checksum {
-        Err(format!(
-            "Duplicate url {url} has different checksums {a_checksum} != {b_checksum}",
-            url = a.url,
-            a_checksum = hex::encode(&a.checksum.value),
-            b_checksum = hex::encode(&b.checksum.value)
-        )
-        .into())
-    } else {
-        Ok(())
-    }
-}
-
-pub fn artifact_is_different(
-    a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-    b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-) -> bool {
-    a.version != b.version
-        || a.arch != b.arch
-        || a.metadata.distro_version != b.metadata.distro_version
-}
-
 #[cfg(test)]
 mod test {
-    use crate::BaseImage;
-    use inventory::artifact::Artifact;
-    use std::io::Write;
-    use std::str::FromStr;
-
     use super::*;
 
-    #[test]
-    fn test_same_url_different_checksum_raises_error() {
-        let a = Artifact {
-            os: inventory::artifact::Os::Linux,
-            arch: inventory::artifact::Arch::Amd64,
-            version: GemVersion::from_str("1.0.0").unwrap(),
+    fn artifact(version: &str, base_image: &str, arch: Arch) -> InventoryArtifact {
+        InventoryArtifact {
+            version: version.parse().unwrap(),
+            os: Os::Linux,
+            arch,
+            url: format!("{S3_BASE_URL}/{base_image}/{arch}/ruby-{version}.tgz"),
             checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
                 .parse()
                 .unwrap(),
             metadata: ArtifactMetadata {
-                timestamp: Utc::now(),
-                distro_version: BaseImage::new("heroku-24").unwrap().distro_version(),
+                timestamp: "2026-04-22T16:44:16Z".parse().unwrap(),
+                distro_version: BaseImage::new(base_image).unwrap().distro_version(),
             },
-            url: "https://example.com".to_string(),
-        };
+        }
+    }
 
-        let b = a.clone();
-        artifact_same_url_different_checksum(&a, &b).unwrap();
+    fn inventory(artifacts: Vec<InventoryArtifact>) -> RubyInventory {
+        RubyInventory::try_from(InventoryFile { artifacts }).unwrap()
+    }
 
-        let mut b = a.clone();
-        b.checksum = "sha256:7bebeee1b9128bdbb290331b813fa01cf43e30cd0098286f7de011796cb8eee5"
-            .parse()
+    fn keys(inventory: &RubyInventory) -> Vec<String> {
+        inventory
+            .artifacts()
+            .map(|artifact| artifact.key().to_string())
+            .collect()
+    }
+
+    fn unsorted_toml(artifacts: Vec<InventoryArtifact>) -> String {
+        InventoryFile { artifacts }.to_string()
+    }
+
+    #[test]
+    fn sorts_newest_version_first_then_by_target() {
+        let inventory = inventory(vec![
+            artifact("3.4.1", "heroku-24", Arch::Arm64),
+            artifact("3.4.10", "heroku-22", Arch::Amd64),
+            artifact("3.4.1", "heroku-22", Arch::Amd64),
+            artifact("3.4.1", "heroku-24", Arch::Amd64),
+        ]);
+        assert_eq!(
+            keys(&inventory),
+            vec![
+                "3.4.10 on heroku-22 (amd64)",
+                "3.4.1 on heroku-22 (amd64)",
+                "3.4.1 on heroku-24 (amd64)",
+                "3.4.1 on heroku-24 (arm64)",
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_what_it_displays() {
+        let inventory = inventory(vec![
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+        ]);
+        assert_eq!(
+            inventory.to_string().parse::<RubyInventory>().unwrap(),
+            inventory
+        );
+    }
+
+    #[test]
+    fn empty_inventory_parses() {
+        "artifacts = []\n".parse::<RubyInventory>().unwrap();
+    }
+
+    #[test]
+    fn parse_sorts_artifacts() {
+        let contents = unsorted_toml(vec![
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+        ]);
+        assert_eq!(
+            keys(&contents.parse::<RubyInventory>().unwrap()),
+            vec!["3.4.0 on heroku-24 (amd64)", "3.3.0 on heroku-24 (amd64)"]
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_artifacts() {
+        let error = RubyInventory::try_from(InventoryFile {
+            artifacts: vec![
+                artifact("3.4.0", "heroku-24", Arch::Amd64),
+                artifact("3.4.0", "heroku-24", Arch::Amd64),
+            ],
+        })
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "3.4.0 on heroku-24 (amd64): listed more than once"
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_distro_version() {
+        let contents = unsorted_toml(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)])
+            .replace("24.04", "20.04");
+        let error = contents.parse::<RubyInventory>().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "3.4.0: distro_version 20.04 is not a known base image"
+        );
+    }
+
+    #[test]
+    fn rejects_arch_not_built_for_base_image() {
+        let mut arm = artifact("3.4.0", "heroku-22", Arch::Amd64);
+        arm.arch = Arch::Arm64;
+        let error = RubyArtifact::try_from(arm).unwrap_err();
+        assert_eq!(error.to_string(), "3.4.0: heroku-22 has no arm64 builds");
+    }
+
+    #[test]
+    fn rejects_darwin() {
+        let mut darwin = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        darwin.os = Os::Darwin;
+        let error = RubyArtifact::try_from(darwin).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "3.4.0: unsupported os darwin, expected linux"
+        );
+    }
+
+    #[test]
+    fn rejects_url_outside_bucket() {
+        let mut elsewhere = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        elsewhere.url = "https://example.com/ruby-3.4.0.tgz".to_owned();
+        let error = RubyArtifact::try_from(elsewhere).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "3.4.0 on heroku-24 (amd64): url https://example.com/ruby-3.4.0.tgz is not under {S3_BASE_URL}"
+            )
+        );
+    }
+
+    #[test]
+    fn rejects_url_that_does_not_parse() {
+        let mut broken = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        broken.url = "not a url".to_owned();
+        let error = RubyArtifact::try_from(broken).unwrap_err();
+        assert!(matches!(error, ArtifactError::InvalidUrl { .. }));
+    }
+
+    #[test]
+    fn rejects_invalid_toml() {
+        let error = "[[artifacts]]\nversion = \"3.4.0\"\n"
+            .parse::<RubyInventory>()
+            .unwrap_err();
+        assert!(matches!(error, InventoryError::Parse(_)));
+    }
+
+    #[test]
+    fn repo_inventory_files_parse() {
+        for (file, contents) in [
+            (
+                "ruby_inventory.toml",
+                include_str!("../../ruby_inventory.toml"),
+            ),
+            (
+                "jruby_inventory.toml",
+                include_str!("../../jruby_inventory.toml"),
+            ),
+        ] {
+            contents
+                .parse::<RubyInventory>()
+                .unwrap_or_else(|error| panic!("{file}: {error}"));
+        }
+    }
+
+    fn change_keys(changes: Option<NonEmpty<InventoryChange>>) -> Vec<String> {
+        changes
+            .iter()
+            .flat_map(|changes| changes.iter())
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    #[test]
+    fn same_inventory_has_no_changes() {
+        let old = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        let new = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        assert!(changes(&old, &new).is_none());
+    }
+
+    #[test]
+    fn changes_lists_added_removed_and_replaced_in_inventory_order() {
+        let old = inventory(vec![
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ]);
+        let mut rebuilt = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        rebuilt.checksum =
+            "sha256:7bebeee1b9128bdbb290331b813fa01cf43e30cd0098286f7de011796cb8eee5"
+                .parse()
+                .unwrap();
+        let new = inventory(vec![
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+            rebuilt,
+            artifact("3.4.1", "heroku-24", Arch::Amd64),
+        ]);
+        assert_eq!(
+            change_keys(changes(&old, &new)),
+            vec![
+                "added 3.4.1 on heroku-24 (amd64)",
+                "replaced 3.4.0 on heroku-24 (amd64)",
+                "removed 3.4.0 on heroku-24 (arm64)",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn check_with_no_changes_downloads_nothing() {
+        let contents = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]).to_string();
+        let changes = inventory_check(&contents, &contents, AllowedChanges::AddOnly)
+            .await
             .unwrap();
-        assert!(artifact_same_url_different_checksum(&a, &b).is_err());
+        assert!(changes.is_none());
+    }
+
+    #[tokio::test]
+    async fn check_rejects_removed_and_replaced_artifacts_before_downloading() {
+        let old = inventory(vec![
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ])
+        .to_string();
+        let mut rebuilt = artifact("3.4.0", "heroku-24", Arch::Amd64);
+        rebuilt.url = format!("{S3_BASE_URL}/heroku-24/amd64/ruby-3.4.0-7bebeee.tgz");
+        let new = inventory(vec![rebuilt]).to_string();
+        let error = inventory_check(&old, &new, AllowedChanges::AddOnly)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            indoc::indoc! {"
+                Expected the inventory change to only add artifacts, but it also removes or replaces some:
+                - replaced 3.4.0 on heroku-24 (amd64)
+                - removed 3.4.0 on heroku-24 (arm64)
+
+                Pass `--allow-inventory-change` (the `allow inventory change` PR label) to allow this."}
+        );
+    }
+
+    #[tokio::test]
+    async fn check_allows_removal_when_any_change_is_allowed() {
+        let old = inventory(vec![
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Arm64),
+        ])
+        .to_string();
+        let new = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]).to_string();
+        let changes = inventory_check(&old, &new, AllowedChanges::Any)
+            .await
+            .unwrap();
+        assert_eq!(
+            change_keys(changes),
+            vec!["removed 3.4.0 on heroku-24 (arm64)"]
+        );
+    }
+
+    #[tokio::test]
+    async fn check_names_which_inventory_failed_to_parse() {
+        let error = inventory_check("", "artifacts = []\n", AllowedChanges::AddOnly)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, InventoryCheckError::Old(_)));
     }
 
     #[test]
-    fn test_is_not_version_match() {
-        let a = Artifact {
-            os: inventory::artifact::Os::Linux,
-            arch: inventory::artifact::Arch::Amd64,
-            version: GemVersion::from_str("1.0.0").unwrap(),
-            checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
-                .parse()
-                .unwrap(),
-            metadata: ArtifactMetadata {
-                timestamp: Utc::now(),
-                distro_version: BaseImage::new("heroku-24").unwrap().distro_version(),
-            },
-            url: "https://example.com".to_string(),
-        };
-
-        let b = a.clone();
-        assert!(!artifact_is_different(&a, &b));
-
-        let mut b = a.clone();
-        b.version = GemVersion::from_str("1.0.1").unwrap();
-        assert!(artifact_is_different(&a, &b));
-
-        let mut b = a.clone();
-        b.arch = inventory::artifact::Arch::Arm64;
-        assert!(artifact_is_different(&a, &b));
-
-        let mut b = a.clone();
-        b.metadata.distro_version = BaseImage::new("heroku-22").unwrap().distro_version();
-        assert!(artifact_is_different(&a, &b));
-    }
-
-    #[test]
-    fn test_append_inventory() {
-        let temp = tempfile::tempdir().expect("Tempdir");
-        let path = temp.path().join("inventory.toml");
-        let artifact = Artifact {
-            os: inventory::artifact::Os::Linux,
-            arch: inventory::artifact::Arch::Amd64,
-            version: GemVersion::from_str("1.0.0").unwrap(),
-            checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
-                .parse()
-                .unwrap(),
-            metadata: ArtifactMetadata {
-                timestamp: Utc::now(),
-                distro_version: BaseImage::new("heroku-24").unwrap().distro_version(),
-            },
-            url: "https://example.com".to_string(),
-        };
-
-        atomic_file_contents(&path, |file, contents| {
-            let mut inventory = parse_inventory(contents)?;
-            inventory.push(artifact.clone());
-            write!(file, "{inventory}").expect("Writeable file");
-            Ok(())
-        })
-        .unwrap();
-
-        let inventory = parse_inventory(&fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(1, inventory.artifacts.len());
-
-        atomic_file_contents(&path, |file, contents| {
-            let mut inventory = parse_inventory(contents)?;
-            inventory.push(artifact.clone());
-            write!(file, "{inventory}").expect("Writeable file");
-            Ok(())
-        })
-        .unwrap();
-        let inventory = parse_inventory(&fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(2, inventory.artifacts.len());
+    fn changes_lists_artifacts_past_the_end_of_the_other_inventory() {
+        let old = inventory(vec![artifact("3.3.0", "heroku-24", Arch::Amd64)]);
+        let new = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        assert_eq!(
+            change_keys(changes(&old, &new)),
+            vec![
+                "added 3.4.0 on heroku-24 (amd64)",
+                "removed 3.3.0 on heroku-24 (amd64)",
+            ]
+        );
+        assert_eq!(
+            change_keys(changes(&new, &RubyInventory::default())),
+            vec!["removed 3.4.0 on heroku-24 (amd64)"]
+        );
     }
 }
