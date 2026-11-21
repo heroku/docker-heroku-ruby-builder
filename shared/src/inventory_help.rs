@@ -6,17 +6,19 @@ use crate::{
 use chrono::{DateTime, Utc};
 use fs_err::{self as fs};
 use gem_version::GemVersion;
-use libherokubuildpack::inventory::Inventory;
 use libherokubuildpack::inventory::artifact::{Arch, Artifact, Os};
 use libherokubuildpack::inventory::checksum::Checksum;
+use libherokubuildpack::inventory::{Inventory, ParseInventoryError};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::cmp::{Ordering, Reverse};
+use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
 use std::io::Read;
 use std::ops::Deref;
 use std::path::Path;
+use std::str::FromStr;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ArtifactMetadata {
@@ -24,6 +26,7 @@ pub struct ArtifactMetadata {
     pub distro_version: DistroVersion,
 }
 
+type InventoryFile = Inventory<GemVersion, Sha256, ArtifactMetadata>;
 type InventoryArtifact = Artifact<GemVersion, Sha256, ArtifactMetadata>;
 
 /// ⁉️😄⁉️ - what one key identifies, and that an inventory holds each key once
@@ -161,6 +164,74 @@ pub enum ArtifactError {
     UrlOutsideBucket { key: ArtifactKey, url: Box<Url> },
 }
 
+/// ⁉️😄⁉️ - why the order matters: the sync automation must write the same bytes for the same builds
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RubyInventory(BTreeMap<ArtifactKey, RubyArtifact>);
+
+impl RubyInventory {
+    pub fn new(artifacts: Vec<RubyArtifact>) -> Result<Self, InventoryError> {
+        let mut map = BTreeMap::new();
+        for artifact in artifacts {
+            let key = artifact.key();
+            if map.insert(key.clone(), artifact).is_some() {
+                return Err(InventoryError::Duplicate(key));
+            }
+        }
+        Ok(Self(map))
+    }
+
+    pub fn artifacts(&self) -> impl ExactSizeIterator<Item = &RubyArtifact> {
+        self.0.values()
+    }
+}
+
+impl TryFrom<InventoryFile> for RubyInventory {
+    type Error = InventoryError;
+
+    fn try_from(inventory: InventoryFile) -> Result<Self, Self::Error> {
+        Self::new(
+            inventory
+                .artifacts
+                .into_iter()
+                .map(RubyArtifact::try_from)
+                .collect::<Result<_, _>>()?,
+        )
+    }
+}
+
+impl FromStr for RubyInventory {
+    type Err = InventoryError;
+
+    fn from_str(contents: &str) -> Result<Self, Self::Err> {
+        Self::try_from(
+            contents
+                .parse::<InventoryFile>()
+                .map_err(InventoryError::Parse)?,
+        )
+    }
+}
+
+impl Display for RubyInventory {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        InventoryFile {
+            artifacts: self.0.values().cloned().map(Into::into).collect(),
+        }
+        .fmt(f)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum InventoryError {
+    #[error("Could not parse inventory: {0}")]
+    Parse(#[source] ParseInventoryError),
+
+    #[error(transparent)]
+    Artifact(#[from] ArtifactError),
+
+    #[error("{0}: listed more than once")]
+    Duplicate(ArtifactKey),
+}
+
 /// ```no_run
 /// use shared::inventory_check;
 ///
@@ -289,6 +360,95 @@ mod test {
         }
     }
 
+    fn inventory(artifacts: Vec<InventoryArtifact>) -> RubyInventory {
+        RubyInventory::try_from(InventoryFile { artifacts }).unwrap()
+    }
+
+    fn keys(inventory: &RubyInventory) -> Vec<String> {
+        inventory
+            .artifacts()
+            .map(|artifact| artifact.key().to_string())
+            .collect()
+    }
+
+    fn unsorted_toml(artifacts: Vec<InventoryArtifact>) -> String {
+        InventoryFile { artifacts }.to_string()
+    }
+
+    #[test]
+    fn sorts_newest_version_first_then_by_target() {
+        let inventory = inventory(vec![
+            artifact("3.4.1", "heroku-24", Arch::Arm64),
+            artifact("3.4.10", "heroku-22", Arch::Amd64),
+            artifact("3.4.1", "heroku-22", Arch::Amd64),
+            artifact("3.4.1", "heroku-24", Arch::Amd64),
+        ]);
+        assert_eq!(
+            keys(&inventory),
+            vec![
+                "3.4.10 on heroku-22 (amd64)",
+                "3.4.1 on heroku-22 (amd64)",
+                "3.4.1 on heroku-24 (amd64)",
+                "3.4.1 on heroku-24 (arm64)",
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_what_it_displays() {
+        let inventory = inventory(vec![
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+        ]);
+        assert_eq!(
+            inventory.to_string().parse::<RubyInventory>().unwrap(),
+            inventory
+        );
+    }
+
+    #[test]
+    fn empty_inventory_parses() {
+        "artifacts = []\n".parse::<RubyInventory>().unwrap();
+    }
+
+    #[test]
+    fn parse_sorts_artifacts() {
+        let contents = unsorted_toml(vec![
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+            artifact("3.4.0", "heroku-24", Arch::Amd64),
+        ]);
+        assert_eq!(
+            keys(&contents.parse::<RubyInventory>().unwrap()),
+            vec!["3.4.0 on heroku-24 (amd64)", "3.3.0 on heroku-24 (amd64)"]
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_artifacts() {
+        let error = RubyInventory::try_from(InventoryFile {
+            artifacts: vec![
+                artifact("3.4.0", "heroku-24", Arch::Amd64),
+                artifact("3.4.0", "heroku-24", Arch::Amd64),
+            ],
+        })
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "3.4.0 on heroku-24 (amd64): listed more than once"
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_distro_version() {
+        let contents = unsorted_toml(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)])
+            .replace("24.04", "20.04");
+        let error = contents.parse::<RubyInventory>().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "3.4.0: distro_version 20.04 is not a known base image"
+        );
+    }
+
     #[test]
     fn rejects_arch_not_built_for_base_image() {
         let mut arm = artifact("3.4.0", "heroku-22", Arch::Amd64);
@@ -327,5 +487,31 @@ mod test {
         broken.url = "not a url".to_owned();
         let error = RubyArtifact::try_from(broken).unwrap_err();
         assert!(matches!(error, ArtifactError::InvalidUrl { .. }));
+    }
+
+    #[test]
+    fn rejects_invalid_toml() {
+        let error = "[[artifacts]]\nversion = \"3.4.0\"\n"
+            .parse::<RubyInventory>()
+            .unwrap_err();
+        assert!(matches!(error, InventoryError::Parse(_)));
+    }
+
+    #[test]
+    fn repo_inventory_files_parse() {
+        for (file, contents) in [
+            (
+                "ruby_inventory.toml",
+                include_str!("../../ruby_inventory.toml"),
+            ),
+            (
+                "jruby_inventory.toml",
+                include_str!("../../jruby_inventory.toml"),
+            ),
+        ] {
+            contents
+                .parse::<RubyInventory>()
+                .unwrap_or_else(|error| panic!("{file}: {error}"));
+        }
     }
 }
