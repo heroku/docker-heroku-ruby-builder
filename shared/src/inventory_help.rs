@@ -179,6 +179,24 @@ impl RubyInventory {
     pub fn artifacts(&self) -> &[RubyArtifact] {
         &self.0
     }
+
+    pub fn contains(&self, key: &ArtifactKey) -> bool {
+        self.position(key).is_ok()
+    }
+
+    pub fn insert(&mut self, artifact: RubyArtifact) -> Result<(), InventoryError> {
+        match self.position(artifact.key()) {
+            Ok(_) => Err(InventoryError::Duplicate(artifact.key().clone())),
+            Err(index) => {
+                self.0.insert(index, artifact);
+                Ok(())
+            }
+        }
+    }
+
+    fn position(&self, key: &ArtifactKey) -> Result<usize, usize> {
+        self.0.binary_search_by(|artifact| artifact.key().cmp(key))
+    }
 }
 
 impl TryFrom<InventoryFile> for RubyInventory {
@@ -595,6 +613,39 @@ mod test {
         broken.url = "not a url".to_owned();
         let error = RubyArtifact::try_from(broken).unwrap_err();
         assert!(matches!(error, ArtifactError::InvalidUrl { .. }));
+    }
+
+    #[test]
+    fn insert_keeps_the_order() {
+        let mut inventory = inventory(vec![
+            artifact("3.4.1", "heroku-24", Arch::Amd64),
+            artifact("3.3.0", "heroku-24", Arch::Amd64),
+        ]);
+        let added = RubyArtifact::try_from(artifact("3.4.0", "heroku-22", Arch::Amd64)).unwrap();
+        let key = added.key().clone();
+        inventory.insert(added).unwrap();
+        assert!(inventory.contains(&key));
+        assert_eq!(
+            keys(&inventory),
+            vec![
+                "3.4.1 on heroku-24 (amd64)",
+                "3.4.0 on heroku-22 (amd64)",
+                "3.3.0 on heroku-24 (amd64)",
+            ]
+        );
+    }
+
+    #[test]
+    fn insert_rejects_a_listed_key() {
+        let mut inventory = inventory(vec![artifact("3.4.0", "heroku-24", Arch::Amd64)]);
+        let error = inventory
+            .insert(RubyArtifact::try_from(artifact("3.4.0", "heroku-24", Arch::Amd64)).unwrap())
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "3.4.0 on heroku-24 (amd64): listed more than once"
+        );
+        assert_eq!(inventory.artifacts().len(), 1);
     }
 
     #[test]
