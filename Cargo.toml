@@ -18,7 +18,6 @@ flate2 = { version = "1", default-features = false, features = [
     "runtime_detection",
 ] }
 fs-err = { version = "3", features = ["debug", "debug_tokio", "tokio"] }
-fs2 = "0.4"
 fun_run = "0.8"
 gem_version = "1.0"
 glob = "0.3"
