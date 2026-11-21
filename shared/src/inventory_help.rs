@@ -2,14 +2,12 @@ use crate::base_image::DistroVersion;
 use crate::{Error, TarDownloadPath, download_tar};
 use chrono::{DateTime, Utc};
 use fs_err::{self as fs};
-use fs2::FileExt;
 use gem_version::GemVersion;
+use libherokubuildpack::inventory::Inventory;
 use libherokubuildpack::inventory::checksum::Checksum;
-use libherokubuildpack::inventory::{self, Inventory};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::io::Read;
-use std::io::Write;
 use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -94,62 +92,6 @@ pub async fn inventory_check(contents: &str) -> Result<(), Error> {
     }
 }
 
-fn atomic_file_contents<F, T>(path: &Path, f: F) -> Result<T, Box<dyn std::error::Error>>
-where
-    F: FnOnce(&mut std::fs::File, &str) -> Result<T, Box<dyn std::error::Error>>,
-{
-    fs::create_dir_all(
-        path.parent().ok_or_else(|| {
-            Error::Other(format!("Cannot determine parent from {}", path.display()))
-        })?,
-    )
-    .map_err(Error::FsError)?;
-
-    let mut file: std::fs::File = fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(path)?
-        .into();
-    file.lock_exclusive()?;
-    use std::io::Seek;
-
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).map_err(Error::FsError)?;
-    file.rewind()?;
-    let result: Result<T, Box<dyn std::error::Error>> = f(&mut file, &contents);
-    fs2::FileExt::unlock(&file)?;
-    result
-}
-
-pub fn atomic_inventory_update<F>(path: &Path, f: F) -> Result<(), Box<dyn std::error::Error>>
-where
-    F: FnOnce(
-        &mut Inventory<GemVersion, Sha256, ArtifactMetadata>,
-    ) -> Result<(), Box<dyn std::error::Error>>,
-{
-    atomic_file_contents(path, |file, contents| {
-        let mut inventory = parse_inventory(contents)?;
-        f(&mut inventory)?;
-        write!(file, "{inventory}").map_err(Error::FsError)?;
-        Ok(())
-    })
-}
-
-fn parse_inventory(
-    contents: &str,
-) -> Result<Inventory<GemVersion, Sha256, ArtifactMetadata>, Error> {
-    if contents.trim().is_empty() {
-        Ok(Inventory {
-            artifacts: Vec::new(),
-        })
-    } else {
-        contents
-            .parse::<Inventory<GemVersion, Sha256, ArtifactMetadata>>()
-            .map_err(|e| Error::Other(format!("Error {e} parsing inventory:\n{contents}")))
-    }
-}
-
 /// Returns the sha256 hash of the file at the given path
 pub fn sha256_from_path(path: &Path) -> Result<String, Error> {
     digest::<Sha256>(fs::File::open(path).map_err(Error::FsError)?)
@@ -180,143 +122,4 @@ where
     }
 
     Ok(digest.finalize_fixed())
-}
-
-/// Raises an error if the same URL has a different checksum
-///
-/// This protects against the (reasonably) unlikely event that the same version generates a checksum with the same first 7 characters but a net different checksum.
-/// While unlikely, it's still possible. If we didn't guard against this case, then it could break people's builds who are relying on the old checksum
-/// no not change.
-pub fn artifact_same_url_different_checksum(
-    a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-    b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    if a.url == b.url && a.checksum != b.checksum {
-        Err(format!(
-            "Duplicate url {url} has different checksums {a_checksum} != {b_checksum}",
-            url = a.url,
-            a_checksum = hex::encode(&a.checksum.value),
-            b_checksum = hex::encode(&b.checksum.value)
-        )
-        .into())
-    } else {
-        Ok(())
-    }
-}
-
-pub fn artifact_is_different(
-    a: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-    b: &inventory::artifact::Artifact<GemVersion, Sha256, ArtifactMetadata>,
-) -> bool {
-    a.version != b.version
-        || a.arch != b.arch
-        || a.metadata.distro_version != b.metadata.distro_version
-}
-
-#[cfg(test)]
-mod test {
-    use crate::BaseImage;
-    use inventory::artifact::Artifact;
-    use std::io::Write;
-    use std::str::FromStr;
-
-    use super::*;
-
-    #[test]
-    fn test_same_url_different_checksum_raises_error() {
-        let a = Artifact {
-            os: inventory::artifact::Os::Linux,
-            arch: inventory::artifact::Arch::Amd64,
-            version: GemVersion::from_str("1.0.0").unwrap(),
-            checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
-                .parse()
-                .unwrap(),
-            metadata: ArtifactMetadata {
-                timestamp: Utc::now(),
-                distro_version: BaseImage::new("heroku-24").unwrap().distro_version(),
-            },
-            url: "https://example.com".to_string(),
-        };
-
-        let b = a.clone();
-        artifact_same_url_different_checksum(&a, &b).unwrap();
-
-        let mut b = a.clone();
-        b.checksum = "sha256:7bebeee1b9128bdbb290331b813fa01cf43e30cd0098286f7de011796cb8eee5"
-            .parse()
-            .unwrap();
-        assert!(artifact_same_url_different_checksum(&a, &b).is_err());
-    }
-
-    #[test]
-    fn test_is_not_version_match() {
-        let a = Artifact {
-            os: inventory::artifact::Os::Linux,
-            arch: inventory::artifact::Arch::Amd64,
-            version: GemVersion::from_str("1.0.0").unwrap(),
-            checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
-                .parse()
-                .unwrap(),
-            metadata: ArtifactMetadata {
-                timestamp: Utc::now(),
-                distro_version: BaseImage::new("heroku-24").unwrap().distro_version(),
-            },
-            url: "https://example.com".to_string(),
-        };
-
-        let b = a.clone();
-        assert!(!artifact_is_different(&a, &b));
-
-        let mut b = a.clone();
-        b.version = GemVersion::from_str("1.0.1").unwrap();
-        assert!(artifact_is_different(&a, &b));
-
-        let mut b = a.clone();
-        b.arch = inventory::artifact::Arch::Arm64;
-        assert!(artifact_is_different(&a, &b));
-
-        let mut b = a.clone();
-        b.metadata.distro_version = BaseImage::new("heroku-22").unwrap().distro_version();
-        assert!(artifact_is_different(&a, &b));
-    }
-
-    #[test]
-    fn test_append_inventory() {
-        let temp = tempfile::tempdir().expect("Tempdir");
-        let path = temp.path().join("inventory.toml");
-        let artifact = Artifact {
-            os: inventory::artifact::Os::Linux,
-            arch: inventory::artifact::Arch::Amd64,
-            version: GemVersion::from_str("1.0.0").unwrap(),
-            checksum: "sha256:dd073bda5665e758c3e6f861a6df435175c8e8faf5ec75bc2afaab1e3eebb2c7"
-                .parse()
-                .unwrap(),
-            metadata: ArtifactMetadata {
-                timestamp: Utc::now(),
-                distro_version: BaseImage::new("heroku-24").unwrap().distro_version(),
-            },
-            url: "https://example.com".to_string(),
-        };
-
-        atomic_file_contents(&path, |file, contents| {
-            let mut inventory = parse_inventory(contents)?;
-            inventory.push(artifact.clone());
-            write!(file, "{inventory}").expect("Writeable file");
-            Ok(())
-        })
-        .unwrap();
-
-        let inventory = parse_inventory(&fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(1, inventory.artifacts.len());
-
-        atomic_file_contents(&path, |file, contents| {
-            let mut inventory = parse_inventory(contents)?;
-            inventory.push(artifact.clone());
-            write!(file, "{inventory}").expect("Writeable file");
-            Ok(())
-        })
-        .unwrap();
-        let inventory = parse_inventory(&fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(2, inventory.artifacts.len());
-    }
 }

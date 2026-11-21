@@ -26,7 +26,6 @@ chrono = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
 libherokubuildpack = { workspace = true }
-fs2 = { workspace = true }
 hex = { workspace = true }
 gem_version = { workspace = true }
 tokio = { workspace = true }
