@@ -35,6 +35,10 @@ impl<T> NonEmpty<T> {
     pub fn last(&self) -> &T {
         self.0.last().expect("non-empty")
     }
+
+    pub fn map<U>(self, f: impl FnMut(T) -> U) -> NonEmpty<U> {
+        NonEmpty(self.0.into_iter().map(f).collect())
+    }
 }
 
 impl<T> Deref for NonEmpty<T> {
@@ -56,6 +60,15 @@ impl<T> DerefMut for NonEmpty<T> {
 impl<T> Extend<T> for NonEmpty<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         self.0.extend(iter);
+    }
+}
+
+impl<T> IntoIterator for NonEmpty<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
@@ -85,5 +98,25 @@ impl<T> TryFrom<Vec<T>> for NonEmpty<T> {
         } else {
             Ok(NonEmpty(value))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn map_keeps_every_item_in_order() {
+        let mut items = NonEmpty::new(1);
+        items.push(2);
+        assert_eq!(items.map(|n| n * 10), NonEmpty(vec![10, 20]));
+    }
+
+    #[test]
+    fn into_iter_yields_owned_items() {
+        let mut items = NonEmpty::new(String::from("a"));
+        items.push(String::from("b"));
+        let owned: Vec<String> = items.into_iter().collect();
+        assert_eq!(owned, vec!["a", "b"]);
     }
 }
