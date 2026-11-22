@@ -6,8 +6,10 @@
 //! four segments to keep its own version distinct from the Ruby version it
 //! implements (e.g. JRuby `9.4.7.0` implements Ruby `3.1.x`).
 
+use gem_version::GemVersion;
 use shared::MajorMinor;
 use std::fmt;
+use std::str::FromStr;
 use winnow::Parser;
 use winnow::ascii::dec_uint;
 use winnow::combinator::{eof, seq};
@@ -39,6 +41,13 @@ pub struct ParseError {
     input: String,
     offset: usize,
     inner: winnow::error::ContextError,
+}
+
+impl From<&JRubyVersion> for GemVersion {
+    fn from(value: &JRubyVersion) -> Self {
+        GemVersion::from_str(&value.to_string())
+            .expect("major.minor.patch.extra to be valid gem version")
+    }
 }
 
 impl fmt::Display for ParseError {

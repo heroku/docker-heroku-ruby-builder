@@ -7,10 +7,14 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use jruby_executable::github_releases::{self, RELEASES_URL, s3_url_to_check};
+use gem_version::GemVersion;
+use jruby_executable::github_releases::{self, RELEASES_URL};
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use shared::github::{GitHubToken, GitHubTokenArg};
-use shared::{NonEmpty, RubyDownloadVersion, RubyInventory, S3Presence, s3_presence};
+use shared::inventory_sync::{SyncReport, Wanted, sync_inventory_file};
+use shared::{ArtifactKey, NonEmpty, RubyDownloadVersion, RubyInventory, build_matrix, s3_url};
+use std::collections::BTreeMap;
+use std::path::Path;
 use std::{error::Error, path::PathBuf};
 use tokio::task::JoinSet;
 
@@ -60,15 +64,21 @@ async fn resolve_stdlib_version(
     Ok((version, stdlib))
 }
 
-/// Check whether `version`'s prebuilt binary already exists on S3 for every
-/// supported base image and supported architecture
-async fn check_version_on_s3(
-    version: JRubyVersion,
-    ruby_stdlib_version: RubyDownloadVersion,
-) -> Result<(JRubyVersion, S3Presence), shared::Error> {
-    let presence =
-        s3_presence(|target| s3_url_to_check(&version, &ruby_stdlib_version, target)).await?;
-    Ok((version, presence))
+fn wanted(version: &JRubyVersion, ruby_stdlib_version: &RubyDownloadVersion) -> Vec<Wanted> {
+    let gem_version: GemVersion = version.into();
+    build_matrix()
+        .into_iter()
+        .map(|target| Wanted {
+            url: s3_url(
+                &Path::new(target.base_image.name())
+                    .join(format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz")),
+            ),
+            key: ArtifactKey {
+                version: gem_version.clone(),
+                target,
+            },
+        })
+        .collect()
 }
 
 /// Attaches human-facing stage context (e.g. "resolving stdlib version") to a
@@ -93,7 +103,7 @@ async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     // erasure, not stringification: the boxed error still carries its source chain;
     // a `String` would throw that away. Text is produced only when we print/return.
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
-    let inventory = fs::read_to_string(&args.inventory)
+    let mut inventory = fs::read_to_string(&args.inventory)
         .map_err(Box::<dyn Error>::from)
         .and_then(|contents| {
             contents
@@ -151,46 +161,43 @@ async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
         }
     }
 
-    print::bullet("Check S3 for missing binaries");
-    let mut s3_set = JoinSet::new();
+    let mut by_gem_version = BTreeMap::new();
+    let mut all_wanted = Vec::new();
     for (version, stdlib) in resolved {
-        s3_set.spawn(check_version_on_s3(version, stdlib));
+        let wanted = wanted(&version, &stdlib);
+        by_gem_version.insert(wanted[0].key.version.clone(), version);
+        all_wanted.extend(wanted);
     }
 
-    let mut versions_to_build = Vec::new();
-    while let Some(result) = s3_set.join_next().await {
-        match result {
-            Ok(Ok((version, presence))) if presence.missing().next().is_none() => {
-                if errors.is_empty() {
-                    print::sub_bullet(format!("{version}: all binaries present"));
-                }
-            }
-            Ok(Ok((version, presence))) => {
-                let missing = presence
-                    .missing()
-                    .map(|target| format!("{}/{}", target.base_image.name(), target.arch))
-                    .collect::<Vec<_>>();
-                print::sub_bullet(format!(
-                    "{version}: missing {} base image(s): {}",
-                    missing.len(),
-                    missing.join(", ")
-                ));
-                versions_to_build.push(version);
-            }
-            Ok(Err(e)) => {
-                print::warning(format!("Error checking version: {e}"));
-                errors.push(Box::new(StageError {
-                    context: "checking S3 for version".to_string(),
-                    source: e.into(),
-                }));
-            }
-            Err(join_err) => {
-                print::warning(format!("Task panicked checking version: {join_err}"));
-                errors.push(Box::new(StageError {
-                    context: "task panicked checking S3 for version".to_string(),
-                    source: Box::new(join_err),
-                }));
-            }
+    print::bullet(format!(
+        "Looking up {} builds on S3 that the inventory does not list",
+        all_wanted.len()
+    ));
+    let report = match sync_inventory_file(&args.inventory, &mut inventory, all_wanted).await {
+        Ok(report) => report,
+        Err(error) => {
+            errors.push(error.into());
+            SyncReport::default()
+        }
+    };
+    for key in &report.added {
+        print::sub_bullet(format!("Added {key}"));
+    }
+    errors.extend(
+        report
+            .errors
+            .into_iter()
+            .map(|error| Box::new(error) as Box<dyn Error>),
+    );
+
+    let mut versions_to_build = Vec::<JRubyVersion>::new();
+    for key in &report.missing {
+        let Some(version) = by_gem_version.get(&key.version) else {
+            continue;
+        };
+        print::sub_bullet(format!("Missing {key}"));
+        if !versions_to_build.contains(version) {
+            versions_to_build.push(version.clone());
         }
     }
 
