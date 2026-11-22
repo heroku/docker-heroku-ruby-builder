@@ -140,12 +140,10 @@ async fn main() {
     if errors.is_empty() {
         print::bullet("done");
     } else {
-        let errors = errors
-            .into_iter()
-            .map(|error| format!("- {error}"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        print::error(format!("Failed\n\n{errors}"));
+        print::error("❌ Failed ❌");
+        for error in &errors {
+            print::bullet(error.to_string());
+        }
         std::process::exit(1);
     }
 }
