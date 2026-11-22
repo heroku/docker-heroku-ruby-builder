@@ -10,7 +10,7 @@ use fs_err as fs;
 use jruby_executable::github_releases::{self, RELEASES_URL, s3_url_to_check};
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use shared::github::{GitHubToken, GitHubTokenArg};
-use shared::{NonEmpty, RubyDownloadVersion, S3Presence, s3_presence};
+use shared::{NonEmpty, RubyDownloadVersion, RubyInventory, S3Presence, s3_presence};
 use std::{error::Error, path::PathBuf};
 use tokio::task::JoinSet;
 
@@ -27,6 +27,10 @@ struct Args {
     /// Path to write JSON output file containing versions that need builds
     #[arg(long = "output", required = true)]
     output: PathBuf,
+
+    /// Path to an inventory file e.g. `jruby_inventory.toml`
+    #[arg(long)]
+    inventory: PathBuf,
 }
 
 /// Keep only the releases at or above `minimum`, narrowing the full release
@@ -89,6 +93,18 @@ async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     // erasure, not stringification: the boxed error still carries its source chain;
     // a `String` would throw that away. Text is produced only when we print/return.
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
+    let inventory = fs::read_to_string(&args.inventory)
+        .map_err(Box::<dyn Error>::from)
+        .and_then(|contents| {
+            contents
+                .parse::<RubyInventory>()
+                .map_err(Box::<dyn Error>::from)
+        })
+        .map_err(NonEmpty::new)?;
+    print::bullet(format!(
+        "Inventory lists {} builds",
+        inventory.artifacts().len()
+    ));
     let gh_token = &args.github.token;
     let releases = github_releases::fetch_releases(gh_token)
         .await
@@ -236,7 +252,7 @@ mod tests {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
         Check for JRuby releases missing from Heroku S3
 
-        Usage: jruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+        Usage: jruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT> --inventory <INVENTORY>
 
         Options:
               --gh-token <TOKEN>
@@ -245,6 +261,8 @@ mod tests {
                   Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be checked
               --output <OUTPUT>
                   Path to write JSON output file containing versions that need builds
+              --inventory <INVENTORY>
+                  Path to an inventory file e.g. `jruby_inventory.toml`
           -h, --help
                   Print help
         ");
