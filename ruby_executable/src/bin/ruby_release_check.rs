@@ -5,7 +5,8 @@ use reqwest::Url;
 use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
 use shared::{
-    BuildTarget, NonEmpty, RubyDownloadVersion, output_ruby_tar_path, s3_presence, s3_url,
+    BuildTarget, NonEmpty, RubyDownloadVersion, RubyInventory, output_ruby_tar_path, s3_presence,
+    s3_url,
 };
 use std::{
     error::Error,
@@ -25,6 +26,10 @@ struct Args {
     /// Path to write JSON output file containing versions that need builds
     #[arg(long = "output", required = true)]
     output: PathBuf,
+
+    /// Path to an inventory file e.g. `ruby_inventory.toml`
+    #[arg(long)]
+    inventory: PathBuf,
 }
 
 fn version_gte(version: &RubyDownloadVersion, minimum: &RubyDownloadVersion) -> bool {
@@ -69,6 +74,21 @@ async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
+    let inventory = match fs::read_to_string(&args.inventory)
+        .map_err(Box::<dyn Error>::from)
+        .and_then(|contents| {
+            contents
+                .parse::<RubyInventory>()
+                .map_err(Box::<dyn Error>::from)
+        }) {
+        Ok(inventory) => inventory,
+        Err(error) => return Err(NonEmpty::new(error)),
+    };
+    print::bullet(format!(
+        "Inventory lists {} builds",
+        inventory.artifacts().len()
+    ));
+
     print::h2(format!("Fetching releases from {}", *RELEASES_URL));
     let releases = match github::get_raw_with_retry(&RELEASES_URL, &args.github.token).await {
         Ok(response) => ruby_lang_versions(response.body).unwrap_drain_errs(&mut errors),
@@ -207,7 +227,7 @@ mod tests {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
         Check for Ruby releases missing from Heroku S3
 
-        Usage: ruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+        Usage: ruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT> --inventory <INVENTORY>
 
         Options:
               --gh-token <TOKEN>
@@ -216,6 +236,8 @@ mod tests {
                   Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked
               --output <OUTPUT>
                   Path to write JSON output file containing versions that need builds
+              --inventory <INVENTORY>
+                  Path to an inventory file e.g. `ruby_inventory.toml`
           -h, --help
                   Print help
         ");
