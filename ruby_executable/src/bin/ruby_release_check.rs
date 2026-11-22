@@ -1,18 +1,21 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
+use gem_version::GemVersion;
 use reqwest::Url;
 use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
+use shared::inventory_sync::{SyncReport, Wanted, sync_inventory_file};
 use shared::{
-    BuildTarget, NonEmpty, RubyDownloadVersion, RubyInventory, output_ruby_tar_path, s3_presence,
-    s3_url,
+    ArtifactKey, BuildTarget, NonEmpty, RubyDownloadVersion, RubyInventory, build_matrix,
+    output_ruby_tar_path, s3_url,
 };
+use std::collections::BTreeMap;
+use std::str::FromStr;
 use std::{
     error::Error,
     path::{Path, PathBuf},
 };
-use tokio::task::JoinSet;
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
 struct Args {
@@ -58,15 +61,18 @@ fn tar_url(version: &RubyDownloadVersion, target: &BuildTarget) -> Url {
     ))
 }
 
-async fn check_version_on_s3(
-    version: RubyDownloadVersion,
-) -> Result<(RubyDownloadVersion, Vec<String>), shared::Error> {
-    let missing = s3_presence(|target| tar_url(&version, target))
-        .await?
-        .missing()
-        .map(|target| format!("{}/{}", target.base_image, target.arch))
-        .collect();
-    Ok((version, missing))
+fn wanted(version: &RubyDownloadVersion) -> Result<Vec<Wanted>, gem_version::VersionError> {
+    let gem_version = GemVersion::from_str(&version.bundler_format())?;
+    Ok(build_matrix()
+        .into_iter()
+        .map(|target| Wanted {
+            url: tar_url(version, &target),
+            key: ArtifactKey {
+                version: gem_version.clone(),
+                target,
+            },
+        })
+        .collect())
 }
 
 async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
@@ -74,7 +80,7 @@ async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
-    let inventory = match fs::read_to_string(&args.inventory)
+    let mut inventory = match fs::read_to_string(&args.inventory)
         .map_err(Box::<dyn Error>::from)
         .and_then(|contents| {
             contents
@@ -99,35 +105,47 @@ async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     };
     print::bullet(format!("Found {} total releases", releases.len()));
 
-    let versions_to_check = retain_releases_gte(&releases, &args.minimum_version);
-
-    print::bullet(format!(
-        "Checking {} versions on S3",
-        versions_to_check.len()
-    ));
-
-    let mut set = JoinSet::new();
-    for version in versions_to_check {
-        set.spawn(check_version_on_s3(version));
+    let mut by_gem_version = BTreeMap::new();
+    let mut all_wanted = Vec::new();
+    for version in retain_releases_gte(&releases, &args.minimum_version) {
+        match wanted(&version) {
+            Ok(wanted) => {
+                by_gem_version.insert(wanted[0].key.version.clone(), version);
+                all_wanted.extend(wanted);
+            }
+            Err(error) => errors.push(Box::new(error)),
+        }
     }
 
-    let mut versions_to_build = Vec::new();
-    while let Some(result) = set.join_next().await {
-        match result {
-            Ok(Ok((version, missing))) => {
-                if missing.is_empty() {
-                    print::sub_bullet(format!("{version}: all binaries present"));
-                } else {
-                    print::sub_bullet(format!(
-                        "{version}: missing {} combo(s): {}",
-                        missing.len(),
-                        missing.join(", ")
-                    ));
-                    versions_to_build.push(version);
-                }
-            }
-            Ok(Err(e)) => errors.push(e.into()),
-            Err(e) => errors.push(e.into()),
+    print::bullet(format!(
+        "Looking up {} builds on S3 that the inventory does not list",
+        all_wanted.len()
+    ));
+    let report = match sync_inventory_file(&args.inventory, &mut inventory, all_wanted).await {
+        Ok(report) => report,
+        Err(error) => {
+            errors.push(error.into());
+            SyncReport::default()
+        }
+    };
+    for key in &report.added {
+        print::sub_bullet(format!("Added {key}"));
+    }
+    errors.extend(
+        report
+            .errors
+            .into_iter()
+            .map(|error| Box::new(error) as Box<dyn Error>),
+    );
+
+    let mut versions_to_build = Vec::<RubyDownloadVersion>::new();
+    for key in &report.missing {
+        let Some(version) = by_gem_version.get(&key.version) else {
+            continue;
+        };
+        print::sub_bullet(format!("Missing {key}"));
+        if versions_to_build.last() != Some(version) {
+            versions_to_build.push(version.clone());
         }
     }
 
