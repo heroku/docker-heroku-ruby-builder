@@ -4,8 +4,9 @@ use fs_err as fs;
 use reqwest::Url;
 use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
-use shared::maybe_err::ResultVec;
-use shared::{BuildTarget, RubyDownloadVersion, output_ruby_tar_path, s3_presence, s3_url};
+use shared::{
+    BuildTarget, NonEmpty, RubyDownloadVersion, output_ruby_tar_path, s3_presence, s3_url,
+};
 use std::{
     error::Error,
     path::{Path, PathBuf},
@@ -63,7 +64,7 @@ async fn check_version_on_s3(
     Ok((version, missing))
 }
 
-async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
+async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     print::h2("Checking for new Ruby releases");
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
@@ -125,26 +126,21 @@ async fn call(args: Args) -> ResultVec<(), Box<dyn Error>> {
             print::sub_bullet(format!("{version}"));
         }
     }
-    errors.into_iter().map(Result::Err).collect()
+    NonEmpty::try_from(errors).map_or(Ok(()), Err)
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-    let errors: Vec<_> = call(args)
-        .await
-        .into_iter()
-        .filter_map(Result::err)
-        .collect();
-
-    if errors.is_empty() {
-        print::bullet("done");
-    } else {
-        print::error("❌ Failed ❌");
-        for error in &errors {
-            print::bullet(error.to_string());
+    match call(args).await {
+        Ok(()) => print::bullet("done"),
+        Err(errors) => {
+            print::error("❌ Failed ❌");
+            for error in &errors {
+                print::bullet(error.to_string());
+            }
+            std::process::exit(1);
         }
-        std::process::exit(1);
     }
 }
 
