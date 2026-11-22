@@ -10,7 +10,7 @@ use fs_err as fs;
 use jruby_executable::github_releases::{self, RELEASES_URL, s3_url_to_check};
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use shared::github::{GitHubToken, GitHubTokenArg};
-use shared::{RubyDownloadVersion, S3Presence, s3_presence};
+use shared::{NonEmpty, RubyDownloadVersion, S3Presence, s3_presence};
 use std::{error::Error, path::PathBuf};
 use tokio::task::JoinSet;
 
@@ -78,7 +78,7 @@ struct StageError {
     source: Box<dyn Error + Send + Sync>,
 }
 
-async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
+async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     print::h2("Checking for new JRuby releases");
     print::bullet(format!("Minimum version: {}", args.minimum_version));
 
@@ -180,9 +180,9 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
 
     fs::write(
         &args.output,
-        &serde_json::to_string_pretty(&versions_to_build).map_err(|e| vec![e.into()])?,
+        &serde_json::to_string_pretty(&versions_to_build).map_err(|e| NonEmpty::new(e.into()))?,
     )
-    .map_err(|e| vec![e.into()])?;
+    .map_err(|e| NonEmpty::new(e.into()))?;
 
     if versions_to_build.is_empty() && errors.is_empty() {
         print::bullet("All checked versions are present on S3");
@@ -193,11 +193,7 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
         }
     }
 
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
+    NonEmpty::try_from(errors).map_or(Ok(()), Err)
 }
 
 #[tokio::main]
