@@ -12,6 +12,7 @@ use libherokubuildpack::inventory::{Inventory, ParseInventoryError};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use sha2::digest::Output;
 use std::cmp::{Ordering, Reverse};
 use std::collections::BTreeMap;
 use std::fmt::{self, Display, Formatter};
@@ -342,7 +343,39 @@ pub enum InventoryCheckError {
     },
 
     #[error(transparent)]
-    Checksum(Error),
+    Checksum(ChecksumError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ChecksumError {
+    #[error("{url}: cannot create a temporary directory: {source}")]
+    TempDir {
+        url: Box<Url>,
+        source: std::io::Error,
+    },
+
+    #[error("{url}: {source}")]
+    Download { url: Box<Url>, source: Error },
+
+    #[error("{url}: cannot hash the downloaded file: {source}")]
+    Hash {
+        url: Box<Url>,
+        source: std::io::Error,
+    },
+
+    #[error("checksum task failed: {0}")]
+    Task(#[source] tokio::task::JoinError),
+
+    #[error(
+        "{url}: checksum mismatch, expected sha256:{} got sha256:{}",
+        hex::encode(&expected.value),
+        hex::encode(actual)
+    )]
+    Mismatch {
+        url: Box<Url>,
+        expected: Checksum<Sha256>,
+        actual: Output<Sha256>,
+    },
 }
 
 /// Validate an inventory change before merge
@@ -369,8 +402,8 @@ pub async fn inventory_check(
         return Ok(None);
     };
 
-    if let Err(error) = verify_checksums(artifacts_to_verify(&changes).map(Deref::deref)).await {
-        errors.push(InventoryCheckError::Checksum(error));
+    if let Err(failed) = verify_checksums(artifacts_to_verify(&changes)).await {
+        errors.extend(failed.map(InventoryCheckError::Checksum));
     }
 
     match NonEmpty::try_from(errors) {
@@ -428,55 +461,61 @@ fn artifacts_to_verify(changes: &NonEmpty<InventoryChange>) -> impl Iterator<Ite
 
 /// Download each artifact, generate its checksum, error if the value differs from the provided inventory.
 pub async fn verify_checksums<'a>(
-    artifacts: impl IntoIterator<Item = &'a InventoryArtifact>,
-) -> Result<(), Error> {
+    artifacts: impl IntoIterator<Item = &'a RubyArtifact>,
+) -> Result<(), NonEmpty<ChecksumError>> {
     let mut set = tokio::task::JoinSet::new();
     for artifact in artifacts.into_iter().cloned() {
-        set.spawn(async move {
-            let temp = tempfile::tempdir().map_err(|e| format!("Error {e}"))?;
-            let path = temp.path().join("file.tar");
-
-            download_tar(&artifact.url, &TarDownloadPath(path.clone()))
-                .await
-                .map_err(|e| format!("Error {e}"))?;
-
-            // Computing a file Hash is CPU bound <https://docs.rs/tokio/latest/tokio/index.html#cpu-bound-tasks-and-blocking-code>
-            let checksum_string: String = tokio::task::spawn_blocking(move || {
-                sha256_from_path(&path).map_err(|e| format!("Error {e}"))
-            })
-            .await
-            .map_err(|e| format!("Error {e}"))??;
-
-            let checksum: Checksum<Sha256> = format!("sha256:{checksum_string}")
-                .parse()
-                .map_err(|e| format!("Error {e}"))?;
-
-            if checksum == artifact.checksum {
-                Ok::<(), String>(())
-            } else {
-                Err(format!(
-                    "Checksum mismatch for {url} expected {expected} got {actual}",
-                    url = artifact.url,
-                    expected = hex::encode(&artifact.checksum.value),
-                    actual = hex::encode(&checksum.value)
-                ))
-            }
-        });
+        set.spawn(verify_checksum(artifact));
     }
 
     let mut errors = Vec::new();
     while let Some(joined) = set.join_next().await {
         match joined {
             Ok(Ok(())) => {}
-            Ok(Err(message)) => errors.push(message),
-            Err(join_error) => errors.push(format!("Error {join_error}")),
+            Ok(Err(error)) => errors.push(error),
+            Err(join_error) => errors.push(ChecksumError::Task(join_error)),
         }
     }
 
-    if errors.is_empty() {
+    match NonEmpty::try_from(errors) {
+        Ok(errors) => Err(errors),
+        Err(_) => Ok(()),
+    }
+}
+
+async fn verify_checksum(artifact: RubyArtifact) -> Result<(), ChecksumError> {
+    let url = Box::new(artifact.url().clone());
+    let temp = tempfile::tempdir().map_err(|source| ChecksumError::TempDir {
+        url: url.clone(),
+        source,
+    })?;
+    let path = temp.path().join("file.tar");
+
+    download_tar(url.as_str(), &TarDownloadPath(path.clone()))
+        .await
+        .map_err(|source| ChecksumError::Download {
+            url: url.clone(),
+            source,
+        })?;
+
+    // Computing a file Hash is CPU bound <https://docs.rs/tokio/latest/tokio/index.html#cpu-bound-tasks-and-blocking-code>
+    let actual =
+        tokio::task::spawn_blocking(move || fs::File::open(&path).and_then(digest::<Sha256>))
+            .await
+            .map_err(ChecksumError::Task)?
+            .map_err(|source| ChecksumError::Hash {
+                url: url.clone(),
+                source,
+            })?;
+
+    if actual.as_slice() == artifact.checksum.value {
         Ok(())
     } else {
-        Err(Error::Other(errors.join("\n")))
+        Err(ChecksumError::Mismatch {
+            url,
+            expected: artifact.checksum.clone(),
+            actual,
+        })
     }
 }
 
@@ -818,6 +857,42 @@ mod test {
         assert_eq!(errors.len(), 2);
         assert!(matches!(errors[0], InventoryCheckError::Old(_)));
         assert!(matches!(errors[1], InventoryCheckError::New(_)));
+    }
+
+    fn local_artifact(base: &str, version: &str, arch: Arch, path: &str) -> RubyArtifact {
+        let mut artifact = RubyArtifact::try_from(artifact(version, "heroku-24", arch)).unwrap();
+        artifact.url = parse_url(&format!("{base}{path}")).unwrap();
+        artifact
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn verify_checksums_reports_every_failed_artifact() {
+        let server = tiny_http::Server::http("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", server.server_addr());
+        std::thread::spawn(move || {
+            for request in server.incoming_requests() {
+                let response = if request.url() == "/missing.tgz" {
+                    tiny_http::Response::from_string("").with_status_code(404)
+                } else {
+                    tiny_http::Response::from_string("not the expected bytes")
+                };
+                let _ = request.respond(response);
+            }
+        });
+
+        let mismatched = local_artifact(&base, "3.4.0", Arch::Amd64, "/mismatched.tgz");
+        let missing = local_artifact(&base, "3.4.0", Arch::Arm64, "/missing.tgz");
+
+        let errors = verify_checksums([&mismatched, &missing]).await.unwrap_err();
+        assert_eq!(errors.len(), 2);
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            ChecksumError::Mismatch { url, .. } if **url == *mismatched.url()
+        )));
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            ChecksumError::Download { url, .. } if **url == *missing.url()
+        )));
     }
 
     #[test]
