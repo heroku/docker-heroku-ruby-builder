@@ -122,7 +122,18 @@ async fn call(args: Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
 
     print::bullet(format!("Found {} non-prerelease versions", releases.len()));
 
-    let versions_to_check = retain_releases_gte(&releases, &args.minimum_version);
+    let versions_to_check = retain_releases_gte(&releases, &args.minimum_version)
+        .into_iter()
+        .filter(|version| {
+            build_matrix()
+                .into_iter()
+                .map(|target| ArtifactKey {
+                    version: version.into(),
+                    target,
+                })
+                .any(|key| !inventory.contains(&key))
+        })
+        .collect::<Vec<_>>();
     print::bullet(format!(
         "Checking {} versions >= {}",
         versions_to_check.len(),
