@@ -27,8 +27,8 @@ pub struct ArtifactMetadata {
     pub distro_version: DistroVersion,
 }
 
-type InventoryFile = Inventory<GemVersion, Sha256, ArtifactMetadata>;
-type InventoryArtifact = Artifact<GemVersion, Sha256, ArtifactMetadata>;
+type RawInventory = Inventory<GemVersion, Sha256, ArtifactMetadata>;
+type RawArtifact = Artifact<GemVersion, Sha256, ArtifactMetadata>;
 
 /// Unique ordered version/target pairs
 ///
@@ -69,7 +69,7 @@ impl Display for VersionTarget {
 pub struct RubyArtifact {
     url: Url,
     base_image: BaseImage,
-    artifact: InventoryArtifact,
+    artifact: RawArtifact,
 }
 
 impl RubyArtifact {
@@ -89,23 +89,23 @@ impl RubyArtifact {
 }
 
 impl Deref for RubyArtifact {
-    type Target = InventoryArtifact;
+    type Target = RawArtifact;
 
     fn deref(&self) -> &Self::Target {
         &self.artifact
     }
 }
 
-impl From<RubyArtifact> for InventoryArtifact {
+impl From<RubyArtifact> for RawArtifact {
     fn from(artifact: RubyArtifact) -> Self {
         artifact.artifact
     }
 }
 
-impl TryFrom<InventoryArtifact> for RubyArtifact {
+impl TryFrom<RawArtifact> for RubyArtifact {
     type Error = ArtifactError;
 
-    fn try_from(artifact: InventoryArtifact) -> Result<Self, Self::Error> {
+    fn try_from(artifact: RawArtifact) -> Result<Self, Self::Error> {
         let version = artifact.version.clone();
         if artifact.os != Os::Linux {
             return Err(ArtifactError::UnsupportedOs {
@@ -206,10 +206,10 @@ impl RubyInventory {
     }
 }
 
-impl TryFrom<InventoryFile> for RubyInventory {
+impl TryFrom<RawInventory> for RubyInventory {
     type Error = InventoryError;
 
-    fn try_from(inventory: InventoryFile) -> Result<Self, Self::Error> {
+    fn try_from(inventory: RawInventory) -> Result<Self, Self::Error> {
         Self::new(
             inventory
                 .artifacts
@@ -226,7 +226,7 @@ impl FromStr for RubyInventory {
     fn from_str(contents: &str) -> Result<Self, Self::Err> {
         Self::try_from(
             contents
-                .parse::<InventoryFile>()
+                .parse::<RawInventory>()
                 .map_err(InventoryError::Parse)?,
         )
     }
@@ -234,7 +234,7 @@ impl FromStr for RubyInventory {
 
 impl Display for RubyInventory {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        InventoryFile {
+        RawInventory {
             artifacts: self.0.values().cloned().map(Into::into).collect(),
         }
         .fmt(f)
@@ -555,8 +555,8 @@ where
 mod test {
     use super::*;
 
-    fn artifact(version: &str, base_image: &str, arch: Arch) -> InventoryArtifact {
-        InventoryArtifact {
+    fn artifact(version: &str, base_image: &str, arch: Arch) -> RawArtifact {
+        RawArtifact {
             version: version.parse().unwrap(),
             os: Os::Linux,
             arch,
@@ -571,8 +571,8 @@ mod test {
         }
     }
 
-    fn inventory(artifacts: Vec<InventoryArtifact>) -> RubyInventory {
-        RubyInventory::try_from(InventoryFile { artifacts }).unwrap()
+    fn inventory(artifacts: Vec<RawArtifact>) -> RubyInventory {
+        RubyInventory::try_from(RawInventory { artifacts }).unwrap()
     }
 
     fn keys(inventory: &RubyInventory) -> Vec<String> {
@@ -582,8 +582,8 @@ mod test {
             .collect()
     }
 
-    fn unsorted_toml(artifacts: Vec<InventoryArtifact>) -> String {
-        InventoryFile { artifacts }.to_string()
+    fn unsorted_toml(artifacts: Vec<RawArtifact>) -> String {
+        RawInventory { artifacts }.to_string()
     }
 
     #[test]
@@ -636,7 +636,7 @@ mod test {
 
     #[test]
     fn rejects_duplicate_artifacts() {
-        let error = RubyInventory::try_from(InventoryFile {
+        let error = RubyInventory::try_from(RawInventory {
             artifacts: vec![
                 artifact("3.4.0", "heroku-24", Arch::Amd64),
                 artifact("3.4.0", "heroku-24", Arch::Amd64),
