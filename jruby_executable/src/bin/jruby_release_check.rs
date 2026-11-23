@@ -200,39 +200,16 @@ async fn call(args: Args) -> Result<(), Vec<Box<dyn Error>>> {
     }
 }
 
-/// Formats a string into a single bullet point item
-///
-/// Multi line text correctly lines up with the text above it instead of with the dash.
-fn bullet_point(s: impl AsRef<str>) -> String {
-    let input = s.as_ref();
-    if input.is_empty() {
-        String::from("- ")
-    } else {
-        input
-            .split_inclusive('\n')
-            .enumerate()
-            .map(|(line_index, line)| {
-                let prefix = if line_index == 0 { "- " } else { "  " };
-                prefix.to_string() + line
-            })
-            .collect()
-    }
-}
-
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
     match call(args).await {
         Ok(()) => print::bullet("Done"),
         Err(errors) => {
-            print::error(format!(
-                "Failed! Errors:\n{}",
-                errors
-                    .iter()
-                    .map(|error| bullet_point(error.to_string()))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ));
+            print::error("❌ Failed ❌");
+            for error in &errors {
+                print::bullet(error.to_string());
+            }
             std::process::exit(1);
         }
     }
@@ -242,19 +219,6 @@ async fn main() {
 mod tests {
     use super::*;
     use clap::CommandFactory;
-
-    #[test]
-    fn bullet_point_formatting() {
-        assert_eq!("- hello world", bullet_point("hello world"));
-        assert_eq!("- ", bullet_point(""));
-        assert_eq!(
-            indoc::indoc! {"
-                - hello
-                  world
-            "},
-            bullet_point("hello\nworld\n")
-        );
-    }
 
     #[test]
     fn test_retain_releases_gte() {
