@@ -7,7 +7,8 @@ use std::path::Path;
 use std::str::FromStr;
 use winnow::Parser;
 use winnow::ascii::dec_uint;
-use winnow::token::literal;
+use winnow::combinator::{eof, opt, preceded};
+use winnow::token::{literal, one_of, rest};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(into = "String", try_from = "String")]
@@ -15,7 +16,7 @@ pub struct RubyDownloadVersion {
     major: u32,
     minor: u32,
     patch: u32,
-    rest: String,
+    pre: Option<String>,
 }
 
 impl RubyDownloadVersion {
@@ -31,14 +32,27 @@ impl RubyDownloadVersion {
         self.patch
     }
 
-    fn sort_key(&self) -> (u32, u32, u32, bool, &str) {
+    fn sort_key(&self) -> (u32, u32, u32, bool, Option<&str>) {
         (
             self.major,
             self.minor,
             self.patch,
-            self.rest.is_empty(),
-            &self.rest,
+            self.pre.is_none(),
+            self.pre.as_deref(),
         )
+    }
+
+    fn format_with_separator(&self, separator: char) -> String {
+        let Self {
+            major,
+            minor,
+            patch,
+            pre,
+        } = self;
+        match pre {
+            Some(pre) => format!("{major}.{minor}.{patch}{separator}{pre}"),
+            None => format!("{major}.{minor}.{patch}"),
+        }
     }
 }
 
@@ -87,11 +101,7 @@ impl From<&RubyDownloadVersion> for GemVersion {
 
 impl Display for RubyDownloadVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}.{}.{}{}",
-            self.major, self.minor, self.patch, self.rest
-        )
+        f.write_str(&self.format_with_separator('-'))
     }
 }
 
@@ -109,15 +119,18 @@ fn parse_version(input: &mut &str) -> winnow::Result<RubyDownloadVersion> {
     let minor = dec_uint.parse_next(input)?;
     literal(".").parse_next(input)?;
     let patch = dec_uint.parse_next(input)?;
-
-    let rest = input.to_string();
-    *input = "";
+    let pre = opt(preceded(
+        one_of(['-', '.']),
+        rest.verify(|pre: &str| pre.starts_with(|c: char| c.is_ascii_alphabetic())),
+    ))
+    .parse_next(input)?;
+    eof.parse_next(input)?;
 
     Ok(RubyDownloadVersion {
         major,
         minor,
         patch,
-        rest,
+        pre: pre.map(str::to_string),
     })
 }
 
@@ -137,21 +150,13 @@ impl RubyDownloadVersion {
 
     /// Returns the Some containing the full release version if it is a prerelease version
     pub fn is_prerelease(&self) -> Option<String> {
-        if self.rest.is_empty() {
-            None
-        } else {
-            Some(format!("{}.{}.{}", self.major, self.minor, self.patch))
-        }
+        self.pre
+            .as_ref()
+            .map(|_| format!("{}.{}.{}", self.major, self.minor, self.patch))
     }
 
     pub fn bundler_format(&self) -> String {
-        format!(
-            "{}.{}.{}{}",
-            self.major,
-            self.minor,
-            self.patch,
-            self.rest.replacen('-', ".", 1)
-        )
+        self.format_with_separator('.')
     }
 
     pub fn dir_name_format(&self) -> String {
@@ -194,9 +199,32 @@ mod test {
     }
 
     #[test]
+    fn parses_the_bundler_format_as_the_download_format() {
+        let bundler = RubyDownloadVersion::new("4.1.0.preview1").unwrap();
+        let download = RubyDownloadVersion::new("4.1.0-preview1").unwrap();
+        assert_eq!(bundler, download);
+        assert_eq!(bundler.to_string(), "4.1.0-preview1");
+        assert_eq!(bundler.bundler_format(), "4.1.0.preview1");
+        assert_eq!(
+            bundler.download_url(),
+            "https://cache.ruby-lang.org/pub/ruby/4.1/ruby-4.1.0-preview1.tar.gz"
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_prereleases() {
+        assert!(RubyDownloadVersion::new("3.4.0.1").is_err());
+        assert!(RubyDownloadVersion::new("3.4.0-1").is_err());
+        assert!(RubyDownloadVersion::new("3.4.0-").is_err());
+        assert!(RubyDownloadVersion::new("3.4.0rc1").is_err());
+    }
+
+    #[test]
     fn rejects_versions_that_are_not_gem_versions() {
         assert!(RubyDownloadVersion::new("3.4.0 foo").is_err());
         assert!(RubyDownloadVersion::new("3.4.0-.1").is_err());
+        assert!(RubyDownloadVersion::new("3.4.0-rc 1").is_err());
+        assert!(RubyDownloadVersion::new("3.4.0.rc..1").is_err());
     }
 
     #[test]
