@@ -176,7 +176,7 @@ pub fn validate_version_for_stack(
     ruby_version: &RubyDownloadVersion,
     base_image: &BaseImage,
 ) -> Result<(), Error> {
-    if base_image.name() == "heroku-22" && ruby_version.major == 3 && ruby_version.minor == 0 {
+    if base_image.name() == "heroku-22" && ruby_version.major() == 3 && ruby_version.minor() == 0 {
         return Err(Error::InvalidVersionForStack {
             version: ruby_version.bundler_format(),
             stack: base_image.to_string(),

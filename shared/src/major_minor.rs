@@ -1,4 +1,3 @@
-use crate::RubyDownloadVersion;
 use std::fmt;
 use std::str::FromStr;
 
@@ -31,15 +30,6 @@ impl FromStr for MajorMinor {
                 })
             })
             .ok_or_else(|| MajorMinorError(s.to_string()))
-    }
-}
-
-impl From<&RubyDownloadVersion> for MajorMinor {
-    fn from(version: &RubyDownloadVersion) -> Self {
-        MajorMinor {
-            major: version.major,
-            minor: version.minor,
-        }
     }
 }
 

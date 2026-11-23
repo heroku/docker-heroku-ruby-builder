@@ -23,8 +23,8 @@ struct Args {
 }
 
 fn version_gte(version: &RubyDownloadVersion, minimum: &RubyDownloadVersion) -> bool {
-    let version_tuple = (version.major, version.minor, version.patch);
-    let minimum_tuple = (minimum.major, minimum.minor, minimum.patch);
+    let version_tuple = (version.major(), version.minor(), version.patch());
+    let minimum_tuple = (minimum.major(), minimum.minor(), minimum.patch());
     version_tuple >= minimum_tuple
 }
 

@@ -1,4 +1,4 @@
-use crate::{BuildTarget, Error, output_ruby_tar_path, s3_url};
+use crate::{BuildTarget, Error, MajorMinor, output_ruby_tar_path, s3_url};
 use gem_version::GemVersion;
 use reqwest::Url;
 use std::cmp::Ordering;
@@ -12,13 +12,25 @@ use winnow::token::literal;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(into = "String", try_from = "String")]
 pub struct RubyDownloadVersion {
-    pub major: u32,
-    pub minor: u32,
-    pub patch: u32,
-    pub rest: String,
+    major: u32,
+    minor: u32,
+    patch: u32,
+    rest: String,
 }
 
 impl RubyDownloadVersion {
+    pub fn major(&self) -> u32 {
+        self.major
+    }
+
+    pub fn minor(&self) -> u32 {
+        self.minor
+    }
+
+    pub fn patch(&self) -> u32 {
+        self.patch
+    }
+
     fn sort_key(&self) -> (u32, u32, u32, bool, &str) {
         (
             self.major,
@@ -54,6 +66,15 @@ impl TryFrom<String> for RubyDownloadVersion {
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
         s.parse()
+    }
+}
+
+impl From<&RubyDownloadVersion> for MajorMinor {
+    fn from(version: &RubyDownloadVersion) -> Self {
+        MajorMinor {
+            major: version.major,
+            minor: version.minor,
+        }
     }
 }
 
