@@ -5,9 +5,10 @@ use indoc::formatdoc;
 use jruby_executable::{JRubyVersion, jruby_build_properties};
 use libherokubuildpack::inventory::artifact::Arch;
 use shared::github::GitHubTokenArg;
+use shared::inventory::sha256_from_path;
 use shared::{
     BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar, s3_url,
-    s3_url_exists, sha256_from_path, tar_dir_to_file, untar_to_dir, write_job_metadata,
+    s3_url_exists, tar_dir_to_file, untar_to_dir, write_job_metadata,
 };
 use std::convert::From;
 use std::error::Error;

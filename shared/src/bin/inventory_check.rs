@@ -1,7 +1,8 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use shared::{AllowedChanges, NonEmpty, inventory_check};
+use shared::NonEmpty;
+use shared::inventory::{AllowedChanges, inventory_check};
 use std::error::Error;
 use std::path::PathBuf;
 
