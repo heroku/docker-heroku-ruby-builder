@@ -1,4 +1,5 @@
 use crate::Error;
+use gem_version::GemVersion;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::str::FromStr;
@@ -54,6 +55,13 @@ impl TryFrom<String> for RubyDownloadVersion {
     }
 }
 
+impl From<&RubyDownloadVersion> for GemVersion {
+    fn from(version: &RubyDownloadVersion) -> Self {
+        GemVersion::from_str(&version.bundler_format())
+            .expect("RubyDownloadVersion::new validates the bundler format as a GemVersion")
+    }
+}
+
 impl Display for RubyDownloadVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -93,6 +101,10 @@ fn parse_version(input: &mut &str) -> winnow::Result<RubyDownloadVersion> {
 impl RubyDownloadVersion {
     pub fn new(s: impl AsRef<str>) -> Result<Self, Error> {
         let version = parse_version(&mut s.as_ref()).map_err(|err| Error::InvalidVersion {
+            version: s.as_ref().to_string(),
+            reason: err.to_string(),
+        })?;
+        GemVersion::from_str(&version.bundler_format()).map_err(|err| Error::InvalidVersion {
             version: s.as_ref().to_string(),
             reason: err.to_string(),
         })?;
@@ -150,17 +162,18 @@ mod test {
     }
 
     #[test]
+    fn rejects_versions_that_are_not_gem_versions() {
+        assert!(RubyDownloadVersion::new("3.4.0 foo").is_err());
+        assert!(RubyDownloadVersion::new("3.4.0-.1").is_err());
+    }
+
+    #[test]
     fn test_pre_version_serialization() {
-        let version = gem_version::GemVersion::from_str(
-            &RubyDownloadVersion::new("4.0.0-preview2")
-                .unwrap()
-                .bundler_format(),
-        )
-        .unwrap();
+        let version = GemVersion::from(&RubyDownloadVersion::new("4.0.0-preview2").unwrap());
 
         #[derive(Serialize)]
         struct FakeInventory {
-            version: gem_version::GemVersion,
+            version: GemVersion,
         }
 
         assert_eq!(

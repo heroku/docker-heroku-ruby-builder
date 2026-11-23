@@ -7,6 +7,7 @@
 //! implements (e.g. JRuby `9.4.7.0` implements Ruby `3.1.x`).
 
 use crate::MajorMinor;
+use gem_version::GemVersion;
 use std::fmt;
 use winnow::Parser;
 use winnow::ascii::dec_uint;
@@ -66,6 +67,15 @@ impl From<&JRubyVersion> for MajorMinor {
             major: version.major,
             minor: version.minor,
         }
+    }
+}
+
+impl From<&JRubyVersion> for GemVersion {
+    fn from(version: &JRubyVersion) -> Self {
+        version
+            .to_string()
+            .parse()
+            .expect("four numeric segments are a valid GemVersion")
     }
 }
 
@@ -197,6 +207,12 @@ mod tests {
                 expected end of input"},
             JRubyVersion::parse("9.4.7.0 ").unwrap_err().to_string(),
         );
+    }
+
+    #[test]
+    fn test_into_gem_version() {
+        let v = JRubyVersion::parse("9.4.7.0").unwrap();
+        assert_eq!(GemVersion::from(&v).to_string(), "9.4.7.0");
     }
 
     #[test]
