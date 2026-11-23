@@ -944,6 +944,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "inventory"
+version = "0.0.0"
+dependencies = [
+ "bullet_stream",
+ "clap",
+ "fs-err",
+ "insta",
+ "shared",
+ "tokio",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1677,7 +1689,6 @@ dependencies = [
 name = "shared"
 version = "0.0.0"
 dependencies = [
- "bullet_stream",
  "chrono",
  "clap",
  "flate2",

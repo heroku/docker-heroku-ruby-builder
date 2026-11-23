@@ -3,10 +3,6 @@ name = "shared"
 edition.workspace = true
 rust-version.workspace = true
 
-[[bin]]
-name = "inventory_check"
-path = "src/bin/inventory_check.rs"
-
 [dependencies]
 clap = { workspace = true }
 indoc = { workspace = true }
@@ -19,7 +15,6 @@ reqwest = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
-bullet_stream = { workspace = true }
 sha2 = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
