@@ -51,12 +51,14 @@ pub mod devcenter;
 mod download_ruby_version;
 pub mod github;
 pub mod inventory;
+pub mod jruby_version;
 mod major_minor;
 pub mod maybe_err;
 mod non_empty;
 
 pub use base_image::{BaseImage, BuildTarget, UnknownDistroVersion, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
+pub use jruby_version::JRubyVersion;
 pub use major_minor::{MajorMinor, MajorMinorError};
 pub use non_empty::{NonEmpty, NonEmptyError};
 

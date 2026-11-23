@@ -1,8 +1,9 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use indoc::formatdoc;
-use jruby_executable::{JRubyVersion, jruby_build_properties};
+use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory::artifact::Arch;
+use shared::JRubyVersion;
 use shared::github::GitHubTokenArg;
 use shared::{BaseImage, source_dir};
 use std::error::Error;

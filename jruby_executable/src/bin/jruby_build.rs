@@ -2,8 +2,9 @@ use bullet_stream::{global::print, style};
 use clap::Parser;
 use fs_err::{self as fs, PathExt};
 use indoc::formatdoc;
-use jruby_executable::{JRubyVersion, jruby_build_properties};
+use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory::artifact::Arch;
+use shared::JRubyVersion;
 use shared::github::GitHubTokenArg;
 use shared::inventory::sha256_from_path;
 use shared::{

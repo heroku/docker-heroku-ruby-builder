@@ -6,7 +6,7 @@
 //! four segments to keep its own version distinct from the Ruby version it
 //! implements (e.g. JRuby `9.4.7.0` implements Ruby `3.1.x`).
 
-use shared::MajorMinor;
+use crate::MajorMinor;
 use std::fmt;
 use winnow::Parser;
 use winnow::ascii::dec_uint;

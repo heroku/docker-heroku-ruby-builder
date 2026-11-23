@@ -2,8 +2,9 @@
 
 use crate::{CheckError, join_all};
 use jruby_executable::github_releases::s3_url_to_check;
-use jruby_executable::{JRubyVersion, jruby_build_properties};
+use jruby_executable::jruby_build_properties;
 use minijinja::{Value, context};
+use shared::JRubyVersion;
 use shared::github::GitHubToken;
 use shared::{BaseImage, MajorMinor, RubyDownloadVersion, s3_presence};
 use std::collections::{BTreeMap, BTreeSet};
