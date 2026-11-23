@@ -34,25 +34,25 @@ type InventoryArtifact = Artifact<GemVersion, Sha256, ArtifactMetadata>;
 ///
 /// For example ruby-4.0.10 (version) on Ubuntu 26.04 for ARM (target)
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ArtifactKey {
+pub struct VersionTarget {
     pub version: GemVersion,
     pub target: BuildTarget,
 }
 
 /// Sort descending so that larger version numbers are shown first.
-impl Ord for ArtifactKey {
+impl Ord for VersionTarget {
     fn cmp(&self, other: &Self) -> Ordering {
         (Reverse(&self.version), &self.target).cmp(&(Reverse(&other.version), &other.target))
     }
 }
 
-impl PartialOrd for ArtifactKey {
+impl PartialOrd for VersionTarget {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Display for ArtifactKey {
+impl Display for VersionTarget {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -77,8 +77,8 @@ impl RubyArtifact {
         &self.url
     }
 
-    pub fn key(&self) -> ArtifactKey {
-        ArtifactKey {
+    pub fn key(&self) -> VersionTarget {
+        VersionTarget {
             version: self.artifact.version.clone(),
             target: BuildTarget {
                 base_image: self.base_image.clone(),
@@ -127,7 +127,7 @@ impl TryFrom<InventoryArtifact> for RubyArtifact {
                 arch: artifact.arch,
             });
         }
-        let key = ArtifactKey {
+        let key = VersionTarget {
             version,
             target: BuildTarget {
                 base_image: base_image.clone(),
@@ -174,12 +174,12 @@ pub enum ArtifactError {
 
     #[error("{key}: {source}")]
     InvalidUrl {
-        key: ArtifactKey,
+        key: VersionTarget,
         source: UrlParseError,
     },
 
     #[error("{key}: url {url} is not under {S3_BASE_URL}")]
-    UrlOutsideBucket { key: ArtifactKey, url: Box<Url> },
+    UrlOutsideBucket { key: VersionTarget, url: Box<Url> },
 }
 
 /// Represents an inventory file in memory e.g. `ruby_inventory.toml`
@@ -187,7 +187,7 @@ pub enum ArtifactError {
 /// Versions (e.g. `4.0.10`) per target (e.g. Ubuntu 26.04 on ARM) are
 /// guaranteed to be unique and consistently ordered in memory
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct RubyInventory(BTreeMap<ArtifactKey, RubyArtifact>);
+pub struct RubyInventory(BTreeMap<VersionTarget, RubyArtifact>);
 
 impl RubyInventory {
     pub fn new(artifacts: Vec<RubyArtifact>) -> Result<Self, InventoryError> {
@@ -250,7 +250,7 @@ pub enum InventoryError {
     Artifact(#[from] ArtifactError),
 
     #[error("{0}: listed more than once")]
-    Duplicate(ArtifactKey),
+    Duplicate(VersionTarget),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -264,7 +264,7 @@ pub enum InventoryChange {
 }
 
 impl InventoryChange {
-    pub fn key(&self) -> ArtifactKey {
+    pub fn key(&self) -> VersionTarget {
         match self {
             Self::Added(artifact) | Self::Removed(artifact) => artifact.key(),
             Self::Replaced { new, .. } => new.key(),
