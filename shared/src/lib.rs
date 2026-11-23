@@ -53,15 +53,18 @@ pub mod github;
 mod inventory_help;
 mod major_minor;
 pub mod maybe_err;
+mod non_empty;
 
-pub use base_image::{BaseImage, BuildTarget, build_matrix};
+pub use base_image::{BaseImage, BuildTarget, UnknownDistroVersion, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
 pub use major_minor::{MajorMinor, MajorMinorError};
+pub use non_empty::{NonEmpty, NonEmptyError};
 
 pub static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
 pub use inventory_help::{
-    ArtifactMetadata, artifact_is_different, artifact_same_url_different_checksum,
-    atomic_inventory_update, inventory_check, sha256_from_path,
+    AllowedChanges, ArtifactError, ArtifactKey, ArtifactMetadata, ChecksumError, InventoryChange,
+    InventoryCheckError, InventoryError, RubyArtifact, RubyInventory, changes, inventory_check,
+    sha256_from_path, verify_checksums,
 };
 
 /// Appends the given string after the filename and before the `ends_with`

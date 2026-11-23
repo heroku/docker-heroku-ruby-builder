@@ -1,30 +1,57 @@
 use bullet_stream::global::print;
 use clap::Parser;
-use fs_err::{self as fs};
-use indoc::formatdoc;
-use shared::inventory_check;
-use std::path::{Path, PathBuf};
+use fs_err as fs;
+use shared::{AllowedChanges, NonEmpty, inventory_check};
+use std::error::Error;
+use std::path::PathBuf;
 
+/// Checks the changed contents of an inventory file exist on Heroku S3 w/ correct checksums
 #[derive(Parser, Debug)]
 struct Args {
-    path: PathBuf,
+    /// Path to the inventory file to compare against.
+    #[arg(long)]
+    old: PathBuf,
+
+    /// Path to the new inventory file.
+    #[arg(long)]
+    new: PathBuf,
+
+    /// By default only additions are allowed. Set this flag to allow deletions or modifications.
+    #[arg(long, env = "ALLOW_INVENTORY_CHANGE")]
+    allow_inventory_change: bool,
 }
 
-async fn check(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let contents = fs::read_to_string(path)?;
-    inventory_check(&contents).await?;
+async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
+    let allowed = if args.allow_inventory_change {
+        AllowedChanges::Any
+    } else {
+        AllowedChanges::AddOnly
+    };
+    let old = fs::read_to_string(&args.old).map_err(|error| NonEmpty::new(error.into()))?;
+    let new = fs::read_to_string(&args.new).map_err(|error| NonEmpty::new(error.into()))?;
+    match inventory_check(&old, &new, allowed)
+        .await
+        .map_err(|errors| errors.map(|error| Box::new(error) as Box<dyn Error>))?
+    {
+        Some(changes) => {
+            print::bullet(format!("Changes: {}", changes.len()));
+            for change in &changes {
+                print::sub_bullet(change.to_string());
+            }
+        }
+        None => print::bullet("No changes"),
+    }
     Ok(())
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
-    if let Err(error) = check(&args.path).await {
-        print::error(formatdoc! {"
-            ❌ Command failed ❌
-
-            {error}
-        "});
+    if let Err(errors) = call(&args).await {
+        print::error("❌ Command failed ❌");
+        for error in &errors {
+            print::bullet(error.to_string());
+        }
         std::process::exit(1);
     }
 }
@@ -37,13 +64,15 @@ mod tests {
     #[test]
     fn get_help() {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
-        Usage: inventory_check <PATH>
+        Checks the changed contents of an inventory file exist on Heroku S3 w/ correct checksums
 
-        Arguments:
-          <PATH>
+        Usage: inventory_check [OPTIONS] --old <OLD> --new <NEW>
 
         Options:
-          -h, --help  Print help
+              --old <OLD>               Path to the inventory file to compare against
+              --new <NEW>               Path to the new inventory file
+              --allow-inventory-change  By default only additions are allowed. Set this flag to allow deletions or modifications [env: ALLOW_INVENTORY_CHANGE=]
+          -h, --help                    Print help
         ");
     }
 }

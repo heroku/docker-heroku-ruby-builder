@@ -8,7 +8,6 @@ name = "inventory_check"
 path = "src/bin/inventory_check.rs"
 
 [dependencies]
-glob = { workspace = true }
 clap = { workspace = true }
 indoc = { workspace = true }
 flate2 = { workspace = true }
@@ -26,7 +25,6 @@ chrono = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
 libherokubuildpack = { workspace = true }
-fs2 = { workspace = true }
 hex = { workspace = true }
 gem_version = { workspace = true }
 tokio = { workspace = true }
