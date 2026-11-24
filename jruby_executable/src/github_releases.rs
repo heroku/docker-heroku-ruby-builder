@@ -1,10 +1,10 @@
 //! JRuby releases published on GitHub and their prebuilt binaries on S3.
 
 use serde::Deserialize;
-use shared::JRubyVersion;
 use shared::github::{self, GitHubToken};
 use shared::maybe_err::ResultVec;
 use shared::{BuildTarget, RubyDownloadVersion, parse_url, s3_url};
+use shared::{JRubyVersion, WinnowParseError};
 use std::future::Future;
 use std::path::Path;
 use url::Url;
@@ -102,7 +102,7 @@ pub enum GithubReleaseError {
     },
 
     #[error(transparent)]
-    CannotParseJrubyVersion(#[from] shared::jruby_version::ParseError),
+    CannotParseJrubyVersion(#[from] WinnowParseError),
 }
 
 /// The S3 URL where the prebuilt binary for `version` would live on `target`

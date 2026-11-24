@@ -6,7 +6,7 @@
 //! four segments to keep its own version distinct from the Ruby version it
 //! implements (e.g. JRuby `9.4.7.0` implements Ruby `3.1.x`).
 
-use crate::MajorMinor;
+use crate::{MajorMinor, WinnowParseError};
 use gem_version::GemVersion;
 use std::fmt;
 use winnow::Parser;
@@ -29,34 +29,10 @@ pub struct JRubyVersion {
     extra: u32,
 }
 
-/// Error returned when a string cannot be parsed into a [`JRubyVersion`].
-///
-/// Holds the structured winnow [`ContextError`](winnow::error::ContextError)
-/// alongside the offending input and the byte offset of the failure, so
-/// [`Display`](fmt::Display) can render a caret diagnostic without round-tripping
-/// through a pre-formatted string.
-#[derive(Debug)]
-pub struct ParseError {
-    input: String,
-    offset: usize,
-    inner: winnow::error::ContextError,
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{}", self.input)?;
-        write!(f, "{:offset$}^", "", offset = self.offset)?;
-        writeln!(f)?;
-        write!(f, "{}", self.inner)
-    }
-}
-
-impl std::error::Error for ParseError {}
-
 impl JRubyVersion {
     /// Parse a version string like `9.4.7.0`. An ergonomic alternative to
     /// `FromStr`; delegates to it, so there is a single parsing implementation.
-    pub fn parse(s: &str) -> Result<Self, ParseError> {
+    pub fn parse(s: &str) -> Result<Self, WinnowParseError> {
         s.parse()
     }
 }
@@ -96,10 +72,10 @@ impl serde::Serialize for JRubyVersion {
 }
 
 impl std::str::FromStr for JRubyVersion {
-    type Err = ParseError;
+    type Err = WinnowParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_version.parse(s).map_err(|e| ParseError {
+        parse_version.parse(s).map_err(|e| WinnowParseError {
             input: s.to_owned(),
             offset: e.offset(),
             inner: e.into_inner(),

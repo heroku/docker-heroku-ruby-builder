@@ -196,6 +196,27 @@ pub struct UrlParseError {
     pub source: url::ParseError,
 }
 
+/// Winnow parse error
+///
+/// Holds the structured winnow [`ContextError`](winnow::error::ContextError)
+#[derive(Debug)]
+pub struct WinnowParseError {
+    input: String,
+    offset: usize,
+    inner: winnow::error::ContextError,
+}
+
+impl std::fmt::Display for WinnowParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.input)?;
+        write!(f, "{:offset$}^", "", offset = self.offset)?;
+        writeln!(f)?;
+        write!(f, "{}", self.inner)
+    }
+}
+
+impl std::error::Error for WinnowParseError {}
+
 /// Parse `input` as a [`Url`], keeping `input` in the error since [`url::ParseError`] omits it.
 pub fn parse_url(input: &str) -> Result<Url, UrlParseError> {
     #[expect(clippy::disallowed_methods)]
