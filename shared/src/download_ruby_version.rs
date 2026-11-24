@@ -1,7 +1,9 @@
-use crate::Error;
+use crate::{BuildTarget, Error, output_ruby_tar_path, s3_url};
 use gem_version::GemVersion;
+use reqwest::Url;
 use std::cmp::Ordering;
 use std::fmt::Display;
+use std::path::Path;
 use std::str::FromStr;
 use winnow::Parser;
 use winnow::ascii::dec_uint;
@@ -141,6 +143,15 @@ impl RubyDownloadVersion {
             major = self.major,
             minor = self.minor,
         )
+    }
+
+    pub fn tar_url(&self, target: &BuildTarget) -> Url {
+        s3_url(&output_ruby_tar_path(
+            Path::new(""),
+            self,
+            &target.base_image,
+            Some(&target.arch),
+        ))
     }
 }
 

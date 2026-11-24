@@ -1,15 +1,11 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use reqwest::Url;
 use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
 use shared::ruby_lang::{RELEASES_URL, ruby_lang_versions};
-use shared::{BuildTarget, RubyDownloadVersion, output_ruby_tar_path, s3_presence, s3_url};
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
+use shared::{RubyDownloadVersion, s3_presence};
+use std::{error::Error, path::PathBuf};
 use tokio::task::JoinSet;
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
@@ -43,19 +39,10 @@ fn retain_releases_gte(
         .collect()
 }
 
-fn tar_url(version: &RubyDownloadVersion, target: &BuildTarget) -> Url {
-    s3_url(&output_ruby_tar_path(
-        Path::new(""),
-        version,
-        &target.base_image,
-        Some(&target.arch),
-    ))
-}
-
 async fn check_version_on_s3(
     version: RubyDownloadVersion,
 ) -> Result<(RubyDownloadVersion, Vec<String>), shared::Error> {
-    let missing = s3_presence(|target| tar_url(&version, target))
+    let missing = s3_presence(|target| version.tar_url(target))
         .await?
         .missing()
         .map(|target| format!("{}/{}", target.base_image, target.arch))
