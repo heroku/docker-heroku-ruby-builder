@@ -14,12 +14,39 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use sha2::digest::Output;
 use std::cmp::{Ordering, Reverse};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display, Formatter};
 use std::io::Read;
 use std::ops::Deref;
 use std::path::Path;
 use std::str::FromStr;
+
+/// Inventory currently stores [`GemVersion`] but we want real types like [`RubyDownloadVersion`](crate::RubyDownloadVersion)
+pub fn version_target<T, E>(
+    inventory: &RubyInventory,
+) -> Result<BTreeSet<(T, BuildTarget)>, NonEmpty<E>>
+where
+    T: for<'a> TryFrom<&'a GemVersion, Error = E> + Ord,
+{
+    let mut held: BTreeSet<(T, BuildTarget)> = BTreeSet::new();
+    let mut errors = Vec::<T::Error>::new();
+    for (version, target) in inventory.version_targets() {
+        match T::try_from(&version) {
+            Ok(v) => {
+                held.insert((v, target));
+            }
+            Err(e) => {
+                errors.push(e);
+            }
+        };
+    }
+
+    if let Ok(e) = NonEmpty::try_from(errors) {
+        Err(e)
+    } else {
+        Ok(held)
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ArtifactMetadata {
@@ -199,6 +226,13 @@ impl RubyInventory {
             }
         }
         Ok(Self(map))
+    }
+
+    pub fn version_targets(&self) -> BTreeSet<(GemVersion, BuildTarget)> {
+        self.0
+            .keys()
+            .map(|x| (x.version.clone(), x.target.clone()))
+            .collect()
     }
 
     pub fn artifacts(&self) -> impl ExactSizeIterator<Item = &RubyArtifact> {
