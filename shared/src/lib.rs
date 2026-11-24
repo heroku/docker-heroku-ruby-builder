@@ -144,8 +144,14 @@ pub enum Error {
     #[error("Failed to download {0}")]
     FailedRequest(reqwest::Error),
 
-    #[error("Invalid ruby version {version} reason: {reason}")]
-    InvalidVersion { version: String, reason: String },
+    #[error(transparent)]
+    InvalidVersion(WinnowParseError),
+
+    #[error("Ruby version {version} is not a valid gem version: {source}")]
+    NotAGemVersion {
+        version: String,
+        source: gem_version::VersionError,
+    },
 
     #[error("Error {0}")]
     FsError(std::io::Error),
@@ -217,6 +223,16 @@ impl std::fmt::Display for WinnowParseError {
 }
 
 impl std::error::Error for WinnowParseError {}
+
+impl From<winnow::error::ParseError<&str, winnow::error::ContextError>> for WinnowParseError {
+    fn from(error: winnow::error::ParseError<&str, winnow::error::ContextError>) -> Self {
+        Self {
+            input: (*error.input()).to_owned(),
+            offset: error.offset(),
+            inner: error.into_inner(),
+        }
+    }
+}
 
 /// Parse `input` as a [`Url`], keeping `input` in the error since [`url::ParseError`] omits it.
 pub fn parse_url(input: &str) -> Result<Url, UrlParseError> {

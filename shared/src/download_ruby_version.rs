@@ -7,7 +7,8 @@ use std::path::Path;
 use std::str::FromStr;
 use winnow::Parser;
 use winnow::ascii::dec_uint;
-use winnow::combinator::{eof, opt, preceded};
+use winnow::combinator::{eof, opt};
+use winnow::error::{StrContext, StrContextValue};
 use winnow::token::{literal, one_of, rest};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -122,37 +123,72 @@ impl FromStr for RubyDownloadVersion {
 }
 
 fn parse_version(input: &mut &str) -> winnow::Result<RubyDownloadVersion> {
-    let major = dec_uint.parse_next(input)?;
-    literal(".").parse_next(input)?;
-    let minor = dec_uint.parse_next(input)?;
-    literal(".").parse_next(input)?;
-    let patch = dec_uint.parse_next(input)?;
-    let pre = opt(preceded(
-        one_of(['-', '.']),
-        rest.verify(|pre: &str| pre.starts_with(|c: char| c.is_ascii_alphabetic())),
-    ))
-    .parse_next(input)?;
-    eof.parse_next(input)?;
+    (
+        segment,
+        dot,
+        segment,
+        dot,
+        segment,
+        prerelease,
+        eof.context(StrContext::Expected(StrContextValue::Description(
+            "end of input",
+        ))),
+    )
+        .map(
+            |(major, (), minor, (), patch, pre, _)| RubyDownloadVersion {
+                major,
+                minor,
+                patch,
+                pre,
+            },
+        )
+        .context(StrContext::Label(
+            "Ruby version (`<major>.<minor>.<patch>[-<prerelease>]`)",
+        ))
+        .parse_next(input)
+}
 
-    Ok(RubyDownloadVersion {
-        major,
-        minor,
-        patch,
-        pre: pre.map(str::to_string),
-    })
+/// An optional `-` or `.` followed by text that starts with a letter, such as `-preview1`.
+fn prerelease(input: &mut &str) -> winnow::Result<Option<String>> {
+    if opt(one_of(['-', '.'])).parse_next(input)?.is_none() {
+        return Ok(None);
+    }
+    rest.verify(|pre: &str| pre.starts_with(|c: char| c.is_ascii_alphabetic()))
+        .context(StrContext::Expected(StrContextValue::Description(
+            "prerelease that starts with a letter",
+        )))
+        .map(|pre: &str| Some(pre.to_string()))
+        .parse_next(input)
+}
+
+fn segment(input: &mut &str) -> winnow::Result<u32> {
+    dec_uint
+        .context(StrContext::Expected(StrContextValue::Description(
+            "non-negative integer",
+        )))
+        .parse_next(input)
+}
+
+/// The literal `.` separator between segments.
+fn dot(input: &mut &str) -> winnow::Result<()> {
+    literal('.')
+        .context(StrContext::Expected(StrContextValue::CharLiteral('.')))
+        .void()
+        .parse_next(input)
 }
 
 impl RubyDownloadVersion {
     pub fn new(s: impl AsRef<str>) -> Result<Self, Error> {
-        let version = parse_version(&mut s.as_ref()).map_err(|err| Error::InvalidVersion {
-            version: s.as_ref().to_string(),
-            reason: err.to_string(),
+        let s = s.as_ref();
+        let version = parse_version
+            .parse(s)
+            .map_err(|error| Error::InvalidVersion(error.into()))?;
+        GemVersion::from_str(&version.bundler_format()).map_err(|source| {
+            Error::NotAGemVersion {
+                version: s.to_string(),
+                source,
+            }
         })?;
-        GemVersion::from_str(&version.bundler_format()).map_err(|err| Error::InvalidVersion {
-            version: s.as_ref().to_string(),
-            reason: err.to_string(),
-        })?;
-
         Ok(version)
     }
 
@@ -191,6 +227,7 @@ impl RubyDownloadVersion {
 
 #[cfg(test)]
 mod test {
+    use indoc::indoc;
     use serde::Serialize;
 
     use super::*;
@@ -233,6 +270,39 @@ mod test {
         assert!(RubyDownloadVersion::new("3.4.0-.1").is_err());
         assert!(RubyDownloadVersion::new("3.4.0-rc 1").is_err());
         assert!(RubyDownloadVersion::new("3.4.0.rc..1").is_err());
+    }
+
+    #[test]
+    fn parse_error_renders_caret_diagnostic() {
+        assert_eq!(
+            indoc! {"
+                3.4.0rc1
+                     ^
+                invalid Ruby version (`<major>.<minor>.<patch>[-<prerelease>]`)
+                expected end of input"},
+            RubyDownloadVersion::new("3.4.0rc1")
+                .unwrap_err()
+                .to_string(),
+        );
+
+        assert_eq!(
+            indoc! {"
+                3.4.0-1
+                      ^
+                invalid Ruby version (`<major>.<minor>.<patch>[-<prerelease>]`)
+                expected prerelease that starts with a letter"},
+            RubyDownloadVersion::new("3.4.0-1").unwrap_err().to_string(),
+        );
+    }
+
+    #[test]
+    fn not_a_gem_version_includes_the_reason() {
+        let error = RubyDownloadVersion::new("3.4.0-rc 1").unwrap_err();
+        assert!(matches!(error, Error::NotAGemVersion { .. }));
+        assert_eq!(
+            error.to_string(),
+            "Ruby version 3.4.0-rc 1 is not a valid gem version: Invalid version string: 3.4.0.rc 1"
+        );
     }
 
     #[test]
