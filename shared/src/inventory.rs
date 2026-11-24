@@ -1,7 +1,7 @@
 use crate::base_image::{DistroVersion, UnknownDistroVersion};
 use crate::{
     BaseImage, BuildTarget, Error, NonEmpty, S3_BASE_URL, TarDownloadPath, UrlParseError,
-    download_tar, parse_url,
+    download_tar, parse_url, s3_url_exists,
 };
 use chrono::{DateTime, Utc};
 use fs_err::{self as fs};
@@ -540,6 +540,12 @@ pub enum DownloadArtifactError {
 
     #[error("{url}: response has no valid Last-Modified header")]
     LastModified { url: Box<Url> },
+
+    #[error("{url}: not found on S3")]
+    ShaUrlMissing { url: Box<Url> },
+
+    #[error("{url}: cannot check if it exists on S3: {source}")]
+    ShaUrlCheck { url: Box<Url>, source: Error },
 }
 
 /// Download `url` and build the inventory entry for `version` on `target`, with the sha256 of the download
@@ -559,6 +565,34 @@ pub async fn download_artifact(
     )?)
 }
 
+/// Like [`download_artifact`], but the entry points at the `-<sha7>.tgz` copy of the download, which must exist
+pub async fn download_sha7_artifact(
+    url: &Url,
+    version: &GemVersion,
+    target: BuildTarget,
+) -> Result<RubyArtifact, DownloadArtifactError> {
+    let artifact = download_artifact(url, version, target).await?;
+    let sha_url = sha_seven_tgz_url(artifact.url(), &artifact.checksum.value);
+    match s3_url_exists(sha_url.clone()).await {
+        Ok(true) => {}
+        Ok(false) => {
+            return Err(DownloadArtifactError::ShaUrlMissing {
+                url: Box::new(sha_url),
+            });
+        }
+        Err(source) => {
+            return Err(DownloadArtifactError::ShaUrlCheck {
+                url: Box::new(sha_url),
+                source,
+            });
+        }
+    }
+    Ok(RubyArtifact::try_from(RawArtifact {
+        url: sha_url.to_string(),
+        ..artifact.into()
+    })?)
+}
+
 fn last_modified(
     url: &Url,
     headers: &reqwest::header::HeaderMap,
@@ -574,6 +608,25 @@ fn last_modified(
     DateTime::parse_from_rfc2822(value)
         .map(|time| time.with_timezone(&Utc))
         .map_err(|_| missing())
+}
+
+fn sha_seven(sha256: &[u8]) -> String {
+    hex::encode(sha256)[..7].to_string()
+}
+
+/// `url` with `-<sha7>` before its `.tgz` extension
+fn sha_seven_tgz_url(url: &Url, sha256: &[u8]) -> Url {
+    let mut url = url.clone();
+    let sha_extension = format!("-{}.tgz", sha_seven(sha256));
+    if !url.path().ends_with(&sha_extension) {
+        let stem = url
+            .path()
+            .strip_suffix(".tgz")
+            .unwrap_or(url.path())
+            .to_string();
+        url.set_path(&format!("{stem}{sha_extension}"));
+    }
+    url
 }
 
 pub fn build_artifact(
@@ -1005,6 +1058,18 @@ mod test {
             error,
             ChecksumError::Download { url, .. } if **url == *missing.url()
         )));
+    }
+
+    #[test]
+    fn sha_seven_tgz_url_adds_the_short_sha_once() {
+        let sha256 = Sha256::digest(b"ruby");
+        let sha7 = &hex::encode(sha256)[..7];
+        let url = parse_url(&format!("{S3_BASE_URL}/heroku-24/amd64/ruby-4.0.10.tgz")).unwrap();
+        let expected = format!("{S3_BASE_URL}/heroku-24/amd64/ruby-4.0.10-{sha7}.tgz");
+
+        let sha_url = sha_seven_tgz_url(&url, &sha256);
+        assert_eq!(sha_url.as_str(), expected);
+        assert_eq!(sha_seven_tgz_url(&sha_url, &sha256).as_str(), expected);
     }
 
     #[test]
