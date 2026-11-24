@@ -180,16 +180,13 @@ mod tests {
             JRubyVersion::parse("9..1.0").unwrap_err().to_string(),
         );
 
-        // A trailing space leaves unconsumed input after the final segment, so
-        // the caret points at the space and the diagnostic reports the failed
-        // end-of-input expectation.
         assert_eq!(
             indoc! {"
-                9.4.7.0 
+                9.4.7.0 |
                        ^
                 invalid JRuby version (`<major>.<minor>.<patch>.<extra>`)
                 expected end of input"},
-            JRubyVersion::parse("9.4.7.0 ").unwrap_err().to_string(),
+            JRubyVersion::parse("9.4.7.0 |").unwrap_err().to_string(),
         );
     }
 
