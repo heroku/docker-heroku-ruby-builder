@@ -14,7 +14,7 @@ struct Args {
     github: GitHubTokenArg,
 
     /// Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked.
-    #[arg(long = "minimum-version", required = true)]
+    #[arg(long = "minimum-version", default_value = shared::MIN_RUBY_VERSION)]
     minimum_version: RubyDownloadVersion,
 
     /// Path to write JSON output file containing versions that need builds
@@ -198,13 +198,13 @@ mod tests {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
         Check for Ruby releases missing from Heroku S3
 
-        Usage: ruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+        Usage: ruby_release_check [OPTIONS] --gh-token <TOKEN> --output <OUTPUT>
 
         Options:
               --gh-token <TOKEN>
                   GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
               --minimum-version <MINIMUM_VERSION>
-                  Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked
+                  Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked [default: 3.2.1]
               --output <OUTPUT>
                   Path to write JSON output file containing versions that need builds
           -h, --help

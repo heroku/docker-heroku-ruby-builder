@@ -8,6 +8,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+pub const MIN_RUBY_VERSION: &str = "3.2.1";
+pub const MIN_JRUBY_VERSION: &str = "9.4.7.0";
+
 pub const MAX_RETRY_ATTEMPTS: u8 = 3;
 #[cfg(not(test))]
 pub const RETRY_DELAY: Duration = Duration::from_secs(1);
@@ -485,6 +488,12 @@ mod test {
     use std::thread;
     use tempfile::tempdir;
     use tiny_http::{Response, Server};
+
+    #[test]
+    fn minimum_versions_parse() {
+        RubyDownloadVersion::new(MIN_RUBY_VERSION).unwrap();
+        JRubyVersion::parse(MIN_JRUBY_VERSION).unwrap();
+    }
 
     #[test]
     fn s3_url_joins_path_segments() {
