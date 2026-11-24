@@ -131,3 +131,10 @@ jobs:
             --version ${{inputs.ruby_version}} \
             --status published \
             --summary-file "$GITHUB_STEP_SUMMARY"
+
+  sync-inventory:
+    needs: build-and-upload
+    if: ${{ !cancelled() && !inputs.dry_run }}
+    uses: ./.github/workflows/sync_inventory.yml
+    secrets:
+      LINGUIST_GH_PRIVATE_KEY: ${{ secrets.LINGUIST_GH_PRIVATE_KEY }}
