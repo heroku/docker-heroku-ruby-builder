@@ -518,35 +518,12 @@ pub async fn verify_checksums<'a>(
 }
 
 async fn verify_checksum(artifact: RubyArtifact) -> Result<(), ChecksumError> {
-    let url = Box::new(artifact.url().clone());
-    let temp = tempfile::tempdir().map_err(|source| ChecksumError::TempDir {
-        url: url.clone(),
-        source,
-    })?;
-    let path = temp.path().join("file.tar");
-
-    download_tar(url.as_str(), &TarDownloadPath(path.clone()))
-        .await
-        .map_err(|source| ChecksumError::Download {
-            url: url.clone(),
-            source,
-        })?;
-
-    // Computing a file Hash is CPU bound <https://docs.rs/tokio/latest/tokio/index.html#cpu-bound-tasks-and-blocking-code>
-    let actual =
-        tokio::task::spawn_blocking(move || fs::File::open(&path).and_then(digest::<Sha256>))
-            .await
-            .map_err(ChecksumError::Task)?
-            .map_err(|source| ChecksumError::Hash {
-                url: url.clone(),
-                source,
-            })?;
-
+    let actual = download_sha256(artifact.url()).await?.sha256;
     if actual.as_slice() == artifact.checksum.value {
         Ok(())
     } else {
         Err(ChecksumError::Mismatch {
-            url,
+            url: Box::new(artifact.url().clone()),
             expected: artifact.checksum.clone(),
             actual,
         })
@@ -599,7 +576,7 @@ fn last_modified(
         .map_err(|_| missing())
 }
 
-fn build_artifact(
+pub fn build_artifact(
     url: &Url,
     version: &GemVersion,
     target: BuildTarget,
