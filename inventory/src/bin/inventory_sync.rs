@@ -1,11 +1,17 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use shared::github::{GitHubToken, GitHubTokenArg};
-use shared::inventory::RubyInventory;
-use shared::{JRubyVersion, NonEmpty, RubyDownloadVersion};
+use shared::github::{self, GitHubToken, GitHubTokenArg};
+use shared::inventory::{RubyInventory, download_sha7_artifact, version_target};
+use shared::ruby_lang::{RELEASES_URL, ruby_lang_versions};
+use shared::{BuildTarget, JRubyVersion, NonEmpty, RubyDownloadVersion, build_matrix};
+use std::collections::BTreeSet;
 use std::error::Error;
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
 
 /// Updates an inventory file to match the artifacts on Heroku S3
 #[derive(Parser, Debug)]
@@ -31,11 +37,26 @@ struct Args {
 }
 
 async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
+    print::h1("Syncing inventory");
     let mut errors = Vec::new();
-    if let Err(e) = ruby_call(&args.ruby_inventory, &args.github.token).await {
+
+    let banner = format!("Ruby inventory `{}`", args.ruby_inventory.display());
+    print::h2(&banner);
+    if let Err(e) = ruby_call(
+        &args.ruby_inventory,
+        &args.min_ruby_version,
+        &args.github.token,
+    )
+    .await
+    {
+        errors.push(format!("❌ {banner} errors ❌",).into());
         errors.extend(e);
     }
+
+    let banner = format!("JRuby inventory `{}`", args.jruby_inventory.display());
+    print::h2(&banner);
     if let Err(e) = jruby_call(&args.jruby_inventory).await {
+        errors.push(format!("❌ {banner} errors ❌",).into());
         errors.extend(e);
     }
 
@@ -48,10 +69,83 @@ async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
 
 async fn ruby_call(
     ruby_inventory: &Path,
-    _gh_token: &GitHubToken,
+    min_ruby: &RubyDownloadVersion,
+    gh_token: &GitHubToken,
 ) -> Result<(), NonEmpty<Box<dyn Error>>> {
-    let _inventory = read_inventory(ruby_inventory)?;
-    Ok(())
+    let mut errors: Vec<Box<dyn Error>> = Vec::new();
+    let mut inventory = read_inventory(ruby_inventory)?;
+    let held: BTreeSet<(RubyDownloadVersion, BuildTarget)> =
+        version_target(&inventory).map_err(|errors| errors.map(Box::<dyn Error>::from))?;
+
+    let desired = {
+        print::bullet(format!("Fetching releases from {}", *RELEASES_URL));
+        let releases = match github::get_raw_with_retry(&RELEASES_URL, gh_token).await {
+            Ok(response) => ruby_lang_versions(response.body).unwrap_drain_errs(&mut errors),
+            Err(e) => {
+                errors.push(e.into());
+                Vec::new()
+            }
+        };
+
+        let mut desired: BTreeSet<(RubyDownloadVersion, BuildTarget)> = BTreeSet::new();
+        let targets = build_matrix();
+        for version in releases.into_iter().filter(|version| version >= min_ruby) {
+            for target in &targets {
+                desired.insert((version.clone(), target.clone()));
+            }
+        }
+        desired
+    };
+    print::bullet(format!("Found {} total releases", desired.len()));
+    let missing = desired.difference(&held);
+    print::bullet(format!(
+        "Inventory missing {} total releases",
+        missing.clone().count()
+    ));
+
+    let added = {
+        // Download isn't CPU bound but checksum generation is
+        let limit = std::thread::available_parallelism().map_or(4, NonZeroUsize::get);
+        let permits = Arc::new(Semaphore::new(limit));
+
+        let mut set = JoinSet::new();
+        for (version, target) in missing.cloned() {
+            let permits = Arc::clone(&permits);
+            set.spawn(async move {
+                let _permit = permits.acquire_owned().await?;
+                Ok::<_, Box<dyn Error + Send + Sync>>(
+                    download_sha7_artifact(&version.tar_url(&target), &(&version).into(), target)
+                        .await?,
+                )
+            });
+        }
+
+        let mut added = Vec::new();
+        while let Some(joined) = set.join_next().await {
+            match joined {
+                Ok(Ok(artifact)) => added.push(artifact),
+                Ok(Err(error)) => errors.push(error),
+                Err(error) => errors.push(error.into()),
+            }
+        }
+        added
+    };
+
+    for artifact in added {
+        print::sub_bullet(format!("Adding `{}`", artifact.url));
+        inventory.insert(artifact);
+    }
+
+    print::bullet("Writing inventory to disk");
+    if let Err(error) = fs::write(ruby_inventory, inventory.to_string()) {
+        errors.push(error.into());
+    }
+
+    if let Ok(e) = NonEmpty::try_from(errors) {
+        Err(e)
+    } else {
+        Ok(())
+    }
 }
 
 async fn jruby_call(jruby_inventory: &Path) -> Result<(), NonEmpty<Box<dyn Error>>> {

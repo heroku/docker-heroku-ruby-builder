@@ -238,6 +238,10 @@ impl RubyInventory {
     pub fn artifacts(&self) -> impl ExactSizeIterator<Item = &RubyArtifact> {
         self.0.values()
     }
+
+    pub fn insert(&mut self, artifact: RubyArtifact) {
+        self.0.insert(artifact.key(), artifact);
+    }
 }
 
 impl TryFrom<RawInventory> for RubyInventory {
@@ -629,7 +633,7 @@ fn sha_seven_tgz_url(url: &Url, sha256: &[u8]) -> Url {
     url
 }
 
-pub fn build_artifact(
+fn build_artifact(
     url: &Url,
     version: &GemVersion,
     target: BuildTarget,
