@@ -335,11 +335,17 @@ async fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
     }
 }
 
-pub async fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
+pub async fn download_tar(
+    url: &str,
+    path: &TarDownloadPath,
+) -> Result<reqwest::header::HeaderMap, Error> {
     with_retries(|| download_tar_inner(url, path)).await
 }
 
-async fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
+async fn download_tar_inner(
+    url: &str,
+    path: &TarDownloadPath,
+) -> Result<reqwest::header::HeaderMap, Error> {
     use tokio::io::AsyncWriteExt;
 
     let client = reqwest::Client::builder()
@@ -353,6 +359,7 @@ async fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Err
         .map_err(Error::FailedRequest)?
         .error_for_status()
         .map_err(Error::FailedRequest)?;
+    let headers = response.headers().clone();
 
     // fs_err::tokio keeps the path-annotated error messages the codebase relies on.
     let mut dest = fs_err::tokio::File::create(path.as_ref())
@@ -368,7 +375,7 @@ async fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Err
             })?;
     }
     dest.flush().await.map_err(Error::FsError)?;
-    Ok(())
+    Ok(headers)
 }
 
 pub fn output_target_dir(
