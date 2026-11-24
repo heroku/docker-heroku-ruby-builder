@@ -1,0 +1,43 @@
+name: Auto-approve inventory sync PRs
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    paths:
+      - 'ruby_inventory.toml'
+      - 'jruby_inventory.toml'
+
+permissions:
+  pull-requests: write
+
+jobs:
+  auto-approve:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'heroku-linguist[bot]' &&
+      github.event.pull_request.head.ref == 'sync-inventory'
+    # IP-allowlisted runner used because the heroku org's IP allow list rejects API calls from GitHub-hosted runners.
+    runs-on: pub-hk-ubuntu-24.04-ip
+    steps:
+      - name: Check only inventory files changed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          changed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)')
+          unexpected=$(grep -v -x -e 'ruby_inventory.toml' -e 'jruby_inventory.toml' <<< "$changed" || true)
+          if [[ -n "$unexpected" ]]; then
+            echo "::error::PR changes files other than the inventory files:"
+            echo "$unexpected"
+            exit 1
+          fi
+      # Approves as `github-actions[bot]` rather than the Linguist user, since a user can't approve their own PR.
+      - name: Approve PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr review --approve "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
