@@ -28,6 +28,8 @@ jobs:
       - name: Cargo build
         run: cargo build --locked
       - name: Sync inventory
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           cargo run --locked --bin inventory_sync 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"

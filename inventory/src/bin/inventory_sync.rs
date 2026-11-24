@@ -1,6 +1,7 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
+use shared::github::{GitHubToken, GitHubTokenArg};
 use shared::inventory::RubyInventory;
 use shared::{JRubyVersion, NonEmpty, RubyDownloadVersion};
 use std::error::Error;
@@ -24,11 +25,14 @@ struct Args {
     /// Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be synced.
     #[arg(long = "min-jruby-version", default_value = shared::MIN_JRUBY_VERSION)]
     min_jruby_version: JRubyVersion,
+
+    #[command(flatten)]
+    github: GitHubTokenArg,
 }
 
 async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     let mut errors = Vec::new();
-    if let Err(e) = ruby_call(&args.ruby_inventory).await {
+    if let Err(e) = ruby_call(&args.ruby_inventory, &args.github.token).await {
         errors.extend(e);
     }
     if let Err(e) = jruby_call(&args.jruby_inventory).await {
@@ -42,7 +46,10 @@ async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     }
 }
 
-async fn ruby_call(ruby_inventory: &Path) -> Result<(), NonEmpty<Box<dyn Error>>> {
+async fn ruby_call(
+    ruby_inventory: &Path,
+    _gh_token: &GitHubToken,
+) -> Result<(), NonEmpty<Box<dyn Error>>> {
     let _inventory = read_inventory(ruby_inventory)?;
     Ok(())
 }
@@ -85,7 +92,7 @@ mod tests {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
         Updates an inventory file to match the artifacts on Heroku S3
 
-        Usage: inventory_sync [OPTIONS]
+        Usage: inventory_sync [OPTIONS] --gh-token <TOKEN>
 
         Options:
               --ruby-inventory <RUBY_INVENTORY>
@@ -96,6 +103,8 @@ mod tests {
                   Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be synced [default: 3.2.1]
               --min-jruby-version <MIN_JRUBY_VERSION>
                   Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be synced [default: 9.4.7.0]
+              --gh-token <TOKEN>
+                  GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
           -h, --help
                   Print help
         ");
