@@ -553,6 +553,106 @@ async fn verify_checksum(artifact: RubyArtifact) -> Result<(), ChecksumError> {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum DownloadArtifactError {
+    #[error(transparent)]
+    Download(#[from] ChecksumError),
+
+    #[error(transparent)]
+    Artifact(#[from] ArtifactError),
+
+    #[error("{url}: response has no valid Last-Modified header")]
+    LastModified { url: Box<Url> },
+}
+
+/// Download `url` and build the inventory entry for `version` on `target`, with the sha256 of the download
+pub async fn download_artifact(
+    url: &Url,
+    version: &GemVersion,
+    target: BuildTarget,
+) -> Result<RubyArtifact, DownloadArtifactError> {
+    let download = download_sha256(url).await?;
+    let timestamp = last_modified(url, &download.headers)?;
+    Ok(build_artifact(
+        url,
+        version,
+        target,
+        &download.sha256,
+        timestamp,
+    )?)
+}
+
+fn last_modified(
+    url: &Url,
+    headers: &reqwest::header::HeaderMap,
+) -> Result<DateTime<Utc>, DownloadArtifactError> {
+    let missing = || DownloadArtifactError::LastModified {
+        url: Box::new(url.clone()),
+    };
+    let value = headers
+        .get(reqwest::header::LAST_MODIFIED)
+        .ok_or_else(missing)?
+        .to_str()
+        .map_err(|_| missing())?;
+    DateTime::parse_from_rfc2822(value)
+        .map(|time| time.with_timezone(&Utc))
+        .map_err(|_| missing())
+}
+
+fn build_artifact(
+    url: &Url,
+    version: &GemVersion,
+    target: BuildTarget,
+    sha256: &Output<Sha256>,
+    timestamp: DateTime<Utc>,
+) -> Result<RubyArtifact, ArtifactError> {
+    RubyArtifact::try_from(RawArtifact {
+        version: version.clone(),
+        os: Os::Linux,
+        arch: target.arch,
+        url: url.to_string(),
+        checksum: format!("sha256:{}", hex::encode(sha256))
+            .parse()
+            .expect("a hex encoded sha256 is a valid checksum"),
+        metadata: ArtifactMetadata {
+            timestamp,
+            distro_version: target.base_image.distro_version(),
+        },
+    })
+}
+
+struct ChecksumDownload {
+    sha256: Output<Sha256>,
+    headers: reqwest::header::HeaderMap,
+}
+
+async fn download_sha256(url: &Url) -> Result<ChecksumDownload, ChecksumError> {
+    let boxed_url = || Box::new(url.clone());
+    let temp = tempfile::tempdir().map_err(|source| ChecksumError::TempDir {
+        url: boxed_url(),
+        source,
+    })?;
+    let path = temp.path().join("file.tar");
+
+    let headers = download_tar(url.as_str(), &TarDownloadPath(path.clone()))
+        .await
+        .map_err(|source| ChecksumError::Download {
+            url: boxed_url(),
+            source,
+        })?;
+
+    // Computing a file Hash is CPU bound <https://docs.rs/tokio/latest/tokio/index.html#cpu-bound-tasks-and-blocking-code>
+    let sha256 =
+        tokio::task::spawn_blocking(move || fs::File::open(&path).and_then(digest::<Sha256>))
+            .await
+            .map_err(ChecksumError::Task)?
+            .map_err(|source| ChecksumError::Hash {
+                url: boxed_url(),
+                source,
+            })?;
+    Ok(ChecksumDownload { sha256, headers })
+}
+
 /// Returns the sha256 hash of the file at the given path
 pub fn sha256_from_path(path: &Path) -> Result<String, Error> {
     digest::<Sha256>(fs::File::open(path).map_err(Error::FsError)?)
@@ -588,6 +688,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use sha2::Digest;
 
     fn artifact(version: &str, base_image: &str, arch: Arch) -> RawArtifact {
         RawArtifact {
@@ -927,6 +1028,64 @@ mod test {
             error,
             ChecksumError::Download { url, .. } if **url == *missing.url()
         )));
+    }
+
+    #[test]
+    fn build_artifact_records_the_target_checksum_and_url() {
+        let url = parse_url(&format!("{S3_BASE_URL}/heroku-24/arm64/ruby-3.4.0.tgz")).unwrap();
+        let target = BuildTarget {
+            base_image: BaseImage::new("heroku-24").unwrap(),
+            arch: Arch::Arm64,
+        };
+        let sha256 = Sha256::digest(b"ruby");
+        let timestamp = "2026-04-22T16:44:16Z".parse().unwrap();
+
+        let artifact =
+            build_artifact(&url, &"3.4.0".parse().unwrap(), target, &sha256, timestamp).unwrap();
+
+        assert_eq!(artifact.key().to_string(), "3.4.0 on heroku-24 (arm64)");
+        assert_eq!(artifact.url(), &url);
+        assert_eq!(artifact.checksum.value, sha256.as_slice());
+        assert_eq!(artifact.metadata.timestamp, timestamp);
+    }
+
+    #[test]
+    fn last_modified_reads_the_s3_header() {
+        let url = parse_url(&format!("{S3_BASE_URL}/heroku-24/amd64/ruby-4.0.10.tgz")).unwrap();
+        let mut headers = reqwest::header::HeaderMap::new();
+        assert!(matches!(
+            last_modified(&url, &headers),
+            Err(DownloadArtifactError::LastModified { .. })
+        ));
+
+        headers.insert(
+            reqwest::header::LAST_MODIFIED,
+            "Wed, 18 Nov 2026 23:41:39 GMT".parse().unwrap(),
+        );
+        assert_eq!(
+            last_modified(&url, &headers).unwrap().to_rfc3339(),
+            "2026-11-18T23:41:39+00:00"
+        );
+    }
+
+    #[test]
+    fn build_artifact_rejects_an_arch_the_base_image_does_not_build() {
+        let url = parse_url(&format!("{S3_BASE_URL}/heroku-22/arm64/ruby-3.4.0.tgz")).unwrap();
+        let target = BuildTarget {
+            base_image: BaseImage::new("heroku-22").unwrap(),
+            arch: Arch::Arm64,
+        };
+
+        let error = build_artifact(
+            &url,
+            &"3.4.0".parse().unwrap(),
+            target,
+            &Sha256::digest(b"ruby"),
+            Utc::now(),
+        )
+        .unwrap_err();
+
+        assert!(matches!(error, ArtifactError::UnsupportedArch { .. }));
     }
 
     #[test]
