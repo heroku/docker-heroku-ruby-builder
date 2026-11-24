@@ -9,7 +9,6 @@ clap = { workspace = true }
 indoc = { workspace = true }
 jruby_executable = { path = "../jruby_executable" }
 minijinja = { workspace = true }
-ruby_executable = { path = "../ruby_executable" }
 shared = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

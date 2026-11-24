@@ -8,12 +8,10 @@ use bullet_stream::global::print;
 use clap::{Args, Parser, Subcommand};
 use indoc::formatdoc;
 use jruby_executable::github_releases;
-use ruby_executable::ruby_lang::{
-    BRANCHES_URL, RELEASES_URL, ruby_lang_branches, ruby_lang_versions,
-};
 use shared::MajorMinor;
 use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
+use shared::ruby_lang::{BRANCHES_URL, RELEASES_URL, ruby_lang_branches, ruby_lang_versions};
 use std::error::Error;
 use std::fmt::Display;
 use support_article::jruby_table::{self, JRubyTable};

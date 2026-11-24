@@ -1456,7 +1456,6 @@ dependencies = [
  "tar",
  "thiserror",
  "tokio",
- "yaml-rust2",
 ]
 
 [[package]]
@@ -1711,6 +1710,7 @@ dependencies = [
  "toml",
  "url",
  "winnow",
+ "yaml-rust2",
 ]
 
 [[package]]
@@ -1792,7 +1792,6 @@ dependencies = [
  "jruby_executable",
  "minijinja",
  "pretty_assertions",
- "ruby_executable",
  "shared",
  "thiserror",
  "tokio",

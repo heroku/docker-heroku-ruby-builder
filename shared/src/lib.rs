@@ -55,6 +55,7 @@ pub mod jruby_version;
 mod major_minor;
 pub mod maybe_err;
 mod non_empty;
+pub mod ruby_lang;
 
 pub use base_image::{BaseImage, BuildTarget, UnknownDistroVersion, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;

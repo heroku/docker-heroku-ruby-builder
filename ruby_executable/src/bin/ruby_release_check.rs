@@ -2,9 +2,9 @@ use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
 use reqwest::Url;
-use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
+use shared::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::{BuildTarget, RubyDownloadVersion, output_ruby_tar_path, s3_presence, s3_url};
 use std::{
     error::Error,

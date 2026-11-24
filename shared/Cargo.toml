@@ -23,6 +23,7 @@ hex = { workspace = true }
 gem_version = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+yaml-rust2 = { workspace = true }
 
 [dev-dependencies]
 indoc = { workspace = true }
