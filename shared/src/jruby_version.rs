@@ -55,6 +55,14 @@ impl From<&JRubyVersion> for GemVersion {
     }
 }
 
+impl TryFrom<&GemVersion> for JRubyVersion {
+    type Error = WinnowParseError;
+
+    fn try_from(value: &GemVersion) -> Result<Self, Self::Error> {
+        value.to_string().parse()
+    }
+}
+
 impl fmt::Display for JRubyVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

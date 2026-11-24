@@ -99,6 +99,14 @@ impl From<&RubyDownloadVersion> for GemVersion {
     }
 }
 
+impl TryFrom<&GemVersion> for RubyDownloadVersion {
+    type Error = Error;
+
+    fn try_from(value: &GemVersion) -> Result<Self, Self::Error> {
+        Self::new(value.to_string())
+    }
+}
+
 impl Display for RubyDownloadVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.format_with_separator('-'))
@@ -225,6 +233,17 @@ mod test {
         assert!(RubyDownloadVersion::new("3.4.0-.1").is_err());
         assert!(RubyDownloadVersion::new("3.4.0-rc 1").is_err());
         assert!(RubyDownloadVersion::new("3.4.0.rc..1").is_err());
+    }
+
+    #[test]
+    fn try_from_gem_version() {
+        let gem = GemVersion::from_str("4.1.0.preview1").unwrap();
+        let version = RubyDownloadVersion::try_from(&gem).unwrap();
+        assert_eq!(version, RubyDownloadVersion::new("4.1.0-preview1").unwrap());
+        assert_eq!(GemVersion::from(&version), gem);
+
+        let gem = GemVersion::from_str("3.4.0-a.-").unwrap();
+        assert!(RubyDownloadVersion::try_from(&gem).is_err());
     }
 
     #[test]
