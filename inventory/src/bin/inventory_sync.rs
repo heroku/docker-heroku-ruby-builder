@@ -1,8 +1,8 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use shared::NonEmpty;
 use shared::inventory::RubyInventory;
+use shared::{JRubyVersion, NonEmpty, RubyDownloadVersion};
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -16,6 +16,14 @@ struct Args {
     /// Path to the jruby inventory.
     #[arg(long, default_value = "jruby_inventory.toml")]
     jruby_inventory: PathBuf,
+
+    /// Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be synced.
+    #[arg(long = "min-ruby-version", default_value = shared::MIN_RUBY_VERSION)]
+    min_ruby_version: RubyDownloadVersion,
+
+    /// Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be synced.
+    #[arg(long = "min-jruby-version", default_value = shared::MIN_JRUBY_VERSION)]
+    min_jruby_version: JRubyVersion,
 }
 
 async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
@@ -84,6 +92,10 @@ mod tests {
                   Path to the ruby inventory [default: ruby_inventory.toml]
               --jruby-inventory <JRUBY_INVENTORY>
                   Path to the jruby inventory [default: jruby_inventory.toml]
+              --min-ruby-version <MIN_RUBY_VERSION>
+                  Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be synced [default: 3.2.1]
+              --min-jruby-version <MIN_JRUBY_VERSION>
+                  Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be synced [default: 9.4.7.0]
           -h, --help
                   Print help
         ");

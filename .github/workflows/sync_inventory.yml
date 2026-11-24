@@ -30,5 +30,4 @@ jobs:
       - name: Sync inventory
         run: |
           set -euo pipefail
-          cargo run --locked --bin inventory_sync -- \
-            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          cargo run --locked --bin inventory_sync 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
