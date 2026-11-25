@@ -2,9 +2,11 @@ use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
 use shared::github::{self, GitHubToken, GitHubTokenArg};
-use shared::inventory::{RubyInventory, download_sha7_artifact, version_target};
+use shared::inventory::{RubyArtifact, RubyInventory, download_sha7_artifact, version_target};
 use shared::ruby_lang::{RELEASES_URL, ruby_lang_versions};
-use shared::{BuildTarget, JRubyVersion, NonEmpty, RubyDownloadVersion, build_matrix};
+use shared::{
+    BuildTarget, JRubyVersion, NonEmpty, RubyDownloadVersion, build_matrix, s3_url_exists,
+};
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::num::NonZeroUsize;
@@ -12,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
+use url::Url;
 
 /// Updates an inventory file to match the artifacts on Heroku S3
 #[derive(Parser, Debug)]
@@ -103,7 +106,7 @@ async fn ruby_call(
         missing.clone().count()
     ));
 
-    let added = {
+    let (added, mut not_built) = {
         // Download isn't CPU bound but checksum generation is
         let limit = std::thread::available_parallelism().map_or(4, NonZeroUsize::get);
         let permits = Arc::new(Semaphore::new(limit));
@@ -113,23 +116,33 @@ async fn ruby_call(
             let permits = Arc::clone(&permits);
             set.spawn(async move {
                 let _permit = permits.acquire_owned().await?;
-                Ok::<_, Box<dyn Error + Send + Sync>>(
-                    download_sha7_artifact(&version.tar_url(&target), &(&version).into(), target)
-                        .await?,
-                )
+                let url = version.tar_url(&target);
+                let download = if s3_url_exists(url.clone()).await? {
+                    Download::Added(download_sha7_artifact(&url, &(&version).into(), target).await?)
+                } else {
+                    Download::NotBuilt(url)
+                };
+                Ok::<_, Box<dyn Error + Send + Sync>>(download)
             });
         }
 
         let mut added = Vec::new();
+        let mut not_built = Vec::new();
         while let Some(joined) = set.join_next().await {
             match joined {
-                Ok(Ok(artifact)) => added.push(artifact),
+                Ok(Ok(Download::Added(artifact))) => added.push(artifact),
+                Ok(Ok(Download::NotBuilt(url))) => not_built.push(url),
                 Ok(Err(error)) => errors.push(error),
                 Err(error) => errors.push(error.into()),
             }
         }
-        added
+        (added, not_built)
     };
+
+    not_built.sort();
+    for url in not_built {
+        print::sub_bullet(format!("Skipping `{url}`, not on S3 yet"));
+    }
 
     for artifact in added {
         print::sub_bullet(format!("Adding `{}`", artifact.url));
@@ -146,6 +159,11 @@ async fn ruby_call(
     } else {
         Ok(())
     }
+}
+
+enum Download {
+    Added(RubyArtifact),
+    NotBuilt(Url),
 }
 
 async fn jruby_call(jruby_inventory: &Path) -> Result<(), NonEmpty<Box<dyn Error>>> {

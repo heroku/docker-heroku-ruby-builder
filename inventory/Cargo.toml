@@ -9,6 +9,7 @@ clap = { workspace = true }
 fs-err = { workspace = true }
 shared = { workspace = true }
 tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

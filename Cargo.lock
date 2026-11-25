@@ -953,6 +953,7 @@ dependencies = [
  "insta",
  "shared",
  "tokio",
+ "url",
 ]
 
 [[package]]

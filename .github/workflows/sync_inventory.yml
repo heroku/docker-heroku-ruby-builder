@@ -41,6 +41,8 @@ jobs:
       - name: Cargo build
         run: cargo build --locked
       - name: Sync inventory
+        id: sync
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
@@ -66,3 +68,8 @@ jobs:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pull-request-number }}
         run: gh pr merge --squash --auto "$PR_NUMBER"
+      - name: Fail if the sync had errors
+        if: steps.sync.outcome == 'failure'
+        run: |
+          echo "::error::Inventory sync had errors. See the Sync inventory step."
+          exit 1
