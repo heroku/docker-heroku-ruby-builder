@@ -293,7 +293,7 @@ mod test {
 
         Options:
               --version <VERSION>
-              --gh-token <TOKEN>   GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
+              --gh-token <TOKEN>   GitHub API token. e.g. `GITHUB_TOKEN=$(gh auth token) <command>` [env: GITHUB_TOKEN]
           -h, --help               Print help
         ");
     }
@@ -307,7 +307,7 @@ mod test {
 
         Options:
               --version <VERSION>
-              --gh-token <TOKEN>             GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
+              --gh-token <TOKEN>             GitHub API token. e.g. `GITHUB_TOKEN=$(gh auth token) <command>` [env: GITHUB_TOKEN]
               --status <STATUS>              Whether to create the entry as an unpublished draft or publish it live [possible values: draft, published]
               --summary-file <SUMMARY_FILE>  Optional file to append a Markdown summary (with the entry's URL) to, e.g. `$GITHUB_STEP_SUMMARY`
           -h, --help                         Print help

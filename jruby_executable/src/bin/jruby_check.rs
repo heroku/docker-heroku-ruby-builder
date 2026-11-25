@@ -151,7 +151,7 @@ mod tests {
               --version <VERSION>
               --base-image <BASE_IMAGE>
               --artifact-dir <ARTIFACT_DIR>
-              --gh-token <TOKEN>             GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
+              --gh-token <TOKEN>             GitHub API token. e.g. `GITHUB_TOKEN=$(gh auth token) <command>` [env: GITHUB_TOKEN]
           -h, --help                         Print help
         ");
     }

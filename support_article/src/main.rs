@@ -203,7 +203,7 @@ mod tests {
 
         Options:
               --gh-token <TOKEN>
-                  GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
+                  GitHub API token. e.g. `GITHUB_TOKEN=$(gh auth token) <command>` [env: GITHUB_TOKEN]
               --minimum-ruby-major-minor <MINIMUM_RUBY_MAJOR_MINOR>
                   Oldest Ruby `MAJOR.MINOR` line to list, such as `3.1`
               --minimum-jruby-major-minor <MINIMUM_JRUBY_MAJOR_MINOR>
