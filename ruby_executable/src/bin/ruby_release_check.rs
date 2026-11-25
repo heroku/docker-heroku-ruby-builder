@@ -215,7 +215,7 @@ mod tests {
 
         Options:
               --gh-token <TOKEN>
-                  GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
+                  GitHub API token. e.g. `GITHUB_TOKEN=$(gh auth token) <command>` [env: GITHUB_TOKEN]
               --minimum-version <MINIMUM_VERSION>
                   Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked
               --output <OUTPUT>

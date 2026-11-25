@@ -62,7 +62,7 @@ impl GitHubToken {
 // Keeps this doc out of the parent command's `--help`.
 #[command(about = None, long_about = None)]
 pub struct GitHubTokenArg {
-    /// GitHub API token. e.g. `--gh-token=$(gh auth token)`
+    /// GitHub API token. e.g. `GITHUB_TOKEN=$(gh auth token) <command>`
     #[arg(
         long = "gh-token",
         env = "GITHUB_TOKEN",
@@ -74,7 +74,7 @@ pub struct GitHubTokenArg {
 
 fn parse_cli_token(value: &str) -> std::result::Result<GitHubToken, String> {
     GitHubToken::try_from(value).map_err(|error| {
-        format!("{error}. Suggestion: generate one locally with: `--gh-token=$(gh auth token)` or set GITHUB_TOKEN")
+        format!("{error}. Suggestion: generate one locally with: `GITHUB_TOKEN=$(gh auth token) <command>`")
     })
 }
 
