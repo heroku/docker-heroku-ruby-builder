@@ -404,6 +404,17 @@ pub fn output_ruby_tar_path(
         .join(format!("ruby-{}.tgz", version.bundler_format()))
 }
 
+pub fn output_jruby_tar_path(
+    output: &Path,
+    version: &JRubyVersion,
+    ruby_stdlib_version: &RubyDownloadVersion,
+    base_image: &BaseImage,
+    cpu_architecture: Option<&Arch>,
+) -> PathBuf {
+    output_target_dir(output, base_image, cpu_architecture)
+        .join(format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz"))
+}
+
 pub fn tar_dir_to_file(compiled_dir: &Path, tar_file: &File) -> Result<(), Error> {
     let enc = flate2::write::GzEncoder::new(tar_file, flate2::Compression::best());
 
@@ -576,6 +587,28 @@ mod test {
 
         // assert!(tar_path.is_absolute());
         assert_eq!(PathBuf::from("/tmp/heroku-22/ruby-2.7.3.tgz"), tar_path);
+    }
+
+    #[test]
+    fn test_output_jruby_tar_path() {
+        let version = JRubyVersion::parse("9.4.16.0").unwrap();
+        let stdlib = RubyDownloadVersion::new("3.1.7").unwrap();
+        let base_image = BaseImage::new("heroku-24").unwrap();
+
+        assert_eq!(
+            output_jruby_tar_path(Path::new("/tmp"), &version, &stdlib, &base_image, None),
+            PathBuf::from("/tmp/heroku-24/ruby-3.1.7-jruby-9.4.16.0.tgz")
+        );
+        assert_eq!(
+            output_jruby_tar_path(
+                Path::new("/tmp"),
+                &version,
+                &stdlib,
+                &base_image,
+                Some(&Arch::Arm64)
+            ),
+            PathBuf::from("/tmp/heroku-24/arm64/ruby-3.1.7-jruby-9.4.16.0.tgz")
+        );
     }
 
     #[test]

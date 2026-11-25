@@ -5,11 +5,12 @@ use jruby_executable::jruby_build_properties;
 use libherokubuildpack::inventory::artifact::Arch;
 use shared::JRubyVersion;
 use shared::github::GitHubTokenArg;
-use shared::{BaseImage, source_dir};
+use shared::{BaseImage, output_jruby_tar_path, source_dir};
 use std::error::Error;
 use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Instant;
-use std::{path::PathBuf, process::Command};
 
 static INNER_OUTPUT: &str = "/tmp/output";
 
@@ -78,9 +79,13 @@ async fn jruby_check(args: &RubyArgs) -> Result<(), Box<dyn Error>> {
     print::sub_stream_cmd(docker_build)?;
 
     let output = {
-        let inner_jruby_path = PathBuf::from(INNER_OUTPUT)
-            .join(base_image.to_string())
-            .join(format!("ruby-{jruby_stdlib_version}-jruby-{version}.tgz"));
+        let inner_jruby_path = output_jruby_tar_path(
+            Path::new(INNER_OUTPUT),
+            version,
+            &jruby_stdlib_version,
+            base_image,
+            None,
+        );
 
         let mut cmd = Command::new("docker");
         cmd.arg("run");

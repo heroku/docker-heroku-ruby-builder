@@ -8,8 +8,9 @@ use shared::JRubyVersion;
 use shared::github::GitHubTokenArg;
 use shared::inventory::sha256_from_path;
 use shared::{
-    BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar, s3_url,
-    s3_url_exists, tar_dir_to_file, untar_to_dir, write_job_metadata,
+    BaseImage, BuildStatus, TarDownloadPath, append_filename_with, download_tar,
+    output_jruby_tar_path, output_target_dir, s3_url, s3_url_exists, tar_dir_to_file, untar_to_dir,
+    write_job_metadata,
 };
 use std::convert::From;
 use std::error::Error;
@@ -68,10 +69,13 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     let ruby_stdlib_version = jruby_build_properties(version, &github.token)
         .await?
         .ruby_stdlib_version()?;
-    let tgz_name = format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz");
-    let expected_output = volume_output_dir
-        .join(base_image.to_string())
-        .join(&tgz_name);
+    let expected_output = output_jruby_tar_path(
+        volume_output_dir,
+        version,
+        &ruby_stdlib_version,
+        base_image,
+        None,
+    );
 
     // TODO: Right now if a new architecture is released, this won't build it.
     // Continue uploading to the root, (no arch) but introduce per-arch check so
@@ -157,11 +161,9 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     }
 
     print::bullet("Creating tgz archives");
-    let tar_dir = volume_output_dir.join(base_image.to_string());
+    fs::create_dir_all(output_target_dir(volume_output_dir, base_image, None))?;
 
-    fs::create_dir_all(&tar_dir)?;
-
-    let tar_file = fs::File::create(tar_dir.join(&tgz_name))?;
+    let tar_file = fs::File::create(&expected_output)?;
 
     let timer = print::sub_start_timer(format!("Write {}", tar_file.path().display()));
     tar_dir_to_file(&jruby_dir, &tar_file)?;
@@ -179,12 +181,19 @@ async fn jruby_build(args: &Args) -> Result<BuildStatus, Box<dyn Error>> {
     // because jruby is architecture independent. However the
     // current lookup code in the buildpack is not.
     for cpu_arch in [Arch::Amd64, Arch::Arm64] {
-        let dir = volume_output_dir
-            .join(base_image.to_string())
-            .join(cpu_arch.to_string());
-        fs::create_dir_all(&dir)?;
+        fs::create_dir_all(output_target_dir(
+            volume_output_dir,
+            base_image,
+            Some(&cpu_arch),
+        ))?;
 
-        let path = dir.join(&tgz_name);
+        let path = output_jruby_tar_path(
+            volume_output_dir,
+            version,
+            &ruby_stdlib_version,
+            base_image,
+            Some(&cpu_arch),
+        );
         print::sub_bullet(format!("Write {}", path.display()));
         fs::copy(tar_file.path(), &path)?;
     }
