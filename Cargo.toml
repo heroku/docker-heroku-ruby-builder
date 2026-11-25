@@ -42,6 +42,7 @@ regex = "1"
 reqwest = { version = "0.13", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.11"
+jruby_executable = { path = "jruby_executable" }
 shared = { path = "shared" }
 tar = "0.4"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util"] }

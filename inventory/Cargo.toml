@@ -7,6 +7,7 @@ rust-version.workspace = true
 bullet_stream = { workspace = true }
 clap = { workspace = true }
 fs-err = { workspace = true }
+jruby_executable = { workspace = true }
 shared = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }

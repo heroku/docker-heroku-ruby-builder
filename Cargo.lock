@@ -951,6 +951,7 @@ dependencies = [
  "clap",
  "fs-err",
  "insta",
+ "jruby_executable",
  "shared",
  "tokio",
  "url",
