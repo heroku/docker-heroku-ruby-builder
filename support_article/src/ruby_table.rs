@@ -2,7 +2,7 @@
 
 use crate::{CheckError, join_all};
 use minijinja::{Value, context};
-use ruby_executable::ruby_lang::BranchStatus;
+use shared::ruby_lang::BranchStatus;
 use shared::{
     BaseImage, BuildTarget, MajorMinor, RubyDownloadVersion, output_ruby_tar_path, s3_presence,
     s3_url,

@@ -3,13 +3,8 @@ name = "shared"
 edition.workspace = true
 rust-version.workspace = true
 
-[[bin]]
-name = "inventory_check"
-path = "src/bin/inventory_check.rs"
-
 [dependencies]
 clap = { workspace = true }
-indoc = { workspace = true }
 flate2 = { workspace = true }
 fs-err = { workspace = true }
 fun_run = { workspace = true }
@@ -19,7 +14,6 @@ reqwest = { workspace = true }
 tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
-bullet_stream = { workspace = true }
 sha2 = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
@@ -29,8 +23,10 @@ hex = { workspace = true }
 gem_version = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+yaml-rust2 = { workspace = true }
 
 [dev-dependencies]
-indoc = "2"
+indoc = { workspace = true }
 insta = { workspace = true }
+serde_json = { workspace = true }
 tiny_http = "0.12"

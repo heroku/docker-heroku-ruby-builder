@@ -3,10 +3,10 @@ use clap::Parser;
 use fs_err::{self as fs, PathExt};
 use indoc::formatdoc;
 use libherokubuildpack::inventory::artifact::Arch;
+use shared::inventory::sha256_from_path;
 use shared::{
     BaseImage, BuildStatus, RubyDownloadVersion, TarDownloadPath, append_filename_with,
-    download_tar, output_ruby_tar_path, s3_url, s3_url_exists, sha256_from_path, source_dir,
-    write_job_metadata,
+    download_tar, output_ruby_tar_path, s3_url, s3_url_exists, source_dir, write_job_metadata,
 };
 use std::{
     io::Write,

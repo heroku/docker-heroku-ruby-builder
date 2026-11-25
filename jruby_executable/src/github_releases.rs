@@ -1,10 +1,10 @@
 //! JRuby releases published on GitHub and their prebuilt binaries on S3.
 
-use crate::JRubyVersion;
 use serde::Deserialize;
 use shared::github::{self, GitHubToken};
 use shared::maybe_err::ResultVec;
-use shared::{BuildTarget, RubyDownloadVersion, parse_url, s3_url};
+use shared::{BuildTarget, RubyDownloadVersion, output_jruby_tar_path, parse_url, s3_url};
+use shared::{JRubyVersion, WinnowParseError};
 use std::future::Future;
 use std::path::Path;
 use url::Url;
@@ -102,7 +102,7 @@ pub enum GithubReleaseError {
     },
 
     #[error(transparent)]
-    CannotParseJrubyVersion(#[from] crate::jruby_version::ParseError),
+    CannotParseJrubyVersion(#[from] WinnowParseError),
 }
 
 /// The S3 URL where the prebuilt binary for `version` would live on `target`
@@ -111,10 +111,13 @@ pub fn s3_url_to_check(
     ruby_stdlib_version: &RubyDownloadVersion,
     target: &BuildTarget,
 ) -> Url {
-    let path = Path::new(target.base_image.name())
-        .join(target.arch.to_string())
-        .join(format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz"));
-    s3_url(&path)
+    s3_url(&output_jruby_tar_path(
+        Path::new(""),
+        version,
+        ruby_stdlib_version,
+        &target.base_image,
+        Some(&target.arch),
+    ))
 }
 
 /// List every non-prerelease JRuby version from the GitHub releases API.

@@ -1,0 +1,14 @@
+[package]
+name = "inventory"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bullet_stream = { workspace = true }
+clap = { workspace = true }
+fs-err = { workspace = true }
+shared = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }

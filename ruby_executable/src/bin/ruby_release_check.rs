@@ -1,15 +1,11 @@
 use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
-use reqwest::Url;
-use ruby_executable::ruby_lang::{RELEASES_URL, ruby_lang_versions};
 use shared::github::{self, GitHubTokenArg};
 use shared::maybe_err::ResultVec;
-use shared::{BuildTarget, RubyDownloadVersion, output_ruby_tar_path, s3_presence, s3_url};
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
+use shared::ruby_lang::{RELEASES_URL, ruby_lang_versions};
+use shared::{RubyDownloadVersion, s3_presence};
+use std::{error::Error, path::PathBuf};
 use tokio::task::JoinSet;
 #[derive(Parser, Debug)]
 #[command(about = "Check for Ruby releases missing from Heroku S3")]
@@ -18,7 +14,7 @@ struct Args {
     github: GitHubTokenArg,
 
     /// Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked.
-    #[arg(long = "minimum-version", required = true)]
+    #[arg(long = "minimum-version", default_value = shared::MIN_RUBY_VERSION)]
     minimum_version: RubyDownloadVersion,
 
     /// Path to write JSON output file containing versions that need builds
@@ -27,8 +23,8 @@ struct Args {
 }
 
 fn version_gte(version: &RubyDownloadVersion, minimum: &RubyDownloadVersion) -> bool {
-    let version_tuple = (version.major, version.minor, version.patch);
-    let minimum_tuple = (minimum.major, minimum.minor, minimum.patch);
+    let version_tuple = (version.major(), version.minor(), version.patch());
+    let minimum_tuple = (minimum.major(), minimum.minor(), minimum.patch());
     version_tuple >= minimum_tuple
 }
 
@@ -43,19 +39,10 @@ fn retain_releases_gte(
         .collect()
 }
 
-fn tar_url(version: &RubyDownloadVersion, target: &BuildTarget) -> Url {
-    s3_url(&output_ruby_tar_path(
-        Path::new(""),
-        version,
-        &target.base_image,
-        Some(&target.arch),
-    ))
-}
-
 async fn check_version_on_s3(
     version: RubyDownloadVersion,
 ) -> Result<(RubyDownloadVersion, Vec<String>), shared::Error> {
-    let missing = s3_presence(|target| tar_url(&version, target))
+    let missing = s3_presence(|target| version.tar_url(target))
         .await?
         .missing()
         .map(|target| format!("{}/{}", target.base_image, target.arch))
@@ -211,13 +198,13 @@ mod tests {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
         Check for Ruby releases missing from Heroku S3
 
-        Usage: ruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+        Usage: ruby_release_check [OPTIONS] --gh-token <TOKEN> --output <OUTPUT>
 
         Options:
               --gh-token <TOKEN>
                   GitHub API token. e.g. `GITHUB_TOKEN=$(gh auth token) <command>` [env: GITHUB_TOKEN]
               --minimum-version <MINIMUM_VERSION>
-                  Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked
+                  Minimum Ruby version to check (e.g. 3.2.0). All releases >= this version will be checked [default: 3.2.1]
               --output <OUTPUT>
                   Path to write JSON output file containing versions that need builds
           -h, --help

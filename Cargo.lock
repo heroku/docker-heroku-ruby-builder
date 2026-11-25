@@ -944,6 +944,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "inventory"
+version = "0.0.0"
+dependencies = [
+ "bullet_stream",
+ "clap",
+ "fs-err",
+ "insta",
+ "shared",
+ "tokio",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1060,7 +1072,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "url",
- "winnow",
 ]
 
 [[package]]
@@ -1445,7 +1456,6 @@ dependencies = [
  "tar",
  "thiserror",
  "tokio",
- "yaml-rust2",
 ]
 
 [[package]]
@@ -1677,7 +1687,6 @@ dependencies = [
 name = "shared"
 version = "0.0.0"
 dependencies = [
- "bullet_stream",
  "chrono",
  "clap",
  "flate2",
@@ -1691,6 +1700,7 @@ dependencies = [
  "regex",
  "reqwest",
  "serde",
+ "serde_json",
  "sha2",
  "tar",
  "tempfile",
@@ -1700,6 +1710,7 @@ dependencies = [
  "toml",
  "url",
  "winnow",
+ "yaml-rust2",
 ]
 
 [[package]]
@@ -1781,7 +1792,6 @@ dependencies = [
  "jruby_executable",
  "minijinja",
  "pretty_assertions",
- "ruby_executable",
  "shared",
  "thiserror",
  "tokio",

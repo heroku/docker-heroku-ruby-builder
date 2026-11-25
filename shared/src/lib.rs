@@ -8,6 +8,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+pub const MIN_RUBY_VERSION: &str = "3.2.1";
+pub const MIN_JRUBY_VERSION: &str = "9.4.7.0";
+
 pub const MAX_RETRY_ATTEMPTS: u8 = 3;
 #[cfg(not(test))]
 pub const RETRY_DELAY: Duration = Duration::from_secs(1);
@@ -50,22 +53,20 @@ mod base_image;
 pub mod devcenter;
 mod download_ruby_version;
 pub mod github;
-mod inventory_help;
+pub mod inventory;
+pub mod jruby_version;
 mod major_minor;
 pub mod maybe_err;
 mod non_empty;
+pub mod ruby_lang;
 
 pub use base_image::{BaseImage, BuildTarget, UnknownDistroVersion, build_matrix};
 pub use download_ruby_version::RubyDownloadVersion;
+pub use jruby_version::JRubyVersion;
 pub use major_minor::{MajorMinor, MajorMinorError};
 pub use non_empty::{NonEmpty, NonEmptyError};
 
 pub static S3_BASE_URL: &str = "https://heroku-buildpack-ruby.s3.dualstack.us-east-1.amazonaws.com";
-pub use inventory_help::{
-    AllowedChanges, ArtifactError, ArtifactKey, ArtifactMetadata, ChecksumError, InventoryChange,
-    InventoryCheckError, InventoryError, RubyArtifact, RubyInventory, changes, inventory_check,
-    sha256_from_path, verify_checksums,
-};
 
 /// Appends the given string after the filename and before the `ends_with`
 ///
@@ -146,8 +147,14 @@ pub enum Error {
     #[error("Failed to download {0}")]
     FailedRequest(reqwest::Error),
 
-    #[error("Invalid ruby version {version} reason: {reason}")]
-    InvalidVersion { version: String, reason: String },
+    #[error(transparent)]
+    InvalidVersion(WinnowParseError),
+
+    #[error("Ruby version {version} is not a valid gem version: {source}")]
+    NotAGemVersion {
+        version: String,
+        source: gem_version::VersionError,
+    },
 
     #[error("Error {0}")]
     FsError(std::io::Error),
@@ -178,7 +185,7 @@ pub fn validate_version_for_stack(
     ruby_version: &RubyDownloadVersion,
     base_image: &BaseImage,
 ) -> Result<(), Error> {
-    if base_image.name() == "heroku-22" && ruby_version.major == 3 && ruby_version.minor == 0 {
+    if base_image.name() == "heroku-22" && ruby_version.major() == 3 && ruby_version.minor() == 0 {
         return Err(Error::InvalidVersionForStack {
             version: ruby_version.bundler_format(),
             stack: base_image.to_string(),
@@ -197,6 +204,37 @@ pub fn validate_version_for_stack(
 pub struct UrlParseError {
     pub input: String,
     pub source: url::ParseError,
+}
+
+/// Winnow parse error
+///
+/// Holds the structured winnow [`ContextError`](winnow::error::ContextError)
+#[derive(Debug)]
+pub struct WinnowParseError {
+    input: String,
+    offset: usize,
+    inner: winnow::error::ContextError,
+}
+
+impl std::fmt::Display for WinnowParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.input)?;
+        write!(f, "{:offset$}^", "", offset = self.offset)?;
+        writeln!(f)?;
+        write!(f, "{}", self.inner)
+    }
+}
+
+impl std::error::Error for WinnowParseError {}
+
+impl From<winnow::error::ParseError<&str, winnow::error::ContextError>> for WinnowParseError {
+    fn from(error: winnow::error::ParseError<&str, winnow::error::ContextError>) -> Self {
+        Self {
+            input: (*error.input()).to_owned(),
+            offset: error.offset(),
+            inner: error.into_inner(),
+        }
+    }
 }
 
 /// Parse `input` as a [`Url`], keeping `input` in the error since [`url::ParseError`] omits it.
@@ -300,11 +338,17 @@ async fn s3_url_exists_inner(url: Url) -> Result<bool, Error> {
     }
 }
 
-pub async fn download_tar(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
+pub async fn download_tar(
+    url: &str,
+    path: &TarDownloadPath,
+) -> Result<reqwest::header::HeaderMap, Error> {
     with_retries(|| download_tar_inner(url, path)).await
 }
 
-async fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Error> {
+async fn download_tar_inner(
+    url: &str,
+    path: &TarDownloadPath,
+) -> Result<reqwest::header::HeaderMap, Error> {
     use tokio::io::AsyncWriteExt;
 
     let client = reqwest::Client::builder()
@@ -318,6 +362,7 @@ async fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Err
         .map_err(Error::FailedRequest)?
         .error_for_status()
         .map_err(Error::FailedRequest)?;
+    let headers = response.headers().clone();
 
     // fs_err::tokio keeps the path-annotated error messages the codebase relies on.
     let mut dest = fs_err::tokio::File::create(path.as_ref())
@@ -333,7 +378,7 @@ async fn download_tar_inner(url: &str, path: &TarDownloadPath) -> Result<(), Err
             })?;
     }
     dest.flush().await.map_err(Error::FsError)?;
-    Ok(())
+    Ok(headers)
 }
 
 pub fn output_target_dir(
@@ -357,6 +402,17 @@ pub fn output_ruby_tar_path(
 ) -> PathBuf {
     output_target_dir(output, base_image, cpu_architecture)
         .join(format!("ruby-{}.tgz", version.bundler_format()))
+}
+
+pub fn output_jruby_tar_path(
+    output: &Path,
+    version: &JRubyVersion,
+    ruby_stdlib_version: &RubyDownloadVersion,
+    base_image: &BaseImage,
+    cpu_architecture: Option<&Arch>,
+) -> PathBuf {
+    output_target_dir(output, base_image, cpu_architecture)
+        .join(format!("ruby-{ruby_stdlib_version}-jruby-{version}.tgz"))
 }
 
 pub fn tar_dir_to_file(compiled_dir: &Path, tar_file: &File) -> Result<(), Error> {
@@ -445,6 +501,12 @@ mod test {
     use tiny_http::{Response, Server};
 
     #[test]
+    fn minimum_versions_parse() {
+        RubyDownloadVersion::new(MIN_RUBY_VERSION).unwrap();
+        JRubyVersion::parse(MIN_JRUBY_VERSION).unwrap();
+    }
+
+    #[test]
     fn s3_url_joins_path_segments() {
         assert_eq!(
             s3_url(Path::new("heroku-24/amd64/ruby-3.4.1.tgz")).as_str(),
@@ -525,6 +587,28 @@ mod test {
 
         // assert!(tar_path.is_absolute());
         assert_eq!(PathBuf::from("/tmp/heroku-22/ruby-2.7.3.tgz"), tar_path);
+    }
+
+    #[test]
+    fn test_output_jruby_tar_path() {
+        let version = JRubyVersion::parse("9.4.16.0").unwrap();
+        let stdlib = RubyDownloadVersion::new("3.1.7").unwrap();
+        let base_image = BaseImage::new("heroku-24").unwrap();
+
+        assert_eq!(
+            output_jruby_tar_path(Path::new("/tmp"), &version, &stdlib, &base_image, None),
+            PathBuf::from("/tmp/heroku-24/ruby-3.1.7-jruby-9.4.16.0.tgz")
+        );
+        assert_eq!(
+            output_jruby_tar_path(
+                Path::new("/tmp"),
+                &version,
+                &stdlib,
+                &base_image,
+                Some(&Arch::Arm64)
+            ),
+            PathBuf::from("/tmp/heroku-24/arm64/ruby-3.1.7-jruby-9.4.16.0.tgz")
+        );
     }
 
     #[test]

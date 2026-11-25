@@ -1,8 +1,8 @@
 //! Release data published by ruby-lang.org in the `ruby/www.ruby-lang.org` repository.
 
+use crate::maybe_err::ResultVec;
+use crate::{MajorMinor, RubyDownloadVersion, parse_url};
 use reqwest::Url;
-use shared::maybe_err::ResultVec;
-use shared::{MajorMinor, RubyDownloadVersion, parse_url};
 use yaml_rust2::{ScanError, Yaml, YamlLoader};
 
 pub static RELEASES_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
@@ -32,7 +32,7 @@ pub enum RubyLangEntryError {
     MissingVersion(Yaml),
 
     #[error(transparent)]
-    CannotParse(#[from] shared::Error),
+    CannotParse(#[from] crate::Error),
 }
 
 /// Parse output from <https://raw.githubusercontent.com/ruby/www.ruby-lang.org/master/_data/releases.yml>

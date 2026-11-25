@@ -8,7 +8,8 @@ use bullet_stream::global::print;
 use clap::Parser;
 use fs_err as fs;
 use jruby_executable::github_releases::{self, RELEASES_URL, s3_url_to_check};
-use jruby_executable::{JRubyVersion, jruby_build_properties};
+use jruby_executable::jruby_build_properties;
+use shared::JRubyVersion;
 use shared::github::{GitHubToken, GitHubTokenArg};
 use shared::{RubyDownloadVersion, S3Presence, s3_presence};
 use std::{error::Error, path::PathBuf};
@@ -21,7 +22,7 @@ struct Args {
     github: GitHubTokenArg,
 
     /// Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be checked.
-    #[arg(long = "minimum-version", required = true)]
+    #[arg(long = "minimum-version", default_value = shared::MIN_JRUBY_VERSION)]
     minimum_version: JRubyVersion,
 
     /// Path to write JSON output file containing versions that need builds
@@ -240,13 +241,13 @@ mod tests {
         insta::assert_snapshot!(shared::help(Args::command(), &[]), @r"
         Check for JRuby releases missing from Heroku S3
 
-        Usage: jruby_release_check --gh-token <TOKEN> --minimum-version <MINIMUM_VERSION> --output <OUTPUT>
+        Usage: jruby_release_check [OPTIONS] --gh-token <TOKEN> --output <OUTPUT>
 
         Options:
               --gh-token <TOKEN>
                   GitHub API token. e.g. `GITHUB_TOKEN=$(gh auth token) <command>` [env: GITHUB_TOKEN]
               --minimum-version <MINIMUM_VERSION>
-                  Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be checked
+                  Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be checked [default: 9.4.7.0]
               --output <OUTPUT>
                   Path to write JSON output file containing versions that need builds
           -h, --help

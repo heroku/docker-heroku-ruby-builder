@@ -1,12 +1,10 @@
 // See `bin/*.rs` for scripts
 
 pub mod github_releases;
-pub mod jruby_version;
-pub use jruby_version::JRubyVersion;
 
 use reqwest::Url;
 use shared::github::{self, GitHubToken};
-use shared::{RubyDownloadVersion, parse_url};
+use shared::{JRubyVersion, RubyDownloadVersion, parse_url};
 
 /// Short: This struct parses a file based on the input jruby version to determine
 /// what Ruby version it targets.
