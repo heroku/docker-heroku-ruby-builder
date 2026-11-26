@@ -335,7 +335,7 @@ mod tests {
               --min-jruby-version <MIN_JRUBY_VERSION>
                   Minimum JRuby version to check (e.g. 9.4.7.0). All releases >= this version will be synced [default: 9.4.7.0]
               --gh-token <TOKEN>
-                  GitHub API token. e.g. `--gh-token=$(gh auth token)` [env: GITHUB_TOKEN]
+                  GitHub API token. e.g. `GITHUB_TOKEN=$(gh auth token) <command>` [env: GITHUB_TOKEN]
           -h, --help
                   Print help
         ");
