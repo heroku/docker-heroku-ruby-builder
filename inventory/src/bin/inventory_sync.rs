@@ -1,5 +1,7 @@
 use bullet_stream::global::print;
-use clap::Parser;
+use clap::builder::BoolValueParser;
+use clap::builder::TypedValueParser;
+use clap::{ArgAction, Parser};
 use fs_err as fs;
 use jruby_executable::{github_releases, jruby_build_properties};
 use shared::github::{self, GitHubToken, GitHubTokenArg};
@@ -21,6 +23,10 @@ use url::Url;
 /// Updates an inventory file to match the artifacts on Heroku S3
 #[derive(Parser, Debug)]
 struct Args {
+    /// Regenerate all version checksums.
+    #[arg(long, action = ArgAction::SetTrue, value_parser = BoolValueParser::new().map(RebuildChecksums))]
+    rebuild_checksums: RebuildChecksums,
+
     /// Path to the ruby inventory.
     #[arg(long, default_value = "ruby_inventory.toml")]
     ruby_inventory: PathBuf,
@@ -40,6 +46,9 @@ struct Args {
     #[command(flatten)]
     github: GitHubTokenArg,
 }
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+struct RebuildChecksums(bool);
 
 async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     print::h1("Syncing inventory");
@@ -326,6 +335,8 @@ mod tests {
         Usage: inventory_sync [OPTIONS] --gh-token <TOKEN>
 
         Options:
+              --rebuild-checksums
+                  Regenerate all version checksums
               --ruby-inventory <RUBY_INVENTORY>
                   Path to the ruby inventory [default: ruby_inventory.toml]
               --jruby-inventory <JRUBY_INVENTORY>
