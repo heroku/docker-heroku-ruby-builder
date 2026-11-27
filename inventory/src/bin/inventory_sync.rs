@@ -47,7 +47,7 @@ struct Args {
     github: GitHubTokenArg,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 struct RebuildChecksums(bool);
 
 async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
@@ -60,6 +60,7 @@ async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
         &args.ruby_inventory,
         &args.min_ruby_version,
         &args.github.token,
+        args.rebuild_checksums,
     )
     .await
     {
@@ -91,6 +92,7 @@ fn ruby_builds_to_sync(
     releases: Vec<RubyDownloadVersion>,
     held: BTreeSet<(RubyDownloadVersion, BuildTarget)>,
     min_ruby: &RubyDownloadVersion,
+    rebuild_checksums: RebuildChecksums,
 ) -> BTreeSet<(RubyDownloadVersion, BuildTarget)> {
     let mut desired = BTreeSet::new();
     let targets = build_matrix();
@@ -100,7 +102,10 @@ fn ruby_builds_to_sync(
         }
     }
 
-    desired.retain(|build| !held.contains(build));
+    match rebuild_checksums {
+        RebuildChecksums(true) => desired.extend(held),
+        RebuildChecksums(false) => desired.retain(|build| !held.contains(build)),
+    }
     desired
 }
 
@@ -108,6 +113,7 @@ async fn ruby_call(
     ruby_inventory: &Path,
     min_ruby: &RubyDownloadVersion,
     gh_token: &GitHubToken,
+    rebuild_checksums: RebuildChecksums,
 ) -> Result<(), NonEmpty<Box<dyn Error>>> {
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
     let mut inventory = read_inventory(ruby_inventory)?;
@@ -123,12 +129,9 @@ async fn ruby_call(
         }
     };
     print::bullet(format!("Found {} total releases", releases.len()));
-    let builds_to_sync = ruby_builds_to_sync(releases, held, min_ruby);
+    let builds_to_sync = ruby_builds_to_sync(releases, held, min_ruby, rebuild_checksums);
 
-    print::bullet(format!(
-        "Inventory missing {} total builds",
-        builds_to_sync.len()
-    ));
+    print::bullet(format!("Syncing {} total builds", builds_to_sync.len()));
 
     let (added, mut not_built) = {
         // Download isn't CPU bound but checksum generation is
@@ -349,9 +352,21 @@ mod tests {
         let releases = vec![ruby("3.1.0"), ruby("3.2.0"), ruby("3.3.0"), ruby("3.4.0")];
         let held = ruby_builds(&["3.3.0"]);
 
-        let builds_to_sync = ruby_builds_to_sync(releases, held, &ruby("3.2.0"));
+        let builds_to_sync =
+            ruby_builds_to_sync(releases, held, &ruby("3.2.0"), RebuildChecksums(false));
 
         assert_eq!(builds_to_sync, ruby_builds(&["3.2.0", "3.4.0"]));
+    }
+
+    #[test]
+    fn builds_to_sync_includes_every_held_build_on_rebuild() {
+        let releases = vec![ruby("3.3.0"), ruby("3.4.0")];
+        let held = ruby_builds(&["3.1.0", "3.3.0"]);
+
+        let builds_to_sync =
+            ruby_builds_to_sync(releases, held, &ruby("3.2.0"), RebuildChecksums(true));
+
+        assert_eq!(builds_to_sync, ruby_builds(&["3.1.0", "3.3.0", "3.4.0"]));
     }
 
     #[test]
