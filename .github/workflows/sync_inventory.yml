@@ -3,6 +3,12 @@ run-name: "Sync inventory"
 
 on:
   workflow_dispatch:
+    inputs:
+      rebuild_checksums:
+          description: "Regenerate all checksums"
+          type: boolean
+          default: false
+          required: false
   workflow_call:
     secrets:
       LINGUIST_GH_PRIVATE_KEY:
@@ -47,7 +53,7 @@ jobs:
           GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
         run: |
           set -euo pipefail
-          cargo run --locked --bin inventory_sync 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          cargo run --locked --bin inventory_sync -- ${{ inputs.rebuild_checksums && '--rebuild-checksums' || '' }} 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Create Pull Request
         id: pr
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
