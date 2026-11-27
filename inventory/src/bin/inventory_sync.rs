@@ -193,6 +193,23 @@ enum Download {
     NotBuilt(Url),
 }
 
+fn jruby_builds_to_sync(
+    releases: Vec<JRubyVersion>,
+    held: BTreeSet<(JRubyVersion, BuildTarget)>,
+    min_jruby: &JRubyVersion,
+) -> BTreeSet<(JRubyVersion, BuildTarget)> {
+    let mut desired = BTreeSet::new();
+    let targets = build_matrix();
+    for version in releases.into_iter().filter(|version| version >= min_jruby) {
+        for target in &targets {
+            desired.insert((version.clone(), target.clone()));
+        }
+    }
+
+    desired.retain(|build| !held.contains(build));
+    desired
+}
+
 async fn jruby_call(
     jruby_inventory: &Path,
     min_jruby: &JRubyVersion,
@@ -203,32 +220,21 @@ async fn jruby_call(
     let held: BTreeSet<(JRubyVersion, BuildTarget)> =
         version_target(&inventory).map_err(|errors| errors.map(Box::<dyn Error>::from))?;
 
-    let desired = {
-        print::bullet("Fetching releases");
-        let releases = github_releases::fetch_releases(gh_token)
-            .await
-            .unwrap_drain_errs(&mut errors);
+    print::bullet("Fetching releases");
+    let releases = github_releases::fetch_releases(gh_token)
+        .await
+        .unwrap_drain_errs(&mut errors);
+    print::bullet(format!("Found {} total releases", releases.len()));
+    let builds_to_sync = jruby_builds_to_sync(releases, held, min_jruby);
 
-        print::bullet(format!("Found {} total releases", releases.len()));
-        let mut desired: BTreeSet<(JRubyVersion, BuildTarget)> = BTreeSet::new();
-        let targets = build_matrix();
-        for version in releases.into_iter().filter(|version| version >= min_jruby) {
-            for target in &targets {
-                desired.insert((version.clone(), target.clone()));
-            }
-        }
-        desired
-    };
-
-    let missing = desired.difference(&held);
     print::bullet(format!(
         "Inventory missing {} total builds",
-        missing.clone().count()
+        builds_to_sync.len()
     ));
 
-    let mut missing_by_version: BTreeMap<JRubyVersion, Vec<BuildTarget>> = BTreeMap::new();
-    for (version, target) in missing.cloned() {
-        missing_by_version.entry(version).or_default().push(target);
+    let mut builds_by_version: BTreeMap<JRubyVersion, Vec<BuildTarget>> = BTreeMap::new();
+    for (version, target) in builds_to_sync {
+        builds_by_version.entry(version).or_default().push(target);
     }
 
     let (added, mut not_built) = {
@@ -237,7 +243,7 @@ async fn jruby_call(
         let permits = Arc::new(Semaphore::new(limit));
 
         let mut set = JoinSet::new();
-        for (version, targets) in missing_by_version {
+        for (version, targets) in builds_by_version {
             let stdlib = match jruby_build_properties(&version, gh_token)
                 .await
                 .and_then(|props| props.ruby_stdlib_version())
@@ -367,6 +373,32 @@ mod tests {
             ruby_builds_to_sync(releases, held, &ruby("3.2.0"), RebuildChecksums(true));
 
         assert_eq!(builds_to_sync, ruby_builds(&["3.1.0", "3.3.0", "3.4.0"]));
+    }
+
+    fn jruby(s: &str) -> JRubyVersion {
+        JRubyVersion::parse(s).unwrap()
+    }
+
+    fn jruby_builds(versions: &[&str]) -> BTreeSet<(JRubyVersion, BuildTarget)> {
+        versions
+            .iter()
+            .flat_map(|v| build_matrix().into_iter().map(|target| (jruby(v), target)))
+            .collect()
+    }
+
+    #[test]
+    fn jruby_builds_to_sync_skips_held_and_old_releases() {
+        let releases = vec![
+            jruby("9.4.6.0"),
+            jruby("9.4.7.0"),
+            jruby("9.4.8.0"),
+            jruby("10.0.0.0"),
+        ];
+        let held = jruby_builds(&["9.4.8.0"]);
+
+        let builds_to_sync = jruby_builds_to_sync(releases, held, &jruby("9.4.7.0"));
+
+        assert_eq!(builds_to_sync, jruby_builds(&["9.4.7.0", "10.0.0.0"]));
     }
 
     #[test]
