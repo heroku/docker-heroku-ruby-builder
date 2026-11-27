@@ -87,6 +87,23 @@ async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
     }
 }
 
+fn ruby_builds_to_sync(
+    releases: Vec<RubyDownloadVersion>,
+    held: BTreeSet<(RubyDownloadVersion, BuildTarget)>,
+    min_ruby: &RubyDownloadVersion,
+) -> BTreeSet<(RubyDownloadVersion, BuildTarget)> {
+    let mut desired = BTreeSet::new();
+    let targets = build_matrix();
+    for version in releases.into_iter().filter(|version| version >= min_ruby) {
+        for target in &targets {
+            desired.insert((version.clone(), target.clone()));
+        }
+    }
+
+    desired.retain(|build| !held.contains(build));
+    desired
+}
+
 async fn ruby_call(
     ruby_inventory: &Path,
     min_ruby: &RubyDownloadVersion,
@@ -97,31 +114,20 @@ async fn ruby_call(
     let held: BTreeSet<(RubyDownloadVersion, BuildTarget)> =
         version_target(&inventory).map_err(|errors| errors.map(Box::<dyn Error>::from))?;
 
-    let desired = {
-        print::bullet(format!("Fetching releases from {}", *RELEASES_URL));
-        let releases = match github::get_raw_with_retry(&RELEASES_URL, gh_token).await {
-            Ok(response) => ruby_lang_versions(response.body).unwrap_drain_errs(&mut errors),
-            Err(e) => {
-                errors.push(e.into());
-                Vec::new()
-            }
-        };
-
-        print::bullet(format!("Found {} total releases", releases.len()));
-        let mut desired: BTreeSet<(RubyDownloadVersion, BuildTarget)> = BTreeSet::new();
-        let targets = build_matrix();
-        for version in releases.into_iter().filter(|version| version >= min_ruby) {
-            for target in &targets {
-                desired.insert((version.clone(), target.clone()));
-            }
+    print::bullet(format!("Fetching releases from {}", *RELEASES_URL));
+    let releases = match github::get_raw_with_retry(&RELEASES_URL, gh_token).await {
+        Ok(response) => ruby_lang_versions(response.body).unwrap_drain_errs(&mut errors),
+        Err(e) => {
+            errors.push(e.into());
+            Vec::new()
         }
-        desired
     };
+    print::bullet(format!("Found {} total releases", releases.len()));
+    let builds_to_sync = ruby_builds_to_sync(releases, held, min_ruby);
 
-    let missing = desired.difference(&held);
     print::bullet(format!(
         "Inventory missing {} total builds",
-        missing.clone().count()
+        builds_to_sync.len()
     ));
 
     let (added, mut not_built) = {
@@ -130,7 +136,7 @@ async fn ruby_call(
         let permits = Arc::new(Semaphore::new(limit));
 
         let mut set = JoinSet::new();
-        for (version, target) in missing.cloned() {
+        for (version, target) in builds_to_sync {
             let permits = Arc::clone(&permits);
             set.spawn(async move {
                 let _permit = permits.acquire_owned().await?;
@@ -326,6 +332,27 @@ async fn main() {
 mod tests {
     use super::*;
     use clap::CommandFactory;
+
+    fn ruby(s: &str) -> RubyDownloadVersion {
+        RubyDownloadVersion::new(s).unwrap()
+    }
+
+    fn ruby_builds(versions: &[&str]) -> BTreeSet<(RubyDownloadVersion, BuildTarget)> {
+        versions
+            .iter()
+            .flat_map(|v| build_matrix().into_iter().map(|target| (ruby(v), target)))
+            .collect()
+    }
+
+    #[test]
+    fn builds_to_sync_skips_held_and_old_releases() {
+        let releases = vec![ruby("3.1.0"), ruby("3.2.0"), ruby("3.3.0"), ruby("3.4.0")];
+        let held = ruby_builds(&["3.3.0"]);
+
+        let builds_to_sync = ruby_builds_to_sync(releases, held, &ruby("3.2.0"));
+
+        assert_eq!(builds_to_sync, ruby_builds(&["3.2.0", "3.4.0"]));
+    }
 
     #[test]
     fn get_help() {
