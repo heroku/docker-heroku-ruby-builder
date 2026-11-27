@@ -74,6 +74,7 @@ async fn call(args: &Args) -> Result<(), NonEmpty<Box<dyn Error>>> {
         &args.jruby_inventory,
         &args.min_jruby_version,
         &args.github.token,
+        args.rebuild_checksums,
     )
     .await
     {
@@ -197,6 +198,7 @@ fn jruby_builds_to_sync(
     releases: Vec<JRubyVersion>,
     held: BTreeSet<(JRubyVersion, BuildTarget)>,
     min_jruby: &JRubyVersion,
+    rebuild_checksums: RebuildChecksums,
 ) -> BTreeSet<(JRubyVersion, BuildTarget)> {
     let mut desired = BTreeSet::new();
     let targets = build_matrix();
@@ -206,7 +208,10 @@ fn jruby_builds_to_sync(
         }
     }
 
-    desired.retain(|build| !held.contains(build));
+    match rebuild_checksums {
+        RebuildChecksums(true) => desired.extend(held),
+        RebuildChecksums(false) => desired.retain(|build| !held.contains(build)),
+    }
     desired
 }
 
@@ -214,6 +219,7 @@ async fn jruby_call(
     jruby_inventory: &Path,
     min_jruby: &JRubyVersion,
     gh_token: &GitHubToken,
+    rebuild_checksums: RebuildChecksums,
 ) -> Result<(), NonEmpty<Box<dyn Error>>> {
     let mut errors: Vec<Box<dyn Error>> = Vec::new();
     let mut inventory = read_inventory(jruby_inventory)?;
@@ -225,12 +231,9 @@ async fn jruby_call(
         .await
         .unwrap_drain_errs(&mut errors);
     print::bullet(format!("Found {} total releases", releases.len()));
-    let builds_to_sync = jruby_builds_to_sync(releases, held, min_jruby);
+    let builds_to_sync = jruby_builds_to_sync(releases, held, min_jruby, rebuild_checksums);
 
-    print::bullet(format!(
-        "Inventory missing {} total builds",
-        builds_to_sync.len()
-    ));
+    print::bullet(format!("Syncing {} total builds", builds_to_sync.len()));
 
     let mut builds_by_version: BTreeMap<JRubyVersion, Vec<BuildTarget>> = BTreeMap::new();
     for (version, target) in builds_to_sync {
@@ -396,9 +399,24 @@ mod tests {
         ];
         let held = jruby_builds(&["9.4.8.0"]);
 
-        let builds_to_sync = jruby_builds_to_sync(releases, held, &jruby("9.4.7.0"));
+        let builds_to_sync =
+            jruby_builds_to_sync(releases, held, &jruby("9.4.7.0"), RebuildChecksums(false));
 
         assert_eq!(builds_to_sync, jruby_builds(&["9.4.7.0", "10.0.0.0"]));
+    }
+
+    #[test]
+    fn jruby_builds_to_sync_includes_every_held_build_on_rebuild() {
+        let releases = vec![jruby("9.4.8.0"), jruby("10.0.0.0")];
+        let held = jruby_builds(&["9.4.6.0", "9.4.8.0"]);
+
+        let builds_to_sync =
+            jruby_builds_to_sync(releases, held, &jruby("9.4.7.0"), RebuildChecksums(true));
+
+        assert_eq!(
+            builds_to_sync,
+            jruby_builds(&["9.4.6.0", "9.4.8.0", "10.0.0.0"])
+        );
     }
 
     #[test]
